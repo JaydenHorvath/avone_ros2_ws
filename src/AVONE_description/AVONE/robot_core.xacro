@@ -1,0 +1,361 @@
+<?xml version="1.0" ?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro" name="AVONE_robot">
+<!-- Generated using onshape-to-robot -->
+<!-- Onshape document_id: a464551bdec68fb8eb43a656 -->
+
+  <!-- Link base_link (root) -->
+  <link name="chassis"/>
+  
+  <!-- Joint connecting base_link to chassis -->
+  <joint name="base_to_chassis" type="fixed">
+    <origin xyz="-0.1706 0 -0.105" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="chassis"/>
+  </joint>
+
+
+
+  <link name="base_link">
+
+    <inertial>
+      <origin xyz="0.812063 -0.000266118 0.127823" rpy="0 0 0"/>
+      <mass value="152"/>
+      <inertia ixx="16.787" ixy="-0.0144134" ixz="2.17886" iyy="94.5857" iyz="0.0189829" izz="101.287"/>
+    </inertial>
+
+
+
+    <!-- Part chassis -->
+    <visual>
+      <origin xyz="2.2924 -0.00985747 0.0751" rpy="3.14159 -0 1.5708"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/chassis.stl"/>
+      </geometry>
+      <material name="chassis_material">
+        <color rgba="0.615686 0.811765 0.929412 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="2.2924 -0.00985747 0.0751" rpy="3.14159 -0 1.5708"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/chassis.stl"/>
+      </geometry>
+    </collision>
+
+
+    <!-- Part rear_wheel_hub -->
+    <visual>
+      <origin xyz="-0.181377 0.297001 -0.105" rpy="6.30462e-15 -0 -6.18615e-05"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/rear_wheel_hub.stl"/>
+      </geometry>
+      <material name="rear_wheel_hub_material">
+        <color rgba="0.972549 0.529412 0.00392157 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.181377 0.297001 -0.105" rpy="6.30462e-15 -0 -6.18615e-05"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/rear_wheel_hub.stl"/>
+      </geometry>
+    </collision>
+
+
+    <!-- Part rear_wheel_hub_2 -->
+    <visual>
+      <origin xyz="0.181423 -0.296978 -0.105" rpy="3.10966e-15 7.00787e-15 -3.14153"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/rear_wheel_hub.stl"/>
+      </geometry>
+      <material name="rear_wheel_hub_2_material">
+        <color rgba="0.972549 0.529412 0.00392157 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.181423 -0.296978 -0.105" rpy="3.10966e-15 7.00787e-15 -3.14153"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/rear_wheel_hub.stl"/>
+      </geometry>
+    </collision>
+
+
+    <!-- Part rear_suspension -->
+    <visual>
+      <origin xyz="-0.17247 -0.28192 0.105" rpy="3.14159 5.47382e-48 -0.0851102"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/rear_suspension.stl"/>
+      </geometry>
+      <material name="rear_suspension_material">
+        <color rgba="0.647059 0.647059 0.647059 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.17247 -0.28192 0.105" rpy="3.14159 5.47382e-48 -0.0851102"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/rear_suspension.stl"/>
+      </geometry>
+    </collision>
+
+
+    <!-- Part rear_suspension_2 -->
+    <visual>
+      <origin xyz="0.189017 0.312761 0.105" rpy="-3.14159 2.33363e-61 -3.05648"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/rear_suspension.stl"/>
+      </geometry>
+      <material name="rear_suspension_2_material">
+        <color rgba="0.647059 0.647059 0.647059 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.189017 0.312761 0.105" rpy="-3.14159 2.33363e-61 -3.05648"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/rear_suspension.stl"/>
+      </geometry>
+    </collision>
+    
+
+    <!-- Part front_suspension -->
+    <visual>
+      <origin xyz="2.0208 0.2935 0.075" rpy="3.14159 -1.54112e-16 1.5708"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/front_suspension.stl"/>
+      </geometry>
+      <material name="front_suspension_material">
+        <color rgba="0.231373 0.380392 0.705882 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="2.0208 0.2935 0.075" rpy="3.14159 -1.54112e-16 1.5708"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/front_suspension.stl"/>
+      </geometry>
+    </collision>
+
+
+    <!-- Part front_suspension_2 -->
+    <visual>
+      <origin xyz="2.2924 -0.2935 0.075" rpy="-3.14159 1.54112e-16 -1.5708"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/front_suspension.stl"/>
+      </geometry>
+      <material name="front_suspension_2_material">
+        <color rgba="0.231373 0.380392 0.705882 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="2.2924 -0.2935 0.075" rpy="-3.14159 1.54112e-16 -1.5708"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/front_suspension.stl"/>
+      </geometry>
+    </collision>
+  </link>
+
+
+  <!-- Link wheel -->
+  <link name="wheel">
+    <inertial>
+      <origin xyz="-8.09407e-17 -1.33567e-17 0.0496398" rpy="0 0 0"/>
+      <mass value="9.8"/>
+      <inertia ixx="0.169474" ixy="2.12205e-15" ixz="6.60536e-16" iyy="0.169474" iyz="1.10915e-15" izz="0.253875"/>
+    </inertial>
+    <!-- Part wheel -->
+    <visual>
+      <origin xyz="-8.09391e-17 7.65875e-18 0.17" rpy="1.5708 -3.89756e-15 3.70519e-15"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/wheel.stl"/>
+      </geometry>
+      <material name="wheel_material">
+        <color rgba="0.917647 0.917647 0.917647 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-8.09391e-17 7.65875e-18 0.17" rpy="1.5708 -3.89756e-15 3.70519e-15"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/wheel.stl"/>
+      </geometry>
+    </collision>
+  </link>
+
+
+  <!-- Joint from chassis_suspension to wheel -->
+  <joint name="RLMotor" type="continuous">
+    <origin xyz="4.71381e-05 0.693977 3.30291e-15" rpy="1.5708 -0 -6.18615e-05"/>
+    <parent link="base_link"/>
+    <child link="wheel"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10"/>
+  </joint>
+
+
+  <!-- Link wheel_2 -->
+  <link name="wheel_2">
+    <inertial>
+      <origin xyz="-1.66794e-17 -1.33614e-17 0.0496398" rpy="0 0 0"/>
+      <mass value="9.8"/>
+      <inertia ixx="0.169474" ixy="1.1918e-15" ixz="-3.1455e-16" iyy="0.169474" iyz="5.0174e-16" izz="0.253875"/>
+    </inertial>
+    <!-- Part wheel_2 -->
+    <visual>
+      <origin xyz="-1.59877e-17 7.65404e-18 0.17" rpy="1.5708 1.86465e-15 -5.13481e-16"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/wheel.stl"/>
+      </geometry>
+      <material name="wheel_2_material">
+        <color rgba="0.917647 0.917647 0.917647 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-1.59877e-17 7.65404e-18 0.17" rpy="1.5708 1.86465e-15 -5.13481e-16"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/wheel.stl"/>
+      </geometry>
+    </collision>
+  </link>
+
+
+  <!-- Joint from chassis_suspension to wheel_2 -->
+  <joint name="RRMotor" type="continuous">
+    <origin xyz="4.71381e-05 -0.693977 2.30371e-15" rpy="1.5708 7.00787e-15 -3.14153"/>
+    <parent link="base_link"/>
+    <child link="wheel_2"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10"/>
+  </joint>
+
+
+  <!-- Link front_wheel_hub -->
+  <link name="front_wheel_hub">
+    <inertial>
+      <origin xyz="0.0824722 -5.82867e-16 0.09" rpy="0 0 0"/>
+      <mass value="1.6"/>
+      <inertia ixx="0.00734348" ixy="-1.63364e-18" ixz="-3.73248e-19" iyy="0.00420677" iyz="6.09249e-20" izz="0.00395986"/>
+    </inertial>
+    <!-- Part front_wheel_hub -->
+    <visual>
+      <origin xyz="-0.290639 0.1358 0.18" rpy="-3.14159 1.1031e-16 -5.55112e-17"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/front_wheel_hub.stl"/>
+      </geometry>
+      <material name="front_wheel_hub_material">
+        <color rgba="0.768627 0.886275 0.952941 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.290639 0.1358 0.18" rpy="-3.14159 1.1031e-16 -5.55112e-17"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/front_wheel_hub.stl"/>
+      </geometry>
+    </collision>
+  </link>
+
+
+  <!-- Link wheel_3 -->
+  <link name="wheel_3">
+    <inertial>
+      <origin xyz="1.09934e-17 -1.19492e-32 0.0496398" rpy="0 0 0"/>
+      <mass value="9.8"/>
+      <inertia ixx="0.169474" ixy="1.82963e-33" ixz="4.67592e-18" iyy="0.169474" iyz="9.43037e-33" izz="0.253875"/>
+    </inertial>
+    <!-- Part wheel_3 -->
+    <visual>
+      <origin xyz="0 0 0.17" rpy="1.5708 9.24446e-32 1.5708"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/wheel.stl"/>
+      </geometry>
+      <material name="wheel_3_material">
+        <color rgba="0.917647 0.917647 0.917647 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.17" rpy="1.5708 9.24446e-32 1.5708"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/wheel.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Joint from front_wheel_hub to wheel_3 -->
+  <joint name="FRwheel" type="continuous">
+    <origin xyz="0.10836 -4.44089e-16 0.09" rpy="1.5708 2.46751e-16 -1.5708"/>
+    <parent link="front_wheel_hub"/>
+    <child link="wheel_3"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="0.0" velocity="100"/>
+  </joint>
+
+
+  <!-- Joint from chassis_suspension to front_wheel_hub -->
+  <joint name="RSteer" type="revolute">
+    <origin xyz="2.1566 -0.584139 0.075" rpy="-3.14159 1.54112e-16 -1.5708"/>
+    <parent link="base_link"/>
+    <child link="front_wheel_hub"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-1.5708" upper="1.5708"/>
+  </joint>
+
+
+  <!-- Link front_wheel_hub_2 -->
+  <link name="front_wheel_hub_2">
+    <inertial>
+      <origin xyz="0.0824722 -7.49401e-16 0.09" rpy="0 0 0"/>
+      <mass value="1.6"/>
+      <inertia ixx="0.00734348" ixy="-4.21008e-17" ixz="3.73248e-19" iyy="0.00420677" iyz="-6.18738e-20" izz="0.00395986"/>
+    </inertial>
+    <!-- Part front_wheel_hub_2 -->
+    <visual>
+      <origin xyz="-0.290639 0.1358 0.18" rpy="3.14159 -1.1031e-16 -1.385e-14"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/front_wheel_hub.stl"/>
+      </geometry>
+      <material name="front_wheel_hub_2_material">
+        <color rgba="0.768627 0.886275 0.952941 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.290639 0.1358 0.18" rpy="3.14159 -1.1031e-16 -1.385e-14"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/front_wheel_hub.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link wheel_4 -->
+  <link name="wheel_4">
+    <inertial>
+      <origin xyz="3.34067e-18 -2.62196e-17 0.0496398" rpy="0 0 0"/>
+      <mass value="9.8"/>
+      <inertia ixx="0.169474" ixy="-2.81054e-16" ixz="-7.22508e-15" iyy="0.169474" iyz="3.81768e-17" izz="0.253875"/>
+    </inertial>
+    <!-- Part wheel_4 -->
+    <visual>
+      <origin xyz="0 -5.20417e-18 0.17" rpy="1.5708 4.25909e-14 -1.07909e-15"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/wheel.stl"/>
+      </geometry>
+      <material name="wheel_4_material">
+        <color rgba="0.917647 0.917647 0.917647 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 -5.20417e-18 0.17" rpy="1.5708 4.25909e-14 -1.07909e-15"/>
+      <geometry>
+        <mesh filename="package://AVONE_description/AVONE/assets/wheel.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Joint from front_wheel_hub_2 to wheel_4 -->
+  <joint name="FLWheel" type="continuous">
+    <origin xyz="0.10836 -8.88178e-16 0.09" rpy="1.5708 -2.50594e-16 -1.5708"/>
+    <parent link="front_wheel_hub_2"/>
+    <child link="wheel_4"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="0.0" velocity="100" />
+  </joint>
+  <!-- Joint from chassis_suspension to front_wheel_hub_2 -->
+  <joint name="LSteer" type="revolute">
+    <origin xyz="2.1566 0.584139 0.075" rpy="3.14159 -1.54112e-16 1.5708"/>
+    <parent link="base_link"/>
+    <child link="front_wheel_hub_2"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-1.5708" upper="1.5708"/>
+  </joint>
+</robot>

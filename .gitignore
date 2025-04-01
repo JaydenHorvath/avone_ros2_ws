@@ -1,0 +1,13 @@
+# Ignore build and install artifacts
+build/
+install/
+log/
+
+# ROS2 local files
+*.pyc
+*.swp
+*.swo
+
+# VSCode or JetBrains configs (optional)
+.vscode/
+.idea/

@@ -1,0 +1,8 @@
+{
+    "documentId": "a464551bdec68fb8eb43a656",
+    "outputFormat": "urdf",
+    "packageName": "AVONE_description/AVONE",
+    "robotName": "AVONE_robot",
+    "assemblyName": "AVONE_ROS"
+    
+    }
