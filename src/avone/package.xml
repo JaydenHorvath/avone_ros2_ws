@@ -3,21 +3,27 @@
 <package format="3">
   <name>avone</name>
   <version>0.0.0</version>
-  <description>Robot description package for AVONE robot</description>
+  <description>TODO: Package description</description>
   <maintainer email="my_email@email.com">Jayden Horvath</maintainer>
-  <license>MIT</license>
+  <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <!-- Runtime dependencies -->
-  <exec_depend>robot_state_publisher</exec_depend>
-  <exec_depend>joint_state_publisher_gui</exec_depend>
-  <exec_depend>xacro</exec_depend>
-  <exec_depend>rviz2</exec_depend>
-
-  <!-- Test dependencies -->
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>laser_geometry</exec_depend>
+  <exec_depend>image_geometry</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>tf2_sensor_msgs</exec_depend>
+  <exec_depend>message_filters</exec_depend>
+  <exec_depend>numpy</exec_depend>
+
+
+  <exec_depend>ultralytics</exec_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

@@ -1,0 +1,39 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+<model name="big_cone">
+  <static>true</static>
+  <link name="link">
+    <inertial>
+        <mass>1.05</mass>
+        <inertia>
+          <ixx>0.00176</ixx>
+          <iyy>0.00176</iyy>
+          <izz>0.0035</izz>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+        </inertia>
+      </inertial>
+      
+    <visual name="visual">
+      <geometry>
+        <mesh>
+          <uri>model://big_cone/meshes/cone_big.dae</uri>
+        </mesh>
+      </geometry>
+    </visual>
+    <collision name="collision">
+      <geometry>
+      <!--
+        <mesh>
+          <uri>model://blue_cone/meshes/cone_blue.dae</uri>
+        </mesh>
+      -->
+       
+      <cylinder><radius>0.14</radius><length>0.5</length></cylinder>
+  
+      </geometry>
+    </collision>
+  </link>
+</model>
+</sdf>

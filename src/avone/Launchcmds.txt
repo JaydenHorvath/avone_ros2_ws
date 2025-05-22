@@ -1,0 +1,229 @@
+
+
+# run robot state publisher 
+ros2 launch articubot_one rsp.launch.py
+
+# run sim and other launch tasks
+ros2 launch articubot_one simple.launch.py
+
+ # Example vel command to move car
+ ros2 topic pub /model/my_robot/cmd_vel geometry_msgs/msg/Twist '{linear: {x: 5.0}, angular: {z: 3.0}}'
+
+
+colcon build
+source install/setup.bash
+
+
+#keyboard teleop 
+
+ros2 run teleop_twist_keyboard teleop_twist_keyboard \
+  --ros-args \
+    --remap cmd_vel:=/ackermann_steering_controller/reference \
+    -p repeat_rate:=10.0 \
+    -p stamped:=true
+
+# run joy node 
+ros2 run joy joy_node
+
+
+# current working joy cmd
+ ros2 run teleop_twist_joy teleop_node   --ros-args     -p stamp:=true     -p axis_linear.x:=1     -p scale_linear.x:=3.0     -p axis_angular.yaw:=3     -p scale_angular.yaw:=0.5    -p enable_button:=4   -r /cmd_vel:=/ackermann_steering_controller/reference_unstamped
+
+# nav2
+
+ros2 launch nav2_bringup navigation_launch.py   use_sim_time:=true   params_file:=$HOME/ros2_ws/src/avone/config/Nav2.yaml
+
+
+
+
+#run mapping
+ros2 launch slam_toolbox online_async_launch.py params_file:=./config/mapper_params_online_async.yaml use_sim_time:=true
+
+
+
+# run map server 
+ros2 run nav2_map_server map_server --ros-args -p yaml_filename:=mapA.yaml -p use_sim_time:=true
+
+#bringup map server 
+ros2 run nav2_util lifecycle_bringup map_server
+
+
+
+# run amcl 
+ros2 run nav2_amcl amcl --ros-args -p use_sim_time:=true
+
+# bringup amcl 
+
+ros2 run nav2_util lifecycle_bringup amcl
+
+# remap cmd_vel for nav2
+ros2 run topic_tools relay /cmd_vel /ackermann_steering_controller/reference_unstamped
+
+
+
+
+# run controller 
+ ros2 run teleop_twist_joy teleop_node   --ros-args   -p axis_linear.x:=1   -p scale_linear.x:=1.0   -p axis_angular.yaw:=3   -p scale_angular.yaw:=-2.0   -p enable_button:=4   -r /cmd_vel:=/model/my_robot/cmd_vel
+
+# cmd_vel bridge
+ros2 run ros_ign_bridge parameter_bridge   /model/my_robot/cmd_vel@geometry_msgs/msg/Twist@ignition.msgs.Twist
+
+
+
+# CONE DETECTION 
+
+#train dataset using FSOCO and yolo11n
+yolo detect train data=datasets/FSOCO/data.yaml model=yolo11n.pt epochs=5 imgsz=640
+
+
+#run detection of a folder 
+yolo detect predict source=datasets/tests/SimTest  model=runs/detect/train4/weights/best.pt
+
+
+
+
+      <plugin
+                filename="libignition-gazebo-ackermann-steering-system.so"
+                name="ignition::gazebo::systems::AckermannSteering">
+                <left_joint>RLMotor</left_joint>
+                <right_joint>RRMotor</right_joint>
+                <left_steering_joint>LSteer</left_steering_joint>
+                <right_steering_joint>RSteer</right_steering_joint>
+                <wheel_separation>1.05</wheel_separation>
+                <kingpin_width>1.17</kingpin_width>
+                <wheel_base>1.74</wheel_base>
+                <steering_limit>0.8</steering_limit>
+                <wheel_radius>0.4</wheel_radius>
+                <odom_publish_frequency>50</odom_publish_frequency>
+            </plugin>
+
+
+      <plugin filename="libignition-gazebo-joint-state-publisher-system.so"
+        name="ignition::gazebo::systems::JointStatePublisher">
+          <topic>joint_states</topic>
+          <update_rate>100</update_rate>
+      </plugin>
+
+
+            <plugin filename="libignition-gazebo-triggered-publisher-system.so"
+            name="ignition::gazebo::systems::TriggeredPublisher">
+        <input type="ignition.msgs.Int32" topic="/keyboard/keypress">
+            <match field="data">16777234</match>
+        </input>
+        <output type="ignition.msgs.Twist" topic="/model/my_robot/cmd_vel">
+            linear: {x: 0.0}, angular: {z: -5}
+        </output>
+      </plugin>
+
+      <plugin filename="libignition-gazebo-triggered-publisher-system.so"
+              name="ignition::gazebo::systems::TriggeredPublisher">
+          <input type="ignition.msgs.Int32" topic="/keyboard/keypress">
+              <match field="data">16777236</match>
+          </input>
+          <output type="ignition.msgs.Twist" topic="/model/my_robot/cmd_vel">
+              linear: {x: 0.0}, angular: {z: 5}
+          </output>
+      </plugin>
+
+      <!-- Moving Forward-->
+        <plugin filename="libignition-gazebo-triggered-publisher-system.so"
+                name="ignition::gazebo::systems::TriggeredPublisher">
+            <input type="ignition.msgs.Int32" topic="/keyboard/keypress">
+                <match field="data">16777235</match>
+            </input>
+            <output type="ignition.msgs.Twist" topic="/model/my_robot/cmd_vel">
+                linear: {x: 4}, angular: {z: 0.0}
+            </output>
+        </plugin>
+                
+        <plugin filename="libignition-gazebo-triggered-publisher-system.so"
+              name="ignition::gazebo::systems::TriggeredPublisher">
+          <input type="ignition.msgs.Int32" topic="/keyboard/keypress">
+              <match field="data">16777237</match>
+          </input>
+          <output type="ignition.msgs.Twist" topic="/model/my_robot/cmd_vel">
+              linear: {x: -4}, angular: {z: 0.0}
+          </output>
+      </plugin>
+
+      <!-- Key 'A' (ASCII = 97): Forward + Turn Left -->
+      <plugin filename="libignition-gazebo-triggered-publisher-system.so"
+              name="ignition::gazebo::systems::TriggeredPublisher">
+          <input type="ignition.msgs.Int32" topic="/keyboard/keypress">
+              <match field="data">68</match> <!-- 'a' key -->
+          </input>
+          <output type="ignition.msgs.Twist" topic="/model/my_robot/cmd_vel">
+              linear: {x: 10.0}, angular: {z: 5.0}
+          </output>
+      </plugin>
+
+
+
+
+
+      <!-- Key 'A' (ASCII = 97): Forward + Turn Left -->
+      <plugin filename="libignition-gazebo-triggered-publisher-system.so"
+              name="ignition::gazebo::systems::TriggeredPublisher">
+          <input type="ignition.msgs.Int32" topic="/keyboard/keypress">
+              <match field="data">65</match> <!-- 'a' key -->
+          </input>
+          <output type="ignition.msgs.Twist" topic="/model/my_robot/cmd_vel">
+              linear: {x: 10.0}, angular: {z: -5.0}
+          </output>
+      </plugin>
+
+
+
+
+WORKING nav2
+controller_server:
+  ros__parameters:
+
+    # ─── local costmap ────────────────────────────────────────────────────────
+    local_costmap:
+      local_costmap:
+        width: 6.0                # was 3.0; needs to cover ±2.42 m
+        height: 6.0
+        resolution: 0.05
+        update_frequency: 10.0
+        publish_frequency: 2.0
+        plugins:
+          - {name: obstacle_layer, type: "nav2_costmap_2d::ObstacleLayer"}
+          - {name: inflation_layer, type: "nav2_costmap_2d::InflationLayer"}
+
+    
+
+    # ─── controller plugin ────────────────────────────────────────────────────
+    controller_plugins: ["RegulatedPurePursuit"]
+
+    RegulatedPurePursuit:
+      plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+      lookahead_distance:      0.5    # how far ahead on the path to aim
+      min_lookahead_distance:  0.1
+      max_lookahead_distance:  1.0
+      transform_tolerance:     0.1    # seconds
+      min_turning_radius:      0.1    # tune to your vehicle
+      max_turning_radius:      2.0
+
+
+
+    # CURRENTLY USING 
+    controller_plugins: ["FollowPath"]
+
+    FollowPath:                            # <-- BT will call “FollowPath”
+      plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+
+      lookahead_distance:      2.0
+      min_lookahead_distance:  0.5
+      max_lookahead_distance:  4.0
+
+      min_turning_radius:      3.0
+      max_turning_radius:      10.0
+
+
+      transform_tolerance:     0.2
+     
+      xy_goal_tolerance:       0.10
+      yaw_goal_tolerance:      0.20
+
+    # … your local_costmap, planner_server, etc. …

@@ -1,0 +1,23 @@
+Visualization Manager:
+Class: "rviz/VisualizationManager"
+Name: "root"
+Enabled: true
+Global Options:
+Fixed Frame: odom
+Frame Rate: 30
+Displays:
+- Name: "Robot Model"
+Class: "rviz_default_plugins/RobotModel"
+Enabled: true
+Robot Description: robot_description
+Alpha: 1.0
+Update Interval: 0.0
+- Name: "Laser Scan"
+Class: "rviz_default_plugins/LaserScan"
+Enabled: true
+Topic: "/scan"
+Queue Size: 10
+Color Transformer: "Intensity"
+Size (m): 0.05
+Style: "Flat Squares"
+Decay Time: 0.0

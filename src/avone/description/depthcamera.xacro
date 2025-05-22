@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" >
+
+    <joint name="depthcamera_joint" type="fixed">
+        <parent link="chassis"/>
+        <child link="depthcamera_link"/>
+        <origin xyz="0.6909 0 0.772413" rpy="0 0 0"/>
+    </joint>
+
+    <link name="depthcamera_link">
+        <visual>
+            <geometry>
+                <box size="0.010 0.03 0.03"/>
+            </geometry>
+            <material name="red"/>
+        </visual>
+    </link>
+
+
+    <joint name="depthcamera_optical_joint" type="fixed">
+        <parent link="depthcamera_link"/>
+        <child link="depthcamera_link_optical"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <link name="depthcamera_link_optical"></link>
+
+
+
+    <gazebo reference="depthcamera_link">
+        <material>Gazebo/Red</material>
+
+        <sensor name="depthcamera" type="depth">
+
+            <gz_frame_id>depthcamera_link_optical</gz_frame_id>
+
+            <pose> 0 0 0 0 0 0 </pose>
+            <visualize>true</visualize>
+            <update_rate>10</update_rate>
+            <camera>
+                <horizontal_fov>1.089</horizontal_fov>
+                <image>
+                    <format>R8G8B8</format>
+                    <width>640</width>
+                    <height>480</height>
+                </image>
+                <clip>
+                    <near>0.05</near>
+                    <far>8.0</far>
+                </clip>
+            </camera>
+            <plugin name="depthcamera_controller" filename="libgazebo_ros_depthcamera.so">
+                <frame_name>depthcamera_link_optical</frame_name>
+                <min_depth>0.1</min_depth>
+                <max_depth>100.0</max_depth>
+            </plugin>
+        </sensor>
+
+
+      
+        
+    </gazebo>
+
+
+</robot>
