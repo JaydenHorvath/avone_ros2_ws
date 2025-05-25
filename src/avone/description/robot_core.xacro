@@ -184,8 +184,22 @@
         <child link="left_motor"/>
         <axis xyz="0 0 -1"/>
 
-     <dynamics damping="0.2" friction="0.1"/>
-      <limit effort="50" velocity="50"/>  <!-- up to 20 m/s -->    </joint>
+     <dynamics damping="0.1" friction="0.48"/>
+
+      <limit 
+          effort="91.0"         
+          velocity="100.7"/>  
+
+        <!-- 
+            effort (Nm) = kT × I_cont  
+              ≈ 0.955 Nm/A × 95 A = 91 Nm 
+            velocity (rad/s) = Kv × V  
+              ≈ (10 rpm/V × 96 V) × (2π/60) ≈ 100.7 rad/s 
+            :contentReference[oaicite:0]{index=0} 
+        -->
+      </joint>
+
+
 
     <link name="left_motor">
         <visual>
@@ -200,7 +214,8 @@
         <collision>
             <origin xyz="-8.09391e-17 7.65875e-18 0.17" rpy="1.5708 0 0"/>
             <geometry>
-                    <sphere radius="0.2"/> 
+                     <!--<mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/wheel.stl"/>    -->  
+                                        <sphere radius="0.203"/>    
                  <!--  <box size="0.3 0.3 0.15"/> -->
             </geometry>
         </collision>
@@ -221,9 +236,13 @@
         <child link="right_motor"/>
         <axis xyz="0 0 1"/>
 
-      <dynamics damping="0.2" friction="0.1"/>
-      <limit effort="50" velocity="50"/>  <!-- up to 20 m/s -->    </joint>
+      <dynamics damping="0.1" friction="0.48"/>
 
+      <limit 
+          effort="91.0"         
+          velocity="100.7"/>  
+    </joint>
+       
     <link name="right_motor">
         <visual>
             <origin xyz="-1.59877e-17 7.65404e-18 0.17" rpy="1.5708 0 0"/>
@@ -236,7 +255,7 @@
         <collision>
             <origin xyz="-1.59877e-17 7.65404e-18 0.17" rpy="1.5708 0 0"/>
             <geometry>
-                     <sphere radius="0.2"/>    
+                     <sphere radius="0.203"/>    
                  <!--  <box size="0.3 0.3 0.15"/> -->
             </geometry>
         </collision>
@@ -257,7 +276,7 @@
         <parent link="chassis"/>
         <child link="front_right_wheel_hub"/>
         <axis xyz="0 0 -1"/>
-        <limit effort="100" velocity="20" lower="-0.8" upper="0.8"/>
+        <limit effort="100" velocity="20" lower="-0.4" upper="0.4"/>
          
           <dynamics damping="0.1" friction="0.05"/>
     </joint>
@@ -311,8 +330,8 @@
         <collision>
             <origin xyz="2.22045e-16 0 0.17" rpy="1.5708 0 1.5708"/>
             <geometry>
-                   <!-- <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/wheel.stl"/>      -->
-                    <sphere radius="0.2"/>
+                   <!--<mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/wheel.stl"/>    -->  
+                                        <sphere radius="0.203"/>    
                  <!--  <box size="0.3 0.3 0.15"/> -->
             </geometry>
         </collision>
@@ -334,7 +353,7 @@
         <parent link="chassis"/>
         <child link="front_left_wheel_hub"/>
         <axis xyz="0 0 -1"/>
-         <limit effort="100" velocity="20" lower="-0.8" upper="0.8"/>
+         <limit effort="100" velocity="20" lower="-0.4" upper="0.4"/>
          
           <dynamics damping="0.1" friction="0.05"/>
     </joint>
@@ -389,7 +408,8 @@
         <collision>
         <origin xyz="0 0 0.17" rpy="1.5708 0 0"/>
         <geometry>
-                     <sphere radius="0.2"/> 
+                      <!--<mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/wheel.stl"/>    -->  
+                                        <sphere radius="0.203"/>   
                  <!--  <box size="0.3 0.3 0.15"/> -->
         </geometry>
         </collision>

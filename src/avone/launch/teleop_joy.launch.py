@@ -20,7 +20,7 @@ def generate_launch_description():
             parameters=[{
                 'stamp': True,
                 'axis_linear.x': 1,
-                'scale_linear.x': 3.0,
+                'scale_linear.x': 2.0,
                 'axis_angular.yaw': 3,
                 'scale_angular.yaw': 0.75,
                 'enable_button': 4

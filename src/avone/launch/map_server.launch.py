@@ -5,7 +5,7 @@ from launch.substitutions import PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
-    map_yaml_path = os.path.expanduser('~/ros2_ws/src/avone/mapA.yaml')
+    map_yaml_path = os.path.expanduser('~/ros2_ws/src/avone/track2.yaml')
 
     return LaunchDescription([
         Node(

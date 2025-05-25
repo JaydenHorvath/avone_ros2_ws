@@ -12,21 +12,16 @@ slam_toolbox:
     # ROS Parameters
     odom_frame: odom
     map_frame: map
-    base_frame: base_frame
+    base_frame: base_link
     scan_topic: /scan
     odom_topic: /odometry/filtered
-    mode: localization
+    mode: mapping
 
     use_sim_time: true
     # Publish both transforms
     publish_map_odom_transform: true     # map → odom
     publish_odometry_frame:    true      # odom → base_link
 
-    # if you'd like to immediately start continuing a map at a given pose
-    # or at the dock, but they are mutually exclusive, if pose is given
-    # will use pose
-    map_file_name: /home/ros2_ws/src/avone/TrackA.yaml
-    map_start_at_dock: true
 
     debug_logging: false
     throttle_scans: 1

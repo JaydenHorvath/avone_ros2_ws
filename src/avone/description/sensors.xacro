@@ -4,7 +4,7 @@
     <joint name="imu_joint" type="fixed">
         <parent link="chassis"/>
         <child link="imu_link"/>
-        <origin xyz="0.6909 0 0.772413" rpy="0 0 0"/>
+        <origin xyz="0 0 0.3" rpy="0 0 0"/>  <!-- e.g. 5 cm above chassis CG -->
     </joint>
 
    <link name="imu_link">

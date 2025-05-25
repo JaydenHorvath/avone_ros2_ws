@@ -2,23 +2,33 @@
 ekf_filter_node:
   ros__parameters:
     use_sim_time: true
-    frequency:  10.0
+    frequency:  50.0
     two_d_mode: true
     # Wheel odom input
     odom0: /ackermann_steering_controller/odometry
-    odom0_config: [true, true, false,
-                   false, false, true,
-                   false, false, false]
+    odom0_config: [
+      false, false, false,    # X, Y, Z positions
+      false, false, false,    #  roll, pitch, yaw orientations
+      true,  true,  false,    #  X, Y, Z linear velocities
+      false, false, true,     #  roll, pitch, yaw angular velocities
+      false, false, false     #  X, Y, Z linear accelerations
+    ]
+
     # IMU input for orientation
     imu0: /imu
-    imu0_config:   [false, false, false,
-                    true,  true,  true,
-                    false, false, false]
+    imu0_config: [
+      false, false, false,    # X, Y, Z positions
+      false, false, true,     #  roll, pitch, yaw orientations
+      false, false, false,    #  X, Y, Z linear velocities
+      false, false, true,     #  roll, pitch, yaw angular velocities
+      false, false, false     #  X, Y, Z linear accelerations
+    ]
+    imu0_remove_gravitational_acceleration: true
 
   # frames
     odom_frame:     odom
     base_link_frame: base_link
-    world_frame:    map
+
 
     # make sure to publish the TF
     publish_tf:     true
