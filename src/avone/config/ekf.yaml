@@ -1,5 +1,5 @@
 # This is an empty file, so that git commits the folder correctlyekf_filter_node:
-ekf_filter_node:
+ekf_filter_node_odom:
   ros__parameters:
     use_sim_time: true
     frequency:  50.0
@@ -28,9 +28,11 @@ ekf_filter_node:
   # frames
     odom_frame:     odom
     base_link_frame: base_link
-
+    world_frame:    odom
 
     # make sure to publish the TF
-    publish_tf:     true
-    publish_odometry_frame: true
+    publish_tf:     false
+    publish_odometry_frame: false
     transform_tolerance: 0.2  # tolerate up to 0.5s of “old” transforms
+
+

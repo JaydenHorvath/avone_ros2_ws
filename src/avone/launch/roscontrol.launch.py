@@ -92,6 +92,10 @@ def generate_launch_description():
             #CAMAERA IMAGE
             'camera/image_raw@sensor_msgs/msg/Image[ignition.msgs.Image',  
 
+            #GPS
+            '/navsat1@sensor_msgs/msg/NavSatFix[ignition.msgs.NavSat',
+            '/navsat2@sensor_msgs/msg/NavSatFix[ignition.msgs.NavSat',
+
                     ],
         remappings=[
         
@@ -202,28 +206,53 @@ def generate_launch_description():
    
 
     # TF relay from controller to /tf
-    topic_remapping = Node(
-       package='topic_tools',
-        executable='relay',
-        name='tf_relay',
-        arguments=['/ackermann_steering_controller/tf_odometry', '/tf'],
-       output='screen'
-    )
+    # topic_remapping = Node(
+    #    package='topic_tools',
+    #     executable='relay',
+    #     name='tf_relay',
+    #     arguments=['/ackermann_steering_controller/tf_odometry', '/tf'],
+    #    output='screen'
+    # )
 
-    ekf_node = Node(
-        package='robot_localization',
-        executable='ekf_node',
-        name='ekf_filter_node',
-        output='screen',
-        parameters=[
-            {'use_sim_time': use_sim_time},
-            PathJoinSubstitution([
-                FindPackageShare('avone'),
-                'config',
-                'ekf.yaml'
-            ])
-        ]
-    )
+    # ekf_node = Node(
+    #     package='robot_localization',
+    #     executable='ekf_node',
+    #     name='ekf_filter_node_odom',
+    #     output='screen',
+    #     parameters=[
+    #         {'use_sim_time': use_sim_time},
+    #         PathJoinSubstitution([
+    #             FindPackageShare('avone'),
+    #             'config',
+    #             'ekf.yaml'
+    #         ])
+    #     ],
+    #     remappings=[('odometry/filtered', 'odometry/local')]
+    # )
+
+    # navsat_tf = Node(
+    # package='robot_localization', executable='navsat_transform_node', name='navsat_transform',
+    # parameters=[
+    #             {'use_sim_time': use_sim_time},
+    #             PathJoinSubstitution([
+    #                 FindPackageShare('avone'),
+    #                 'config',
+    #                 'navsat_transform.yaml'
+    #             ])
+    #         ]
+    # )
+
+    # ekf_map = Node(
+    #     package='robot_localization', executable='ekf_node', name='ekf_map',
+    #     parameters=[
+    #             {'use_sim_time': use_sim_time},
+    #             PathJoinSubstitution([
+    #                 FindPackageShare('avone'),
+    #                 'config',
+    #                 'map_ekf.yaml'
+    #             ])
+    #         ]
+    # )
 
   
 
@@ -255,7 +284,7 @@ def generate_launch_description():
         # Robot state publisher
         rsp_node,
         # TF relay
-        topic_remapping,
+        # topic_remapping,
         # Bridge
         ros_gz_bridge,
         # Gazebo sim
@@ -267,8 +296,9 @@ def generate_launch_description():
 
         depth_to_scan,
         
-        ekf_node,
+        #  ekf_node,
       
+        # ekf_map,
        
         
         # Sequence controllers: joint_state -> ackermann -> brake

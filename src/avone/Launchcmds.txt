@@ -44,6 +44,11 @@ ros2 launch slam_toolbox online_async_launch.py params_file:=./config/mapper_par
 # run map server 
 ros2 run nav2_map_server map_server --ros-args -p yaml_filename:=mapA.yaml -p use_sim_time:=true
 
+# map server with live map 
+
+ros2 run nav2_map_server map_server   --ros-args     -p yaml_filename:="/home/jay/ros2_ws/src/avone/track3.yaml"     -p topic:=/live_map     -p subscribe_to_updates:=True
+
+
 #bringup map server 
 ros2 run nav2_util lifecycle_bringup map_server
 

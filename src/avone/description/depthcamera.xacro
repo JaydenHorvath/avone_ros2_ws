@@ -37,6 +37,7 @@
             <pose> 0 0 0 0 0 0 </pose>
             <visualize>true</visualize>
             <update_rate>10</update_rate>
+            <topic>depth/image_raw</topic>
             <camera>
                 <horizontal_fov>1.089</horizontal_fov>
                 <image>
@@ -49,11 +50,7 @@
                     <far>8.0</far>
                 </clip>
             </camera>
-            <plugin name="depthcamera_controller" filename="libgazebo_ros_depthcamera.so">
-                <frame_name>depthcamera_link_optical</frame_name>
-                <min_depth>0.1</min_depth>
-                <max_depth>100.0</max_depth>
-            </plugin>
+        
         </sensor>
 
 

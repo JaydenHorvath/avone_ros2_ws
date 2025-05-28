@@ -19,10 +19,10 @@ class YoloRosNode(Node):
 
         # Subscribers
         self.image_sub = self.create_subscription(
-            Image, '/camera/image_raw', self.image_callback, 10
+            Image, '/camera/rgbd/image_raw', self.image_callback, 10
         )
         self.info_sub = self.create_subscription(
-            CameraInfo, '/camera/camera_info', self.caminfo_callback, 10
+            CameraInfo, '/camera/rgbd/camera_info', self.caminfo_callback, 10
         )
 
         # Publishers

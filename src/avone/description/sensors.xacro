@@ -4,22 +4,84 @@
     <joint name="imu_joint" type="fixed">
         <parent link="chassis"/>
         <child link="imu_link"/>
-        <origin xyz="0 0 0.3" rpy="0 0 0"/>  <!-- e.g. 5 cm above chassis CG -->
+          <origin xyz="0.5 0 0.5" rpy="0 0 0"/>
     </joint>
 
-   <link name="imu_link">
-  <!-- no <sensor> here! -->
-</link>
+  <link name="imu_link"></link>
 
-<gazebo reference="imu_link">
-   <sensor name="imu_sensor" type="imu">
-    <gz_frame_id>imu_link</gz_frame_id>
-                    <always_on>1</always_on>
-                    <update_rate>10</update_rate>
-                    <visualize>true</visualize>
-                    <topic>imu</topic>
-                </sensor>
-</gazebo>
+  <gazebo reference="imu_link">
+    <sensor name="imu_sensor" type="imu">
+      <gz_frame_id>imu_link</gz_frame_id>
+      <always_on>1</always_on>
+      <update_rate>50</update_rate>
+      <visualize>true</visualize>
+      <topic>imu</topic>
+    </sensor>
+  </gazebo>
+
+  <!-- FRONT GPS ANTENNA -->
+  <joint name="gps_antenna1_joint" type="fixed">
+        <parent link="chassis"/>
+        <child link="gps_antenna1_link"/>
+          <origin xyz="2.3674 0 0.2977" rpy="0 0 0"/>
+    </joint>
+
+  <link name="gps_antenna1_link">
+    <visual>
+      <geometry>
+        <cylinder radius="0.0625" length="0.085"/>
+      </geometry>
+      <material name="white"/>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.0625" length="0.085"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <gazebo reference="gps_antenna1_link">
+    <sensor name="navsat1" type="navsat">
+    <gz_frame_id>gps_antenna1_link</gz_frame_id>
+      <always_on>1</always_on>
+      <update_rate>50</update_rate>
+      <topic>navsat1</topic>
+
+     
+    </sensor>
+  </gazebo>
+
+  <!-- REAR GPS ANTENNA -->
+<joint name="gps_antenna2_joint" type="fixed">
+        <parent link="chassis"/>
+        <child link="gps_antenna2_link"/>
+          <origin xyz="0.2299 0 0.4025" rpy="0 0 0"/>
+    </joint>
+
+  <link name="gps_antenna2_link">
+    <visual>
+      <geometry>
+        <cylinder radius="0.0625" length="0.085"/>
+      </geometry>
+      <material name="white"/>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.0625" length="0.085"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <gazebo reference="gps_antenna2_link">
+    <sensor name="navsat2" type="navsat">
+    <gz_frame_id>gps_antenna2_link</gz_frame_id>
+      <always_on>1</always_on>
+      <update_rate>50</update_rate>
+      <topic>navsat2</topic>
+
+     
+    </sensor>
+  </gazebo>
 
 
 </robot>

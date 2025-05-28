@@ -25,6 +25,7 @@ setup(
             # this makes “ros2 run yolo_ros yolo_node” invoke your main()
             'yolo_node = yolo_ros.yolo_node:main',
             'cone_posestimation = yolo_ros.cone_posestimation:main',
+            'cone_validator = yolo_ros.cone_validator:main'
         ],
     },
 )

@@ -6,8 +6,10 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo
 from vision_msgs.msg import Detection2DArray
-from geometry_msgs.msg import PointStamped
+from geometry_msgs.msg import PointStamped, PoseStamped, Quaternion
 from visualization_msgs.msg import Marker
+
+
 
 class MultiConeLocalizer(Node):
     def __init__(self):
@@ -52,8 +54,8 @@ class MultiConeLocalizer(Node):
                                  self.detections_cb, 10)
 
         # Publishers
-        self.pt_pub     = self.create_publisher(PointStamped, '/cone_position', 10)
-        self.marker_pub = self.create_publisher(Marker,       '/cone_markers',   10)
+        self.pose_pub   = self.create_publisher(PoseStamped,   '/cone_pose',    10)
+        self.marker_pub = self.create_publisher(Marker,        '/cone_markers', 10)
 
     def camera_info_cb(self, msg: CameraInfo):
         if self.fx is None:
@@ -100,28 +102,40 @@ class MultiConeLocalizer(Node):
             X = (u - self.cx) * Z / self.fx
             Y = (v - self.cy) * Z / self.fy
 
-            # publish 3D point
-            pt = PointStamped()
-            pt.header = det.header
-            pt.point.x = X
-            pt.point.y = Y
-            pt.point.z = Z
-            self.pt_pub.publish(pt)
+            # skip far‐away cones
+            max_range = 15.0  # meters
+            r = math.sqrt(X*X + Y*Y + Z*Z)
+            if r > max_range:
+                continue
 
-            # publish rectangular prism (cube) marker
+            # publish PoseStamped ps as before…
+            ps = PoseStamped()
+            ps.header = det.header
+            ps.pose.position.x = X
+            ps.pose.position.y = Y
+            ps.pose.position.z = Z
+            ps.pose.orientation.w = 1.0
+            self.pose_pub.publish(ps)
+
+            # now build the Marker from ps.pose.position
             m = Marker()
-            m.header = det.header
+            m.header = ps.header
             m.ns     = f'cone_{label}'
             m.id     = idx
             m.type   = Marker.CUBE
             m.action = Marker.ADD
-            m.pose.position = pt.point
-            m.pose.orientation.w = 1.0
-            # cube: x/y = 2*R, z = H
+
+            # assign the marker pose from ps
+            m.pose.position = ps.pose.position
+            m.pose.orientation = ps.pose.orientation
+
+            # size and color as before
             m.scale.x = 2.0 * R
             m.scale.y = 2.0 * R
             m.scale.z = H
-            m.color.r, m.color.g, m.color.b, m.color.a = color
+            r,g,b,a = color
+            m.color.r, m.color.g, m.color.b, m.color.a = r,g,b,a
+
             self.marker_pub.publish(m)
 
     def destroy_node(self):

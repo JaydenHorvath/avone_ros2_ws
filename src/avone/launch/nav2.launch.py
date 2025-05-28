@@ -9,7 +9,7 @@ from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
     # Full path to your Nav2 config file
-    nav2_config = os.path.expanduser('~/ros2_ws/src/avone/config/Nav2.yaml')
+    nav2_config = os.path.expanduser('~/ros2_ws/src/avone/config/Nav2_cost.yaml')
 
     return LaunchDescription([
         # Launch the main Nav2 bringup launch file
