@@ -15,8 +15,12 @@ setup(
     ],
     install_requires=[
         'setuptools',
-        # add any pure-Python dependencies here, e.g.:
-        # 'numpy',
+         'rclpy',
+        'sensor_msgs',
+        'vision_msgs',
+        'message_filters',   # <<< add this
+        'tf2_ros',
+        'tf2_geometry_msgs',
     ],
     zip_safe=True,
     maintainer='jay',
@@ -29,6 +33,9 @@ setup(
             # <executable_name> = <module>:<function>
             'conelandmarkmapper = cone_mapper.conelandmarkmapper:main',
              'live_cone_map = cone_mapper.live_cone_map:main',
+              'groundremoval = cone_mapper.groundremoval:main',
+              'lidargroundremoval = cone_mapper.lidargroundremoval:main',
+              'groundremovalright = cone_mapper.groundremovalright:main'
         ],
     },
 )

@@ -1,0 +1,272 @@
+#!/usr/bin/env python3
+
+import rclpy
+from rclpy.node import Node
+from rclpy.time import Time
+from sensor_msgs.msg import PointCloud2
+from sensor_msgs_py import point_cloud2
+from std_msgs.msg import Header
+from visualization_msgs.msg import Marker, MarkerArray
+from geometry_msgs.msg import PointStamped
+
+import numpy as np
+import pcl
+
+import tf2_ros
+from tf2_geometry_msgs import do_transform_point
+from tf2_ros import TransformException
+
+
+class ConeLandmarkMapperNode(Node):
+    def __init__(self):
+        super().__init__('cone_landmark_mapper')
+
+        # Clustering parameters (override via --ros-args)
+        self.declare_parameter('cluster_tolerance', 0.07)    # meters
+        self.declare_parameter('min_cluster_size', 40)       # min points per cluster
+        self.declare_parameter('max_cluster_size', 2000)     # max points per cluster
+
+        self.cluster_tolerance = (
+            self.get_parameter('cluster_tolerance')
+                .get_parameter_value()
+                .double_value
+        )
+        self.min_cluster_size = (
+            self.get_parameter('min_cluster_size')
+                .get_parameter_value()
+                .integer_value
+        )
+        self.max_cluster_size = (
+            self.get_parameter('max_cluster_size')
+                .get_parameter_value()
+                .integer_value
+        )
+
+        # Name of the world frame (override via --ros-args -p world_frame:=<frame>)
+        self.declare_parameter('world_frame', 'odom')
+        self.world_frame = (
+            self.get_parameter('world_frame')
+                .get_parameter_value()
+                .string_value
+        )
+
+        # Keep track of all known cone centroids (in world frame) and stable IDs
+        self.known_centroids = []  # list of [x, y, z] in world frame
+        self.next_id = 0
+
+        # TF2 buffer & listener
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
+
+        # Subscribe to the ground-removed cloud (in camera frame)
+        self.create_subscription(
+            PointCloud2,
+            '/cloud_no_ground_ransac',
+            self.cloud_callback,
+            10
+        )
+
+        # Publish cone‐centroid markers (MarkerArray) in world frame
+        self.marker_pub = self.create_publisher(
+            MarkerArray,
+            '/cone_centroid_markers',
+            10
+        )
+        # Publish centroids as a small PointCloud2 in world frame
+        self.centroid_pub = self.create_publisher(
+            PointCloud2,
+            '/cone_centroid_cloud',
+            10
+        )
+
+    def cloud_callback(self, msg: PointCloud2):
+        # 1) Read raw (x, y, z) tuples from PointCloud2 (camera frame)
+        xyz_list = [
+            (pt[0], pt[1], pt[2])
+            for pt in point_cloud2.read_points(
+                msg,
+                field_names=('x', 'y', 'z'),
+                skip_nans=False
+            )
+        ]
+        if not xyz_list:
+            self.get_logger().warn('Received empty or invalid PointCloud2')
+            # Re‐publish any known markers (even if no new data)
+            self._publish_all_markers(msg.header)
+            return
+
+        # 2) Convert to N×3 numpy array
+        cloud_arr = np.asarray(xyz_list, dtype=np.float32)
+
+        # 3) Remove rows containing NaN/Inf
+        valid_mask = np.isfinite(cloud_arr).all(axis=1)
+        cloud_arr = cloud_arr[valid_mask]
+        if cloud_arr.size == 0:
+            self.get_logger().warn('All points were NaN/Inf after filtering')
+            self._publish_all_markers(msg.header)
+            return
+
+        # 4) Build a PCL PointCloud from filtered array
+        pcl_cloud = pcl.PointCloud(cloud_arr)
+
+        # 5) Build KD‐Tree for clustering
+        tree = pcl_cloud.make_kdtree()
+
+        # 6) Configure Euclidean Cluster Extraction
+        ec = pcl_cloud.make_EuclideanClusterExtraction()
+        try:
+            ec.set_cluster_tolerance(self.cluster_tolerance)
+        except AttributeError:
+            ec.set_ClusterTolerance(self.cluster_tolerance)
+        try:
+            ec.set_min_cluster_size(self.min_cluster_size)
+        except AttributeError:
+            ec.set_MinClusterSize(self.min_cluster_size)
+        try:
+            ec.set_max_cluster_size(self.max_cluster_size)
+        except AttributeError:
+            ec.set_MaxClusterSize(self.max_cluster_size)
+        try:
+            ec.set_search_method(tree)
+        except AttributeError:
+            ec.set_SearchMethod(tree)
+
+        # 7) Run clustering
+        try:
+            cluster_indices = ec.Extract()
+        except Exception as e:
+            self.get_logger().error(f'Clustering failed: {e}')
+            self._publish_all_markers(msg.header)
+            return
+
+        if not cluster_indices:
+            # No cones detected in this frame; keep publishing known ones
+            self._publish_all_markers(msg.header)
+            return
+
+        # 8) For each cluster, compute centroid in camera frame, then transform to world
+        pcl_array = np.asarray(pcl_cloud, dtype=np.float32)
+        newly_seen_world = []
+
+        camera_frame = msg.header.frame_id
+        stamp = Time(seconds=msg.header.stamp.sec,
+                     nanoseconds=msg.header.stamp.nanosec)
+
+        # Try to get camera→world at exact timestamp; on failure, fallback to "latest"
+        try:
+            tf_msg = self.tf_buffer.lookup_transform(
+                self.world_frame,
+                camera_frame,
+                stamp
+            )
+        except TransformException:
+            # Extrapolation or not yet available: get the latest available transform
+            try:
+                tf_msg = self.tf_buffer.lookup_transform(
+                    self.world_frame,
+                    camera_frame,
+                    Time()
+                )
+            except TransformException as ex2:
+                self.get_logger().error(
+                    f'Could not get any valid TF from "{camera_frame}" to "{self.world_frame}": {ex2}'
+                )
+                # Cannot transform; re‐publish known markers and bail
+                self._publish_all_markers(msg.header)
+                return
+
+        for indices in cluster_indices:
+            pts = pcl_array[indices]                # Nx3 subset of points
+            centroid_cam = np.mean(pts, axis=0).tolist()  # [x, y, z] in camera frame
+
+            # Pack centroid into PointStamped (camera frame)
+            p_cam = PointStamped()
+            p_cam.header.frame_id = camera_frame
+            p_cam.header.stamp = msg.header.stamp
+            p_cam.point.x = float(centroid_cam[0])
+            p_cam.point.y = float(centroid_cam[1])
+            p_cam.point.z = float(centroid_cam[2])
+
+            # Transform to world frame
+            try:
+                p_world = do_transform_point(p_cam, tf_msg)
+                newly_seen_world.append([
+                    p_world.point.x,
+                    p_world.point.y,
+                    p_world.point.z
+                ])
+            except TransformException as e:
+                self.get_logger().error(f'Point transform failed: {e}')
+                continue
+
+        # 9) Merge newly seen world‐frame centroids into known list
+        eps = 0.10  # 10 cm threshold for “same cone”
+        for cw in newly_seen_world:
+            if not any(
+                np.linalg.norm(np.array(cw) - np.array(old)) < eps
+                for old in self.known_centroids
+            ):
+                self.known_centroids.append(cw)
+
+        # 10) Publish all known centroids (in world frame)
+        self._publish_all_markers(msg.header)
+
+    def _publish_all_markers(self, header):
+        """
+        Build & publish a MarkerArray and PointCloud2 of every known centroid
+        in world frame. Header frame_id = self.world_frame.
+        """
+        marker_array = MarkerArray()
+        centroids_world = []
+
+        for idx, centroid in enumerate(self.known_centroids):
+            m = Marker()
+            m.header.frame_id = self.world_frame
+            m.header.stamp = header.stamp
+            m.ns = "cone_centroids"
+            m.id = idx
+            m.type = Marker.SPHERE
+            m.action = Marker.ADD
+            m.pose.position.x = float(centroid[0])
+            m.pose.position.y = float(centroid[1])
+            m.pose.position.z = float(centroid[2])
+            m.pose.orientation.w = 1.0
+            m.scale.x = 0.10
+            m.scale.y = 0.10
+            m.scale.z = 0.10
+            m.color.r = 1.0
+            m.color.g = 0.0
+            m.color.b = 0.0
+            m.color.a = 0.8
+            # Default lifetime = 0 → infinite persistence
+            marker_array.markers.append(m)
+
+            centroids_world.append((
+                float(centroid[0]),
+                float(centroid[1]),
+                float(centroid[2])
+            ))
+
+        # Publish MarkerArray (world frame)
+        self.marker_pub.publish(marker_array)
+
+        # Publish centroids as PointCloud2 (world frame)
+        header_pc = Header()
+        header_pc.stamp = header.stamp
+        header_pc.frame_id = self.world_frame
+        cloud_centroids = point_cloud2.create_cloud_xyz32(
+            header_pc,
+            centroids_world
+        )
+        self.centroid_pub.publish(cloud_centroids)
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = ConeLandmarkMapperNode()
+    rclpy.spin(node)
+    rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()

@@ -22,7 +22,7 @@ Visualization Manager:
       Enabled: true
       Cell Size: 1
       Plane: XY
-      Plane Cell Count: 10
+      Plane Cell Count: 100
       Normal Cell Count: 0
       Color: 160; 160; 164
       Line Style:
@@ -53,17 +53,6 @@ Visualization Manager:
       Collision Enabled: false
       TF Prefix: ""
       Update Interval: 0
-
-    - Name: LaserScan
-      Class: rviz_default_plugins/LaserScan
-      Enabled: true
-      Topic: /scan
-      Queue Size: 10
-      Style: Points
-      Size (m): 0.03
-      Color: 255; 0; 0
-      Alpha: 1.0
-      Buffer Length: 1
 
   Tools:
     - Class: rviz_default_plugins/Interact

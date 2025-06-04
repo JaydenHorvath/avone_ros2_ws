@@ -12,7 +12,7 @@
     <!-- <xacro:include filename="depthcamera.xacro" /> -->
     
    <xacro:include filename="rgbdcamera.xacro" /> 
-
+    <!-- <xacro:include filename="dualrgbdcamera.xacro" /> -->
    <xacro:include filename="sensors.xacro" /> 
 
    <!-- <xacro:include filename="lidar.xacro" />  -->
