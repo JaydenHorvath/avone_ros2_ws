@@ -47,7 +47,7 @@ class MultiConeLocalizer(Node):
 
         # Subscribers
         self.create_subscription(CameraInfo,
-                                 '/yolo/camera_info',
+                                 '/camera/camera_info',
                                  self.camera_info_cb, 10)
         self.create_subscription(Detection2DArray,
                                  '/yolo/detections',

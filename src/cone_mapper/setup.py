@@ -32,10 +32,11 @@ setup(
         'console_scripts': [
             # <executable_name> = <module>:<function>
             'conelandmarkmapper = cone_mapper.conelandmarkmapper:main',
-             'live_cone_map = cone_mapper.live_cone_map:main',
               'groundremoval = cone_mapper.groundremoval:main',
               'lidargroundremoval = cone_mapper.lidargroundremoval:main',
-              'groundremovalright = cone_mapper.groundremovalright:main'
+              'groundremovalright = cone_mapper.groundremovalright:main',
+              'conecenterline = cone_mapper.conecenterline:main',
+              'yolobasedlandmark = cone_mapper.yolobasedlandmark:main'
         ],
     },
 )

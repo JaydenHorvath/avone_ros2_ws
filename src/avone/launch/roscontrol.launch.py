@@ -112,6 +112,18 @@ def generate_launch_description():
         ]
     )
 
+    static_map_tf =      Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='static_odom_to_map',
+            output='screen',
+            arguments=[
+                '0', '0', '0',   # x y z
+                '0', '0', '0',   # roll pitch yaw
+                'odom', 'map'    # parent_frame child_frame
+            ]
+        )
+
     # -------------------------------------------------------------------------
     # Gazebo bridge, state publisher, and related Nodes
     # -------------------------------------------------------------------------
@@ -133,18 +145,18 @@ def generate_launch_description():
             '/model/my_robot/tf@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V',
             '/model/my_robot/cmd_vel@geometry_msgs/msg/Twist[ignition.msgs.Twist',
             '/joint_states@sensor_msgs/msg/JointState[ignition.msgs.Model',
-            # 'rgbdcamera/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
-            # 'rgbdcamera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
-            # 'rgbdcamera/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image',
-            # 'rgbdcamera/image@sensor_msgs/msg/Image[ignition.msgs.Image',
-            'rgbdcameraright/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
-            'rgbdcameraright/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
-            'rgbdcameraright/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image',
-            'rgbdcameraright/image@sensor_msgs/msg/Image[ignition.msgs.Image',
-            'rgbdcameraleft/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
-            'rgbdcameraleft/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
-            'rgbdcameraleft/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image',
-            'rgbdcameraleft/image@sensor_msgs/msg/Image[ignition.msgs.Image',
+            'rgbdcamera/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
+            'rgbdcamera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
+            'rgbdcamera/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image',
+            'rgbdcamera/image@sensor_msgs/msg/Image[ignition.msgs.Image',
+            # 'rgbdcameraright/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
+            # 'rgbdcameraright/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
+            # 'rgbdcameraright/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image',
+            # 'rgbdcameraright/image@sensor_msgs/msg/Image[ignition.msgs.Image',
+            # 'rgbdcameraleft/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
+            # 'rgbdcameraleft/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
+            # 'rgbdcameraleft/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image',
+            # 'rgbdcameraleft/image@sensor_msgs/msg/Image[ignition.msgs.Image',
             '/imu@sensor_msgs/msg/Imu[ignition.msgs.IMU',
             '/lidar@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan',
             '/lidar/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
@@ -202,10 +214,16 @@ def generate_launch_description():
         arguments=[
             '-entity', 'my_robot',
             '-topic', 'robot_description',
+            # small track
             '-x', '-10.0',
             '-y', '11',
             '-z', '0.1',
             '--Y', '0'
+            # accel
+            # '-x', '25.2118',
+            # '-y', '-0.2167',
+            # '-z', '0.1',
+            # '--Y', '3.14'
         ]
     )
 
@@ -341,11 +359,12 @@ def generate_launch_description():
 
         # ----------------------------------------------------
         # 10) robot_localization Nodes
-        # ----------------------------------------------------
+        # ---------------------------------------------------- 
+        static_map_tf,
         ekf_local_node,
         navsat_transform_node,
         ekf_map_node,
-
+       
         # ----------------------------------------------------
         # 11) RViz (delayed)
         # ----------------------------------------------------

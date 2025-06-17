@@ -23,13 +23,20 @@ class YoloRosNode(Node):
         self.frame_queue = deque(maxlen=2)   # keep only up to 2 frames; drop older
         self.queue_lock = Lock()
 
-        # Subscribers (just push into queue, don’t run inference here)
+        # # Subscribers (just push into queue, don’t run inference here)
+        # self.image_sub = self.create_subscription(
+        #     Image, '/camera/camera/color/image_raw', self.image_callback, 10
+        # )
+        # self.info_sub = self.create_subscription(
+        #     CameraInfo, '/camera/camera/color/camera_info', self.caminfo_callback, 10
+        # )
         self.image_sub = self.create_subscription(
-            Image, '/camera/rgbd/image_raw', self.image_callback, 10
+            Image, '/camera/image_raw', self.image_callback, 10
         )
         self.info_sub = self.create_subscription(
-            CameraInfo, '/camera/rgbd/camera_info', self.caminfo_callback, 10
+            CameraInfo, '/camera/camera_info', self.caminfo_callback, 10
         )
+
 
         # Publishers (we will publish from the worker thread)
         self.image_pub = self.create_publisher(Image, '/yolo/image', 10)
@@ -38,12 +45,15 @@ class YoloRosNode(Node):
 
         # LOAD YOLO MODEL ON GPU WITH FP16
         # Note: `device='cuda:0'` forces GPU; `model.model.half()` enables FP16.
-        self.model = YOLO('/home/jay/Documents/yolo11-tutorial/runs/detect/train17/weights/best.pt')
+        self.model = YOLO('/home/jay/Documents/yolo11-tutorial/runs/detect/train18/weights/best.pt')
         # 2) move weights onto GPU #0
         self.model.to('cuda:0')         # or self.model.cuda()
 
         # 3) convert to FP16
         self.model.model.half()
+
+  
+
 
         # START A DEDICATED INFERENCE THREAD
         self.running = True

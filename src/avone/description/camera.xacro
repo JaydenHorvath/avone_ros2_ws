@@ -40,15 +40,15 @@
             <topic>camera/image_raw</topic>
             <camera>
             <camera_info_topic>camera/camera_info</camera_info_topic>
-                      <horizontal_fov>1.91986</horizontal_fov>
+                      <horizontal_fov>1.8</horizontal_fov>
                 <image>
                     <format>R8G8B8</format>
-                    <width>1280</width>
-                    <height>720</height>
+                           <width>640</width>
+          <height>360</height>
                 </image>
                 <clip>
                     <near>0.3</near>
-                    <far>20.0</far>
+                    <far>10.0</far>
                 </clip>
             </camera>
            

@@ -13,8 +13,8 @@ Panels:
 
 Visualization Manager:
   Global Options:
-    Fixed Frame: odom
-    Background Color: 48; 48; 48
+    Fixed Frame: map
+    Background Color: 192; 191; 188
     Frame Rate: 30
   Displays:
     - Name: Grid
@@ -24,11 +24,11 @@ Visualization Manager:
       Plane: XY
       Plane Cell Count: 100
       Normal Cell Count: 0
-      Color: 160; 160; 164
+      Color: 36; 31; 49
       Line Style:
         Value: Lines
         Line Width: 0.03
-      Reference Frame: odom
+      Reference Frame: map
 
     - Name: TF
       Class: rviz_default_plugins/TF

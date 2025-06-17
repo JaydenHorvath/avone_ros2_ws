@@ -25,7 +25,10 @@ setup(
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
-            'waypoint_publisher = avone_nav.waypoint_publisher:main'
+            'DelaunayPlanner = avone_nav.DelaunayPlanner:main',
+            'WaypointFinder = avone_nav.WaypointFinder:main',
+            'Nav2waypoint = avone_nav.Nav2waypoint:main',
+            'trackvisualise = avone_nav.trackvisualise:main'
         ],
     },
 )
