@@ -23,19 +23,22 @@ class YoloRosNode(Node):
         self.frame_queue = deque(maxlen=2)   # keep only up to 2 frames; drop older
         self.queue_lock = Lock()
 
-        # # Subscribers (just push into queue, don’t run inference here)
-        # self.image_sub = self.create_subscription(
-        #     Image, '/camera/camera/color/image_raw', self.image_callback, 10
-        # )
-        # self.info_sub = self.create_subscription(
-        #     CameraInfo, '/camera/camera/color/camera_info', self.caminfo_callback, 10
-        # )
+        # Subscribers (just push into queue, don’t run inference here)
         self.image_sub = self.create_subscription(
-            Image, '/camera/image_raw', self.image_callback, 10
+            Image, '/camera/camera/color/image_raw', self.image_callback, 10
         )
         self.info_sub = self.create_subscription(
-            CameraInfo, '/camera/camera_info', self.caminfo_callback, 10
+            CameraInfo, '/camera/camera/color/camera_info', self.caminfo_callback, 10
+
         )
+
+        
+        # self.image_sub = self.create_subscription(
+        #     Image, '/camera/image_raw', self.image_callback, 10
+        # )
+        # self.info_sub = self.create_subscription(
+        #     CameraInfo, '/camera/camera_info', self.caminfo_callback, 10
+        # )
 
 
         # Publishers (we will publish from the worker thread)

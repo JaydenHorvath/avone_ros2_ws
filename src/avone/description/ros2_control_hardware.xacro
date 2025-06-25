@@ -1,9 +1,24 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <ros2_control name="GazeboSimSystem" type="system">
+  <ros2_control name="AVONE_ros2_control" type="system">
     <hardware>
-       <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+      <plugin>avone/AvoneSystemHardware</plugin>
+      <param name="max_steer_angle">0.7</param>
+      <param name="min_steer_angle">-0.7</param>
+      <param name="max_rpm">15000</param>
+      <param name="can_interface">vcan0</param>
+      <param name="can_baudrate">250000</param>
+      <param name="read_timeout_ms">20</param>
+      <param name="l_motor_can_id">0x127</param>
+      <param name="r_motor_can_id">0x128</param>
+      <param name="steer_can_id">0x200</param>
+
+      <param name="cmd_l_motor_can_id">0x27</param>
+      <param name="cmd_r_motor_can_id">0x28</param>
+      <param name="cmd_steer_can_id">0x20</param>
+
+
     </hardware>
 
   <!-- front steering -->
@@ -41,15 +56,6 @@
   </joint>
 
 </ros2_control>
-
-  <gazebo>
-    <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
-     <robot_param>robot_description</robot_param>
-        <robot_param_node>robot_state_publisher</robot_param_node>
-      <parameters>$(find avone)/config/ackermann_drive_controller.yaml</parameters>
-    </plugin>
-
-  </gazebo>
 
 
 </robot>

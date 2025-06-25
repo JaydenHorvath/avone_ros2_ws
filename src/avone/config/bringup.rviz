@@ -1,0 +1,99 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+    Help Height: 78
+    Property Tree Widget:
+      Expanded:
+        - /Global Options1
+        - /Status1
+        - /TF1
+        - /RobotModel1
+      Splitter Ratio: 0.5
+ 
+
+Visualization Manager:
+  Global Options:
+    Fixed Frame: odom
+    Background Color: 192; 191; 188
+    Frame Rate: 30
+  Displays:
+    - Name: Grid
+      Class: rviz_default_plugins/Grid
+      Enabled: true
+      Cell Size: 1
+      Plane: XY
+      Plane Cell Count: 100
+      Normal Cell Count: 0
+      Color: 36; 31; 49
+      Line Style:
+        Value: Lines
+        Line Width: 0.03
+      Reference Frame: odom
+
+    - Name: TF
+      Class: rviz_default_plugins/TF
+      Enabled: true
+      Frame Timeout: 15
+      Marker Scale: 1
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      # <-- no hard-coded Tree: let RViz subscribe to /tf
+
+    - Name: RobotModel
+      Class: rviz_default_plugins/RobotModel
+      Enabled: true
+      Description Source: Topic
+      Description Topic:
+        Value: /robot_description
+        History Policy: Keep Last
+        Durability Policy: Volatile
+        Reliability Policy: Reliable
+      Visual Enabled: true
+      Collision Enabled: false
+      TF Prefix: ""
+      Update Interval: 0
+
+  Tools:
+    - Class: rviz_default_plugins/Interact
+      Hide Inactive Objects: true
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+    - Class: rviz_default_plugins/Measure
+      Line color: 128; 128; 0
+    - Class: rviz_default_plugins/SetInitialPose
+      Topic: /initialpose
+    - Class: rviz_default_plugins/SetGoal
+      Topic: /goal_pose
+    - Class: rviz_default_plugins/PublishPoint
+      Single click: true
+      Topic: /clicked_point
+
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Name: Current View
+      Target Frame: base_link      # <--- main car frame!
+      Distance: 8.0               # meters behind car
+      Yaw: 3.14                   # 180 deg (directly behind)
+      Pitch: 0.35                 # 0 = flat, pi/2 = top-down
+      Focal Point: {X: 0, Y: 0, Z: 0}
+      Near Clip Distance: 0.01
+      Invert Z Axis: false
+
+Window Geometry:
+  X: 0
+  Y: 28
+  Width: 1920
+  Height: 997
+  Hide Left Dock: false
+  Hide Right Dock: false
+  Selection:
+    collapsed: false
+  Displays:
+    collapsed: false
+  Tool Properties:
+    collapsed: false
+  Views:
+    collapsed: false

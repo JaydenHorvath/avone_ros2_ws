@@ -21,7 +21,12 @@ setup(
     entry_points={
         'console_scripts': [
             'motor_control = motor_control.motor_control:main',
-            'imu_test = motor_control.imu_test:main'
+            'imu_test = motor_control.imu_test:main',
+            'gps_odom_test = motor_control.gps_odom_test:main',
+            'gps_old_test = motor_control.gps_old_test:main',
+            'gps_sim = motor_control.gps_sim:main',
+            'CAN_motorcontrollers = motor_control.CAN_motorcontrollers:main',
+             'wheelspeedtest = motor_control.wheelspeedtest:main',
         ],
     },
 )

@@ -89,13 +89,15 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'use_sim_time': use_sim_time},
-            {'frequency': 30.0, 'publish_filtered_gps': True}
+            {'frequency': 30.0, 'publish_filtered_gps': False},
+             {'broadcast_utm_transform': True},
+            
         ],
-        remappings=[
-            ('gps/fix', '/navsat1'),
+         remappings=[
+            ('gps/fix', '/navsat'),
             ('odometry/filtered', '/odometry/local'),
             ('odometry/gps', '/odometry/gps'),
-        ]
+         ]
     )
 
     ekf_map_node = Node(
@@ -120,7 +122,7 @@ def generate_launch_description():
             arguments=[
                 '0', '0', '0',   # x y z
                 '0', '0', '0',   # roll pitch yaw
-                'odom', 'map'    # parent_frame child_frame
+                'map', 'odom'    # parent_frame child_frame
             ]
         )
 
@@ -263,6 +265,17 @@ def generate_launch_description():
         ]
     )
 
+    # tf_odometry_relay = Node(
+    #     package='topic_tools',
+    #     executable='relay',
+    #     name='tf_odometry_relay',
+    #     arguments=[
+    #         '/ackermann_steering_controller/tf_odometry',  # incoming topic
+    #         '/tf'                                           # outgoing topic
+    #     ],
+    #     output='screen'
+    # )
+
     # -------------------------------------------------------------------------
     # Teleop Nodes (joy + teleop_twist_joy)
     # -------------------------------------------------------------------------
@@ -288,7 +301,7 @@ def generate_launch_description():
             'repeat_rate': 50.0
         }],
         remappings=[
-            ('/cmd_vel', '/ackermann_steering_controller/reference_unstamped')
+            ('/cmd_vel', '/ackermann_steering_controller/reference')
         ]
     )
 
@@ -361,10 +374,10 @@ def generate_launch_description():
         # 10) robot_localization Nodes
         # ---------------------------------------------------- 
         static_map_tf,
-        ekf_local_node,
-        navsat_transform_node,
-        ekf_map_node,
-       
+         ekf_local_node,
+           navsat_transform_node,
+         ekf_map_node,
+    #    tf_odometry_relay,
         # ----------------------------------------------------
         # 11) RViz (delayed)
         # ----------------------------------------------------

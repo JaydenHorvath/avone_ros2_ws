@@ -17,9 +17,79 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
+find_package(hardware_interface REQUIRED)
+find_package(pluginlib REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_lifecycle REQUIRED)
+
+add_library(
+  avone
+  SHARED
+  src/avone_system_hardware.cpp
+  src/avone_can_interface.cpp
+  
+)
+
+add_executable(avone_can_interface
+  src/avone_can_interface_main.cpp   # <-- your main(), e.g. test file
+  src/avone_can_interface.cpp        # <-- the class implementation
+)
+target_include_directories(avone_can_interface
+  PRIVATE
+    include
+)
+ament_target_dependencies(avone_can_interface rclcpp)   # Remove rclcpp if unused
+
+install(
+  TARGETS avone_can_interface
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+add_executable(can_simulator src/can_simulator.cpp)
+
+ament_target_dependencies(can_simulator
+  rclcpp
+)
+
+install(TARGETS
+  can_simulator
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+add_executable(twiststamped src/twiststamped.cpp)
+ament_target_dependencies(twiststamped rclcpp geometry_msgs)
+install(TARGETS twiststamped DESTINATION lib/${PROJECT_NAME})
+
+
+target_include_directories(
+  avone
+  PUBLIC
+  include
+)
+ament_target_dependencies(
+  avone
+  hardware_interface
+  rclcpp
+  rclcpp_lifecycle
+)
+# prevent pluginlib from using boost
+target_compile_definitions(avone PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
+
+pluginlib_export_plugin_description_file(
+  hardware_interface avone.xml)
+
+install(
+  TARGETS
+  avone
+  RUNTIME DESTINATION bin
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+)
+
+install(
+  DIRECTORY include/
+  DESTINATION include
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -30,7 +100,31 @@ if(BUILD_TESTING)
   # uncomment the line when this package is not in a git repo
   #set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
+  find_package(ament_cmake_gmock REQUIRED)
+  find_package(ros2_control_test_assets REQUIRED)
+
+  ament_add_gmock(test_avone_system_hardware test/test_avone_system_hardware.cpp)
+  target_include_directories(test_avone_system_hardware PRIVATE include)
+  ament_target_dependencies(
+    test_avone_system_hardware
+    hardware_interface
+    pluginlib
+    ros2_control_test_assets
+  )
 endif()
+
+ament_export_include_directories(
+  include
+)
+ament_export_libraries(
+  avone
+)
+ament_export_dependencies(
+  hardware_interface
+  pluginlib
+  rclcpp
+  rclcpp_lifecycle
+)
 
 install(
   DIRECTORY config description launch worlds

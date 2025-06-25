@@ -38,12 +38,12 @@ def generate_launch_description():
     ]
     )
     
-    # node_joint_state_publisher = Node(
-#     package='joint_state_publisher_gui',
-#     executable='joint_state_publisher_gui',
-#     name='joint_state_publisher_gui',
-#     output='screen'
-# )
+    node_joint_state_publisher = Node(
+    package='joint_state_publisher_gui',
+    executable='joint_state_publisher_gui',
+    name='joint_state_publisher_gui',
+    output='screen'
+)
             # RViz Node (without config file)
 
 
@@ -60,8 +60,8 @@ def generate_launch_description():
             description='Use sim time if true'),
 
         node_robot_state_publisher,
-        #node_joint_state_publisher,
-        #node_rviz,
+        node_joint_state_publisher,
+        # node_rviz,
         
         
     ])

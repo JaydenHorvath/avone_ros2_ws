@@ -1,0 +1,9 @@
+<library path="avone">
+  <class name="avone/AvoneSystemHardware"
+         type="avone::AvoneSystemHardware"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      ros2_control hardware interface.
+    </description>
+  </class>
+</library>
