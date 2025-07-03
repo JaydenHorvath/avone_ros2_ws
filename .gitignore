@@ -14,3 +14,4 @@ log/
 .idea/
 robot_localization_debug.txt
 robot_localization_debug.txt
+src/ros_team_workspace/
