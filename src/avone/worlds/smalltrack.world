@@ -14,7 +14,8 @@
       <publish_rate>10</publish_rate>
     </plugin>
 
-  
+    
+ 
 
     <plugin
       filename="gz-sim-user-commands-system"
@@ -83,21 +84,10 @@
       </link>
     </model>
 
-    <light name="sun" type="directional">
-      <cast_shadows>true</cast_shadows>
-      <pose>0 0 10 0 0 0</pose>
-      <diffuse>1 1 1 1</diffuse>
-      <specular>0.1 0.1 0.1 1</specular>
-      <attenuation>
-        <range>1000</range>
-        <constant>0.9</constant>
-        <linear>0.01</linear>
-        <quadratic>0.001</quadratic>
-      </attenuation>
-      <direction>-0.5 0.5 -1</direction>
-    </light>
-
-   
+  <scene>
+  <ambient>1 1 1 1</ambient>       <!-- Max brightness, perfectly even -->
+  <background>1 1 1 1</background> <!-- Pure white background (optional) -->
+</scene>
    <!-- Oval “donut” of cones -->
 <!-- Angles: 0°, 30°, …, 330° -->
 <!-- Inner ellipse: a=5, b=3 (blue) -->
@@ -775,8 +765,8 @@
     </include>
 
 
-    <!-- <include>
-      <pose>-9.61314 13.0 0.15 0 0 0</pose>
+  <include>
+      <pose>-9.4 13 0.2 0 0 0</pose>
       <uri>model://big_cone</uri>
       <name>big_cone_67</name>
       
@@ -785,8 +775,10 @@
     </include>
 
 
-    <include>
-      <pose>-9.99934 12.989 0.15 0 0 0</pose>
+
+
+       <include>
+      <pose>-9.99934 12.989 0.2 0 0 0</pose>
       <uri>model://big_cone</uri>
       <name>big_cone_68</name>
       
@@ -796,7 +788,7 @@
 
 
     <include>
-      <pose>-9.62148 8.39323 0.15 0 0 0</pose>
+      <pose>-9.62148 8.39323 0.2 0 0 0</pose>
       <uri>model://big_cone</uri>
       <name>big_cone_69</name>
       
@@ -806,13 +798,13 @@
 
 
     <include>
-      <pose>-9.98667 8.39348 0.15 0 0 0</pose>
+      <pose>-9.98667 8.39348 0.2 0 0 0</pose>
       <uri>model://big_cone</uri>
       <name>big_cone_70</name>
       
       <covariance x="0.01" y="0.01" xy="0.0"/>
 
-    </include> -->
+    </include>
 
   </world>
 </sdf>

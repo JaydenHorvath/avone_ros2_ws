@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+
+import os
+
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import (
+    Command,
+    FindExecutable,
+    LaunchConfiguration,
+    PathJoinSubstitution
+)
+from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
+
+def generate_launch_description():
+    # Whether to use /clock (e.g. for bag playback or sim)
+    use_sim_time = LaunchConfiguration('use_sim_time', default='false')
+
+    # Build the robot_description parameter from your XACRO
+    robot_description_content = Command([
+        FindExecutable(name='xacro'),
+        ' ',
+        PathJoinSubstitution([
+            FindPackageShare('avone'),
+            'description',
+            'robot.urdf.xacro'
+        ])
+    ])
+
+    # Path to your RViz config
+    rviz_config = PathJoinSubstitution([
+        FindPackageShare('avone'),
+        'config',
+        'view_bot.rviz'
+    ])
+
+    return LaunchDescription([
+        # Allow overriding sim-time
+        DeclareLaunchArgument(
+            'use_sim_time',
+            default_value='false',
+            description='Use simulated clock if true'
+        ),
+
+        # Publish joint_states so moving links get transforms
+        Node(
+            package='joint_state_publisher',
+            executable='joint_state_publisher',
+            name='joint_state_publisher',
+            output='screen',
+            parameters=[{'use_sim_time': use_sim_time}]
+        ),
+
+        # If you prefer a simple GUI slider to manipulate joints, uncomment this:
+        # Node(
+        #     package='joint_state_publisher_gui',
+        #     executable='joint_state_publisher_gui',
+        #     name='joint_state_publisher_gui',
+        #     output='screen',
+        #     parameters=[{'use_sim_time': use_sim_time}]
+        # ),
+
+        # Publish the robot_description to TF
+        Node(
+            package='robot_state_publisher',
+            executable='robot_state_publisher',
+            name='robot_state_publisher',
+            output='screen',
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                'robot_description': robot_description_content
+            }]
+        ),
+
+        # Finally, launch RViz with your desired config
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            output='screen',
+            parameters=[{'use_sim_time': use_sim_time}],
+            arguments=['-d', rviz_config]
+        ),
+    ])

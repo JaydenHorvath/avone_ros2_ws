@@ -7,15 +7,20 @@
   <maintainer email="c3350128@uon.edu.au">jay</maintainer>
   <license>TODO: License declaration</license>
 
+  <buildtool_depend>ament_python</buildtool_depend>
 
   <depend>cv_bridge</depend>
    <build_depend>geometry_msgs</build_depend>
   <build_depend>vision_msgs</build_depend>
-
+  
+  
   <exec_depend>rclpy</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>vision_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
+    <exec_depend>transformers</exec_depend>
+  <exec_depend>torch</exec_depend>
+
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
@@ -24,6 +29,8 @@
 
   <exec_depend>vision_msgs</exec_depend>
 
+  <depend>tf2_sensor_msgs</depend>
+  <depend>tf2_ros</depend>      <!-- you already have this, but double-check -->
 
   <export>
     <build_type>ament_python</build_type>

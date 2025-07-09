@@ -7,23 +7,18 @@
         <origin xyz="0.6909 0 0.772413" rpy="0 0 0"/>
     </joint>
 
-    <link name="depthcamera_link">
-        <visual>
-            <geometry>
-                <box size="0.010 0.03 0.03"/>
-            </geometry>
-            <material name="red"/>
-        </visual>
-    </link>
+    <link name="depthcamera_link"/>
+     
 
 
     <joint name="depthcamera_optical_joint" type="fixed">
         <parent link="depthcamera_link"/>
         <child link="depthcamera_link_optical"/>
-        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2} "/>
+         <!-- <origin xyz="0 0 0" rpy="0 0 0"/> -->
     </joint>
 
-    <link name="depthcamera_link_optical"></link>
+    <link name="depthcamera_link_optical"/>
 
 
 
@@ -31,30 +26,33 @@
         <material>Gazebo/Red</material>
 
         <sensor name="depthcamera" type="depth">
-
+            <point_cloud>true</point_cloud>
             <gz_frame_id>depthcamera_link_optical</gz_frame_id>
-
+            <frame_id>depthcamera_link_optical</frame_id>
             <pose> 0 0 0 0 0 0 </pose>
             <visualize>true</visualize>
             <update_rate>30</update_rate>
             <topic>depth/image_raw</topic>
+            <camera_info_topic>depth/camera_info</camera_info_topic>
+            
+            <always_on>1</always_on>
             <camera>
-                <horizontal_fov>1.089</horizontal_fov>
+                <horizontal_fov>1.2042771838760875</horizontal_fov>
                 <image>
-                    <format>R8G8B8</format>
+                   
                     <width>640</width>
-                    <height>480</height>
+                    <height>360</height>
                 </image>
                 <clip>
-                    <near>0.05</near>
-                    <far>8.0</far>
+                    <near>0.1</near>
+                    <far>6.0</far>
                 </clip>
             </camera>
-        
+         
         </sensor>
 
 
-      
+        
         
     </gazebo>
 

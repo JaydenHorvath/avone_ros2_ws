@@ -17,6 +17,11 @@
 
   <depend>rclcpp_lifecycle</depend>
 
+  <depend>ignition-gazebo6</depend>
+  <depend>ignition-transport11</depend>
+
+  <build_depend>geometry_msgs</build_depend>
+
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
   <test_depend>ament_cmake_gmock</test_depend>
@@ -31,6 +36,7 @@
   <exec_depend>tf2_sensor_msgs</exec_depend>
   <exec_depend>message_filters</exec_depend>
   <exec_depend>numpy</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
 
 
   <exec_depend>ultralytics</exec_depend>

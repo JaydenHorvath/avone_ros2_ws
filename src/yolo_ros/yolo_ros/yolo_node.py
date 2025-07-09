@@ -1,157 +1,224 @@
+#!/usr/bin/env python3
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image, CameraInfo
 from vision_msgs.msg import (
-    Detection2D,
     Detection2DArray,
+    Detection2D,
     BoundingBox2D,
     ObjectHypothesisWithPose,
 )
-from geometry_msgs.msg import PoseWithCovariance
-from cv_bridge import CvBridge       # <— add this line
+from geometry_msgs.msg import PoseArray, Pose
+from cv_bridge import CvBridge
 from ultralytics import YOLO
-from collections import deque
-from threading import Thread, Lock
-from time import sleep
+import numpy as np
+import cv2
+
+def iou(boxA, boxB):
+    xA = max(boxA[0], boxB[0])
+    yA = max(boxA[1], boxB[1])
+    xB = min(boxA[2], boxB[2])
+    yB = min(boxA[3], boxB[3])
+    inter = max(0, xB-xA) * max(0, yB-yA)
+    areaA = (boxA[2]-boxA[0]) * (boxA[3]-boxA[1])
+    areaB = (boxB[2]-boxB[0]) * (boxB[3]-boxB[1])
+    return inter / float(areaA + areaB - inter + 1e-8)
+
+def filter_yellow_with_orange_proximity(detections,
+                                        iou_thresh=0.25,
+                                        pixel_thresh=30,
+                                        z_thresh=0.2):
+    oranges = [d for d in detections if d['label'] in ('orange','large_orange')]
+    yellows = [d for d in detections if d['label']=='yellow']
+    others  = [d for d in detections if d['label'] not in ('orange','large_orange','yellow')]
+    keep = []
+    keep += oranges
+    for y in yellows:
+        y_box = y['bbox']
+        y_ctr = np.array([ (y_box[0]+y_box[2])/2, (y_box[1]+y_box[3])/2 ])
+        y_z   = y['pos'][2]
+        suppressed = False
+        for o in oranges:
+            o_box = o['bbox']
+            o_ctr = np.array([ (o_box[0]+o_box[2])/2, (o_box[1]+o_box[3])/2 ])
+            o_z   = o['pos'][2]
+            if iou(y_box,o_box)>iou_thresh or \
+               np.linalg.norm(y_ctr-o_ctr)<pixel_thresh or \
+               abs(y_z-o_z)<z_thresh:
+                suppressed = True
+                break
+        if not suppressed:
+            keep.append(y)
+    keep += others
+    return keep
 
 class YoloRosNode(Node):
     def __init__(self):
         super().__init__('yolo_ros_node')
         self.bridge = CvBridge()
 
-        # THREAD-SAFE QUEUE FOR FRAMES
-        self.frame_queue = deque(maxlen=2)   # keep only up to 2 frames; drop older
-        self.queue_lock = Lock()
+        # --- YOLO model load ---
+        weights = '/home/jay/Documents/yolo11-tutorial/runs/detect/train18/weights/best.pt'
+        self.model = YOLO(weights)
 
-        # Subscribers (just push into queue, don’t run inference here)
-        self.image_sub = self.create_subscription(
-            Image, '/camera/camera/color/image_raw', self.image_callback, 10
-        )
-        self.info_sub = self.create_subscription(
-            CameraInfo, '/camera/camera/color/camera_info', self.caminfo_callback, 10
+        # --- class ↔ label ↔ visuals ↔ real heights ---
+        self.color_map = {0:'blue', 2:'orange', 1:'large_orange', 4:'yellow'}
+        self.visual_map = {
+            'blue': (255, 0, 0),
+            'yellow': (0,255,255),
+            'orange': (0,128,255),
+            'large_orange': (0,80,180),
+            'unknown': (128,128,128)
+        }
+        self.height_map = {
+            'blue': 0.325,
+            'yellow': 0.325,
+            'orange': 0.325,
+            'large_orange': 0.505
+        }
 
-        )
+        # --- large_orange box‐size filtering params ---
+        self.min_large_px = 50    # minimum pixel‐height
+        self.min_ar = 0.2          # min width/height
+        self.max_ar = 0.8          # max width/height
 
-        
-        # self.image_sub = self.create_subscription(
-        #     Image, '/camera/image_raw', self.image_callback, 10
-        # )
-        # self.info_sub = self.create_subscription(
-        #     CameraInfo, '/camera/camera_info', self.caminfo_callback, 10
-        # )
+        # --- camera intrinsics (set once) ---
+        self.fx = self.fy = self.cx = self.cy = None
 
+        # --- ROS subscriptions & publishers ---
+        self.create_subscription(CameraInfo,
+                                 '/camera/camera_info',
+                                 self.caminfo_cb, 10)
+        self.create_subscription(Image,
+                                 '/camera/image_raw',
+                                 self.image_cb, 10)
 
-        # Publishers (we will publish from the worker thread)
-        self.image_pub = self.create_publisher(Image, '/yolo/image', 10)
-        self.info_pub  = self.create_publisher(CameraInfo, '/yolo/camera_info', 10)
-        self.det_pub   = self.create_publisher(Detection2DArray, '/yolo/detections', 10)
+        self.info_pub  = self.create_publisher(CameraInfo,
+                                               '/yolo/camera_info', 10)
+        self.det_pub   = self.create_publisher(Detection2DArray,
+                                               '/yolo/detections', 10)
+        self.pose_pub  = self.create_publisher(PoseArray,
+                                               '/cone_poses', 10)
+        self.image_pub = self.create_publisher(Image,
+                                               '/yolo/image', 10)
 
-        # LOAD YOLO MODEL ON GPU WITH FP16
-        # Note: `device='cuda:0'` forces GPU; `model.model.half()` enables FP16.
-        self.model = YOLO('/home/jay/Documents/yolo11-tutorial/runs/detect/train18/weights/best.pt')
-        # 2) move weights onto GPU #0
-        self.model.to('cuda:0')         # or self.model.cuda()
+        self.conf_thresh = 0.7
+        self.get_logger().info('YOLO node with large_orange size filtering started')
 
-        # 3) convert to FP16
-        self.model.model.half()
+    def caminfo_cb(self, msg:CameraInfo):
+        if self.fx is None:
+            self.fx, self.fy = msg.k[0], msg.k[4]
+            self.cx, self.cy = msg.k[2], msg.k[5]
+            self.get_logger().info(
+                f"Camera intrinsics fx={self.fx}, fy={self.fy}, cx={self.cx}, cy={self.cy}"
+            )
+        self.info_pub.publish(msg)
 
-  
-
-
-        # START A DEDICATED INFERENCE THREAD
-        self.running = True
-        self.infer_thread = Thread(target=self.inference_worker, daemon=True)
-        self.infer_thread.start()
-
-        self.get_logger().info("YOLO node up and running on CUDA with FP16!")
-
-    def caminfo_callback(self, info_msg: CameraInfo):
-        # Immediately forward camera info
-        self.info_pub.publish(info_msg)
-
-    def image_callback(self, img_msg: Image):
-        # 1) Convert ROS‐Image to CV2
+    def image_cb(self, img_msg:Image):
         try:
-            cv_img = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding='bgr8')
+            frame = self.bridge.imgmsg_to_cv2(img_msg, 'bgr8')
         except Exception as e:
             self.get_logger().error(f"cv_bridge error: {e}")
             return
 
-        # 2) Push the raw CV image + header into our queue
-        with self.queue_lock:
-            # Store a tuple (image, header); maxlen=2 means if queue is full, oldest is discarded
-            self.frame_queue.append((cv_img, img_msg.header))
+        vis = frame.copy()
+        results = self.model(frame)[0]
 
-    def inference_worker(self):
-        """
-        Continuously pull the most recent frame from the queue,
-        run YOLO inference (FP16) on it, then publish annotated image + detections.
-        """
-        from time import sleep
-
-        while rclpy.ok() and self.running:
-            frame_item = None
-
-            # Pop the newest frame (if any)
-            with self.queue_lock:
-                if self.frame_queue:
-                    frame_item = self.frame_queue.pop()
-                    # Clear the queue if there was more than one, since we only want most recent
-                    self.frame_queue.clear()
-
-            if frame_item is None:
-                # No frame available—sleep for a few milliseconds and retry
-                sleep(0.005)
+        dets = []
+        for box in results.boxes:
+            conf = float(box.conf[0].item())
+            if conf < self.conf_thresh:
                 continue
 
-            cv_img, header = frame_item
+            cls_id = int(box.cls[0].item())
+            label  = self.color_map.get(cls_id,'unknown')
+            x1,y1,x2,y2 = box.xyxy[0].tolist()
+            h = y2 - y1
+            w = x2 - x1
 
-            # 3) Run inference (FP16 on GPU). This is synchronous, but it's in our worker thread.
-            #    Because we set model to FP16 and device='cuda:0', this call will use more GPU resources.
-            results = self.model(cv_img, imgsz=640, half=True)  # imgsz=640 is common; adjust as needed
+            # -- large_orange bbox filtering --
+            if label=='large_orange':
+                if h < self.min_large_px:
+                    continue
+                ar = (w/h) if h>0 else 0
+                if not (self.min_ar < ar < self.max_ar):
+                    continue
 
-            # 4) Annotate & publish image
-            annotated = results[0].plot()  # still returns uint8 BGR on CPU, but inference was fp16 on GPU
-            out_msg = self.bridge.cv2_to_imgmsg(annotated, encoding='bgr8')
-            out_msg.header = header
-            self.image_pub.publish(out_msg)
+            # -- estimate 3D Z from pixel height --
+            if self.fx and label in self.height_map and h>0:
+                Z = (self.fy * self.height_map[label]) / h
+                u = (x1+x2)/2.0;  v = (y1+y2)/2.0
+                X = (u - self.cx)*Z/self.fx
+                Y = (v - self.cy)*Z/self.fy
+            else:
+                X=Y=0.0; Z=float(h)
 
-            # 5) Build & publish Detection2DArray
-            det_arr = Detection2DArray()
-            det_arr.header = header
-            for box in results[0].boxes:
-                x1, y1, x2, y2 = box.xyxy[0].tolist()
-                w = x2 - x1
-                h = y2 - y1
+            dets.append({
+                'bbox': (x1,y1,x2,y2),
+                'conf': conf,
+                'label': label,
+                'pos': np.array([X,Y,Z])
+            })
 
-                det = Detection2D()
-                det.header = header
+        # suppress yellow near any orange
+        dets = filter_yellow_with_orange_proximity(dets)
 
-                # BBox center & size
-                bb = BoundingBox2D()
-                bb.center.position.x = float((x1 + x2) / 2.0)
-                bb.center.position.y = float((y1 + y2) / 2.0)
-                bb.size_x = float(w)
-                bb.size_y = float(h)
-                det.bbox = bb
+        det_arr  = Detection2DArray()
+        det_arr.header = img_msg.header
+        pose_arr = PoseArray()
+        pose_arr.header = img_msg.header
 
-                hyp = ObjectHypothesisWithPose()
-                hyp.hypothesis.class_id = str(int(box.cls[0].item()))
-                hyp.hypothesis.score = float(box.conf[0].item())
-                hyp.pose = PoseWithCovariance()
+        for d in dets:
+            x1,y1,x2,y2 = d['bbox']
+            X,Y,Z = d['pos']
+            label = d['label']
+            conf  = d['conf']
+            color = self.visual_map.get(label,(128,128,128))
 
-                det.results = [hyp]
-                det_arr.detections.append(det)
+            # draw
+            cv2.rectangle(vis, (int(x1),int(y1)),
+                               (int(x2),int(y2)), color, 2)
+            cv2.putText(vis,
+                        f"{label} {conf*100:.1f}% {Z:.2f}m",
+                        (int(x1),int(y1)-10),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5, color, 2)
 
-            self.det_pub.publish(det_arr)
+            # Detection2D
+            d2 = Detection2D()
+            d2.header = img_msg.header
+            bb = BoundingBox2D()
+            bb.center.position.x = (x1+x2)/2.0
+            bb.center.position.y = (y1+y2)/2.0
+            bb.size_x = x2 - x1
+            bb.size_y = y2 - y1
+            d2.bbox = bb
 
-        self.get_logger().info("Inference worker shutting down.")
+            hyp = ObjectHypothesisWithPose()
+            hyp.hypothesis.class_id = label
+            hyp.hypothesis.score    = conf
+            hyp.pose.pose.position.x = float(X)
+            hyp.pose.pose.position.y = float(Y)
+            hyp.pose.pose.position.z = float(Z)
+            hyp.pose.pose.orientation.w = 1.0
+            d2.results = [hyp]
+            det_arr.detections.append(d2)
 
-    def destroy_node(self):
-        # Stop the worker thread cleanly before shutting down
-        self.running = False
-        self.infer_thread.join(timeout=1.0)
-        super().destroy_node()
+            # PoseArray
+            p = Pose()
+            p.position.x = float(X)
+            p.position.y = float(Y)
+            p.position.z = float(Z)
+            p.orientation.w = 1.0
+            pose_arr.poses.append(p)
+
+        # publish
+        out_img = self.bridge.cv2_to_imgmsg(vis,'bgr8')
+        out_img.header = img_msg.header
+        self.image_pub.publish(out_img)
+        self.det_pub.publish(det_arr)
+        self.pose_pub.publish(pose_arr)
 
 def main(args=None):
     rclpy.init(args=args)
@@ -162,5 +229,5 @@ def main(args=None):
         node.destroy_node()
         rclpy.shutdown()
 
-if __name__ == '__main__':
+if __name__=='__main__':
     main()

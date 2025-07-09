@@ -1,0 +1,72 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <world name="cone_row_world">
+
+    <!-- Physics and core systems -->
+    <physics name="dart_physics" type="dart">
+      <max_step_size>0.001</max_step_size>
+      <real_time_update_rate>100</real_time_update_rate>
+      <thread_count>4</thread_count>
+    </physics>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <!-- Ground plane -->
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="ground_plane_link">
+        <collision name="collision">
+          <geometry>
+            <plane><normal>0 0 1</normal><size>100 100</size></plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane><normal>0 0 1</normal><size>100 100</size></plane>
+          </geometry>
+          <material>
+            <ambient>0.8 0.8 0.8 1</ambient>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Simple row of cones in front of spawn -->
+    <!-- Spawn at origin, cones placed along +X axis -->
+    <include>
+      <pose>8 2 0.15 0 0 0</pose>
+      <uri>model://blue_cone</uri>
+      <name>blue_cone_0</name>
+    </include>
+
+    <include>
+      <pose>8 4 0.15 0 0 0</pose>
+      <uri>model://yellow_cone</uri>
+      <name>yellow_cone_0</name>
+    </include>
+
+    <include>
+      <pose>8 0 0.15 0 0 0</pose>
+      <uri>model://orange_cone</uri>
+      <name>orange_cone_0</name>
+    </include>
+
+    <include>
+      <pose>8 -2 0.20 0 0 0</pose>
+      <uri>model://big_cone</uri>
+      <name>large_orange_cone_0</name>
+    </include>
+
+    <!-- Lighting/scene settings -->
+    <scene>
+      <ambient>1 1 1 1</ambient>
+      <background>1 1 1 1</background>
+    </scene>
+
+  </world>
+</sdf>

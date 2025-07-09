@@ -35,9 +35,15 @@ class GroundRemovalRANSACNode(Node):
             depth=     1
         )
 
+        # self.pc_sub = self.create_subscription(
+        #     PointCloud2,
+        #     '/camera/camera/depth/color/points',  # ← adjust to your actual depth‐cloud topic
+        #     self.cloud_callback,
+        #     qos
+        # )
         self.pc_sub = self.create_subscription(
             PointCloud2,
-            '/camera/camera/depth/color/points',  # ← adjust to your actual depth‐cloud topic
+            '/lidar/points',  # ← adjust to your actual depth‐cloud topic
             self.cloud_callback,
             qos
         )

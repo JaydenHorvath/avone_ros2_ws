@@ -32,7 +32,7 @@
 
         <sensor name="camera" type="camera">
 
-            <gz_frame_id>camera_link</gz_frame_id>
+            <gz_frame_id>camera_link_optical</gz_frame_id>
 
             <pose> 0 0 0 0 0 0 </pose>
             <visualize>true</visualize>
@@ -40,15 +40,15 @@
             <topic>camera/image_raw</topic>
             <camera>
             <camera_info_topic>camera/camera_info</camera_info_topic>
-                      <horizontal_fov>1.8</horizontal_fov>
+                      <horizontal_fov>1.2042771838760875</horizontal_fov>
                 <image>
                     <format>R8G8B8</format>
                            <width>640</width>
           <height>360</height>
                 </image>
                 <clip>
-                    <near>0.3</near>
-                    <far>10.0</far>
+                    <near>0.1</near>
+                    <far>20.0</far>
                 </clip>
             </camera>
            

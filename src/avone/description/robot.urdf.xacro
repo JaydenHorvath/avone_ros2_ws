@@ -12,14 +12,14 @@
 
   <!-- 3) Simulation ros2_control -->
   <!-- <xacro:if value="$(arg use_sim)"> -->
-    <!-- <xacro:include filename="ros2_control.xacro"/> -->
+    <xacro:include filename="ros2_control.xacro"/>
     <!-- if you want gazebo_control in sim, uncomment this too -->
     <!-- <xacro:include filename="gazebo_control.xacro"/> -->
   <!-- </xacro:if> -->
 
   <!-- 4) Real-hardware ros2_control -->
   <!-- <xacro:unless value="$(arg use_sim)"> -->
-    <xacro:include filename="ros2_control_hardware.xacro"/>
+    <!-- <xacro:include filename="ros2_control_hardware.xacro"/> -->
   <!-- </xacro:unless> -->
 
   <!-- 5) Sensors, cameras, lidar, etc. -->
@@ -27,5 +27,8 @@
   <xacro:include filename="rgbdcamera.xacro"/>
   <xacro:include filename="sensors.xacro"/>
   <xacro:include filename="lidar.xacro"/>
+ <xacro:include filename="depthcamera.xacro"/> 
+  <xacro:include filename="dualcamera.xacro"/> 
+
 
 </robot>

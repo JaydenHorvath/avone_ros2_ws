@@ -22,6 +22,7 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
+
 def generate_launch_description():
     # Use /clock if running in Gazebo
     use_sim_time = LaunchConfiguration('use_sim_time', default='true')
@@ -94,7 +95,7 @@ def generate_launch_description():
             
         ],
          remappings=[
-            ('gps/fix', '/navsat'),
+            ('gps/fix', '/navsat1'),
             ('odometry/filtered', '/odometry/local'),
             ('odometry/gps', '/odometry/gps'),
          ]
@@ -151,14 +152,14 @@ def generate_launch_description():
             'rgbdcamera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
             'rgbdcamera/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image',
             'rgbdcamera/image@sensor_msgs/msg/Image[ignition.msgs.Image',
-            # 'rgbdcameraright/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
-            # 'rgbdcameraright/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
-            # 'rgbdcameraright/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image',
-            # 'rgbdcameraright/image@sensor_msgs/msg/Image[ignition.msgs.Image',
-            # 'rgbdcameraleft/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
-            # 'rgbdcameraleft/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
-            # 'rgbdcameraleft/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image',
-            # 'rgbdcameraleft/image@sensor_msgs/msg/Image[ignition.msgs.Image',
+            'rgb_right/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
+            'rgb_right/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
+            'rgb_right/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image',
+            'rgb_right/image@sensor_msgs/msg/Image[ignition.msgs.Image',
+            'rgb_left/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
+            'rgb_left/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
+            'rgb_left/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image',
+            'rgb_left/image@sensor_msgs/msg/Image[ignition.msgs.Image',
             '/imu@sensor_msgs/msg/Imu[ignition.msgs.IMU',
             '/lidar@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan',
             '/lidar/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
@@ -166,6 +167,9 @@ def generate_launch_description():
             'camera/image_raw@sensor_msgs/msg/Image[ignition.msgs.Image',
             '/navsat1@sensor_msgs/msg/NavSatFix[ignition.msgs.NavSat',
             '/navsat2@sensor_msgs/msg/NavSatFix[ignition.msgs.NavSat',
+            '/depth/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
+            '/depth/image_raw@sensor_msgs/msg/Image[ignition.msgs.Image',
+            '/depth/image_raw/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
         ],
         remappings=[
             ('rgbdcamera/image', '/camera/rgbd/image_raw'),
@@ -177,24 +181,7 @@ def generate_launch_description():
         ]
     )
 
-    depth_to_scan = Node(
-        package='depthimage_to_laserscan',
-        executable='depthimage_to_laserscan_node',
-        name='depth_to_scan',
-        output='screen',
-        parameters=[
-            {'use_sim_time': True},
-            {'range_min': 0.5},
-            {'range_max': 20.0},
-            {'scan_height': 10},
-            {'output_frame_id': 'base_link'},
-        ],
-        remappings=[
-            ('image', '/camera/rgbd/depth_image'),
-            ('camera_info', '/camera/rgbd/camera_info'),
-            ('scan', '/depth_scan'),
-        ]
-    )
+
 
     gz_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -217,10 +204,21 @@ def generate_launch_description():
             '-entity', 'my_robot',
             '-topic', 'robot_description',
             # small track
-            '-x', '-10.0',
+            '-x', '-14.8',
             '-y', '11',
             '-z', '0.1',
             '--Y', '0'
+
+            # '-x', '0',
+            # '-y', '0',
+            # '-z', '0',
+            # '--Y', '0'
+
+            # # small track
+            # '-x', '-10.0',
+            # '-y', '11',
+            # '-z', '0.1',
+            # '--Y', '0'
             # accel
             # '-x', '25.2118',
             # '-y', '-0.2167',
@@ -279,6 +277,13 @@ def generate_launch_description():
     # -------------------------------------------------------------------------
     # Teleop Nodes (joy + teleop_twist_joy)
     # -------------------------------------------------------------------------
+    twiststamped_node =     Node(
+        package='avone',
+        executable='twiststamped',
+        name='twiststamped',
+        output='screen'
+    )
+    
     joy_node = Node(
         package='joy',
         executable='joy_node',
@@ -300,9 +305,9 @@ def generate_launch_description():
             'enable_button': 4,
             'repeat_rate': 50.0
         }],
-        remappings=[
-            ('/cmd_vel', '/ackermann_steering_controller/reference')
-        ]
+        # remappings=[
+        #     ('/cmd_vel', '/ackermann_steering_controller/reference')
+        # ]
     )
 
     # -------------------------------------------------------------------------
@@ -352,7 +357,7 @@ def generate_launch_description():
         # ----------------------------------------------------
         # 8) DepthImage → LaserScan
         # ----------------------------------------------------
-        depth_to_scan,
+   
 
         # ----------------------------------------------------
         # 9) Sequence controller spawners
@@ -387,5 +392,6 @@ def generate_launch_description():
         # 12) Teleop: joy_node & teleop_twist_joy_node
         # ----------------------------------------------------
         joy_node,
+        twiststamped_node,
         teleop_twist_joy_node,
     ])

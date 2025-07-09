@@ -36,7 +36,8 @@ setup(
               'lidargroundremoval = cone_mapper.lidargroundremoval:main',
               'groundremovalright = cone_mapper.groundremovalright:main',
               'conecenterline = cone_mapper.conecenterline:main',
-              'yolobasedlandmark = cone_mapper.yolobasedlandmark:main'
+              'yolobasedlandmark = cone_mapper.yolobasedlandmark:main',
+              'lidarconemapper = cone_mapper.lidarconemapper:main',
         ],
     },
 )

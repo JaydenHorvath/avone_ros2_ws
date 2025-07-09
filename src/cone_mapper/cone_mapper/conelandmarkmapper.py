@@ -33,7 +33,7 @@ class ConeLandmarkMapperNode(Node):
 
         # clustering parameters
         self.declare_parameter('cluster_tolerance', 0.07)
-        self.declare_parameter('min_cluster_size', 40)
+        self.declare_parameter('min_cluster_size', 3)
         self.declare_parameter('max_cluster_size', 2000)
         self.cluster_tolerance = self.get_parameter('cluster_tolerance').get_parameter_value().double_value
         self.min_cluster_size  = self.get_parameter('min_cluster_size').get_parameter_value().integer_value
