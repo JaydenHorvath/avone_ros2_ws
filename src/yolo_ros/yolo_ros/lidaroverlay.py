@@ -21,6 +21,9 @@ class LidarImageOverlay(Node):
         # for mapping ring→BGR colour
         self.ring_colors = {}
 
+        # img_sub   = message_filters.Subscriber(self, Image,       '/camera/image_raw')
+        # info_sub  = message_filters.Subscriber(self, CameraInfo,  '/camera/camera_info')
+        # cloud_sub = message_filters.Subscriber(self, PointCloud2, '/cloud_no_ground_ransac')
         img_sub   = message_filters.Subscriber(self, Image,       '/camera/image_raw')
         info_sub  = message_filters.Subscriber(self, CameraInfo,  '/camera/camera_info')
         cloud_sub = message_filters.Subscriber(self, PointCloud2, '/cloud_no_ground_ransac')

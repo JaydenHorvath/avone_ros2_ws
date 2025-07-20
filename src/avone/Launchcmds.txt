@@ -1,3 +1,20 @@
+#quanergy lidar setup 
+
+
+
+
+
+
+
+
+
+ros2 launch quanergy_client_ros client.launch.py host:=192.168.1.100
+
+#nav voxel markers
+ros2 run nav2_costmap_2d nav2_costmap_2d_markers   voxel_grid:=/local_costmap/voxel_grid   visualization_marker:=/voxel_markers
+
+
+
 # CAN 
 
 sudo modprobe vcan

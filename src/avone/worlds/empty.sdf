@@ -3,6 +3,59 @@
   <!-- 1) Define the world -->
   <world name="empty">
   
+   <physics name="dart_physics" type="dart">
+      <max_step_size>0.001</max_step_size>
+      <real_time_update_rate>100</real_time_update_rate>
+      <thread_count>20</thread_count>          <!-- match your CPU cores -->
+    </physics>
+
+    <plugin
+      filename="gz-sim-scene-broadcaster-system"
+      name="gz::sim::systems::SceneBroadcaster">
+      <publish_rate>10</publish_rate>
+    </plugin>
+
+    
+ 
+
+    <plugin
+      filename="gz-sim-user-commands-system"
+      name="gz::sim::systems::UserCommands">
+    </plugin>
+
+ 
+   
+    <plugin
+      filename="gz-sim-physics-system"
+      name="gz::sim::systems::Physics">
+    </plugin>
+
+
+    <plugin
+      filename="gz-sim-sensors-system"
+      name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    
+    <plugin
+      filename="gz-sim-imu-system"
+      name="gz::sim::systems::Imu">
+    </plugin>
+  
+
+    <plugin filename="ignition-gazebo-navsat-system" name="ignition::gazebo::systems::NavSat"/>
+
+    
+    
+    <spherical_coordinates>
+        <surface_model>EARTH_WGS84</surface_model>
+        <world_frame_orientation>ENU</world_frame_orientation>
+        <latitude_deg>-22.986687</latitude_deg>
+        <longitude_deg>-43.202501</longitude_deg>
+        <elevation>0</elevation>
+        <heading_deg>0</heading_deg>
+    </spherical_coordinates>
+
     <!-- 2) Ground plane -->
     <model name="ground_plane">
       <static>true</static>

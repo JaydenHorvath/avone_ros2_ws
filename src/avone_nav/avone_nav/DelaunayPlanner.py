@@ -20,9 +20,9 @@ class DelaunayPlanner(Node):
 
         # subscribe to your blue/yellow cone topics
         self.create_subscription(
-            MarkerArray, 'cone_landmarks_blue', self._blue_cb, 10)
+            MarkerArray, '/cone_landmarks_blue', self._blue_cb, 10)
         self.create_subscription(
-            MarkerArray, 'cone_landmarks_yellow', self._yellow_cb, 10)
+            MarkerArray, '/cone_landmarks_yellow', self._yellow_cb, 10)
 
         # publishers for triangles, midpoints, and path
         self.tri_pub  = self.create_publisher(Marker, '/delaunay_triangles', 10)

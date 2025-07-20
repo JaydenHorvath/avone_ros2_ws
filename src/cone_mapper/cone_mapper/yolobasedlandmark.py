@@ -41,7 +41,7 @@ class HybridConeLocalizer(Node):
 
         # Camera intrinsics
         self.fx = self.fy = self.cx = self.cy = None
-        self.create_subscription(CameraInfo, '/camera/camera_info',
+        self.create_subscription(CameraInfo, '/camera/camera/color/camera_info',
                                  self.caminfo_cb, 10)
 
         # Subscribers: YOLO + ground-removed pointcloud

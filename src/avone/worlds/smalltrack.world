@@ -763,7 +763,7 @@
       <covariance x="0.01" y="0.01" xy="0.0"/>
 
     </include>
-
+<!-- 
 
   <include>
       <pose>-9.4 13 0.2 0 0 0</pose>
@@ -804,7 +804,7 @@
       
       <covariance x="0.01" y="0.01" xy="0.0"/>
 
-    </include>
+    </include> -->
 
   </world>
 </sdf>

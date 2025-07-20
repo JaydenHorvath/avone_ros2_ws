@@ -15,7 +15,7 @@ setup(
     ],
     install_requires=[
         'setuptools',
-         'rclpy',
+        'rclpy',
         'sensor_msgs',
         'vision_msgs',
         'message_filters',   # <<< add this
@@ -27,7 +27,7 @@ setup(
     maintainer_email='c3350128@uon.edu.au',
     description='Maps cone landmarks using an RGB-D camera',
     license='Apache License 2.0',
-    tests_require=['pytest'],
+    # tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             # <executable_name> = <module>:<function>

@@ -17,7 +17,7 @@ setup(
     maintainer_email='c3350128@uon.edu.au',
     description='TODO: Package description',
     license='TODO: License declaration',
-    tests_require=['pytest'],
+    # tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'motor_control = motor_control.motor_control:main',

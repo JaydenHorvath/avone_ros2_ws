@@ -17,7 +17,7 @@ class GroundRemovalRANSACNode(Node):
         super().__init__('ground_removal_ransac_node')
 
         # ——— RANSAC parameters —————————————————————————————————
-        self.declare_parameter('dist_thresh', 0.02)
+        self.declare_parameter('dist_thresh', 0.1)
         self.declare_parameter('max_iter',   100)
         self.declare_parameter('downsample_leaf', 0.02)  # 2 cm voxels
 
@@ -41,19 +41,26 @@ class GroundRemovalRANSACNode(Node):
         #     self.cloud_callback,
         #     qos
         # )
-        self.pc_sub = self.create_subscription(
-            PointCloud2,
-            '/lidar/points',  # ← adjust to your actual depth‐cloud topic
-            self.cloud_callback,
-            qos
-        )
-
         # self.pc_sub = self.create_subscription(
         #     PointCloud2,
-        #     '/camera/rgbd/points',  # ← adjust to your actual depth‐cloud topic
+        #     '/lidar/points',  # ← adjust to your actual depth‐cloud topic
         #     self.cloud_callback,
         #     qos
         # )
+
+        # self.pc_sub = self.create_subscription(
+        #     PointCloud2,
+        #     '/points_180',  # ← adjust to your actual depth‐cloud topic
+        #     self.cloud_callback,
+        #     qos
+        # )
+
+        self.pc_sub = self.create_subscription(
+            PointCloud2,
+            '/camera/rgbd/points',  # ← adjust to your actual depth‐cloud topic
+            self.cloud_callback,
+            qos
+        )
 
         # Publisher for the “no‐ground” cloud:
         self.pc_pub = self.create_publisher(

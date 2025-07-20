@@ -32,7 +32,7 @@ def generate_launch_description():
             package='topic_tools',
             executable='relay',
             name='cmd_vel_relay',
-            arguments=['/cmd_vel', '/ackermann_steering_controller/reference_unstamped'],
+            arguments=['/cmd_vel', '/ackermann_steering_controller/reference'],
             output='screen'
         )
     ])

@@ -47,6 +47,7 @@ setup(
             'infofake = yolo_ros.infofake:main',
             'image_publisher = yolo_ros.image_publisher:main',
             'lidaroverlay = yolo_ros.lidaroverlay:main',
+            'filterlidar = yolo_ros.filterlidar:main',
 
         ],
     },
