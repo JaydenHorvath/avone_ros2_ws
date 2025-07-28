@@ -1,6 +1,42 @@
+# CHARGE ENABLE 
+
+cansend can0 0FA#01
+
+
+
+
 #quanergy lidar setup 
 
 
+ip addr show dev enx6c6e070b25d8^C
+jay@jay-legion:~/ros2_ws$ sudo journalctl -u isc-dhcp-server --since "1 minute ago" | grep 'Listening on'
+jay@jay-legion:~/ros2_ws$ sudo ip link set dev enx6c6e070b25d8 up
+jay@jay-legion:~/ros2_ws$ sudo ip addr flush dev enx6c6e070b25d8
+sudo ip addr add 192.168.1.1/24 dev enx6c6e070b25d8
+jay@jay-legion:~/ros2_ws$ sudo systemctl restart isc-dhcp-server
+sudo systemctl status isc-dhcp-server
+● isc-dhcp-server.service - ISC DHCP IPv4 server
+     Loaded: loaded (/lib/systemd/system/isc-dhcp-server.service; enabled; vendor preset: enabled)
+     Active: active (running) since Tue 2025-07-22 15:28:05 AEST; 9ms ago
+       Docs: man:dhcpd(8)
+   Main PID: 38923 (dhcpd)
+      Tasks: 4 (limit: 38059)
+     Memory: 5.2M
+        CPU: 7ms
+     CGroup: /system.slice/isc-dhcp-server.service
+             └─38923 dhcpd -user dhcpd -group dhcpd -f -4 -pf /run/dhcp-server/dhcpd.pid -cf /etc/dhcp/dhcpd.conf
+
+Jul 22 15:28:05 jay-legion sh[38923]: Wrote 0 new dynamic host decls to leases file.
+Jul 22 15:28:05 jay-legion sh[38923]: Wrote 0 leases to leases file.
+Jul 22 15:28:05 jay-legion dhcpd[38923]: PID file: /run/dhcp-server/dhcpd.pid
+Jul 22 15:28:05 jay-legion dhcpd[38923]: Internet Systems Consortium DHCP Server 4.4.1
+Jul 22 15:28:05 jay-legion dhcpd[38923]: Copyright 2004-2018 Internet Systems Consortium.
+Jul 22 15:28:05 jay-legion dhcpd[38923]: All rights reserved.
+Jul 22 15:28:05 jay-legion dhcpd[38923]: For info, please visit https://www.isc.org/software/dhcp/
+Jul 22 15:28:05 jay-legion dhcpd[38923]: Wrote 0 deleted host decls to leases file.
+Jul 22 15:28:05 jay-legion dhcpd[38923]: Wrote 0 new dynamic host decls to leases file.
+Jul 22 15:28:05 jay-legion dhcpd[38923]: Wrote 0 leases to leases file.
+jay@jay-legion:~/ros2_ws$ 
 
 
 
@@ -14,8 +50,13 @@ ros2 launch quanergy_client_ros client.launch.py host:=192.168.1.100
 ros2 run nav2_costmap_2d nav2_costmap_2d_markers   voxel_grid:=/local_costmap/voxel_grid   visualization_marker:=/voxel_markers
 
 
+# CAN setup
+sudo ip link set can0 down
+sudo ip link set can0 type can bitrate 250000 
+sudo ip link set can0 up
 
-# CAN 
+
+# VCAN setup
 
 sudo modprobe vcan
 sudo ip link add dev vcan0 type vcan
