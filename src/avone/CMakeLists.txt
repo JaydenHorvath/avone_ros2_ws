@@ -23,9 +23,7 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
-find_package(gazebo_msgs REQUIRED)
-find_package(ignition-gazebo6 REQUIRED)
-find_package(ignition-transport11 REQUIRED)
+
 
 # Find dependencies for the overlay node
 find_package(sensor_msgs REQUIRED)
@@ -63,7 +61,7 @@ ament_target_dependencies(
   rclcpp_lifecycle
   geometry_msgs
   nav_msgs
-  gazebo_msgs
+  
   vision_msgs                # ← add here
 )
 target_compile_definitions(avone PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
@@ -113,16 +111,7 @@ ament_target_dependencies(
 )
 install(TARGETS twiststamped DESTINATION lib/${PROJECT_NAME})
 
-# Sensor-only Gazebo pose sync executable
-add_executable(fakegazebopose src/fakegazebopose.cpp)
-ament_target_dependencies(
-  fakegazebopose
-  rclcpp
-  nav_msgs
-  gazebo_msgs
-  geometry_msgs
-)
-install(TARGETS fakegazebopose DESTINATION lib/${PROJECT_NAME})
+
 
 # —————————————————————————————————————————————
 
@@ -157,7 +146,7 @@ if(BUILD_TESTING)
     ros2_control_test_assets
     geometry_msgs
     nav_msgs
-    gazebo_msgs
+    
   )
 endif()
 
@@ -170,7 +159,7 @@ ament_export_dependencies(
   rclcpp_lifecycle
   geometry_msgs
   nav_msgs
-  gazebo_msgs
+  
 )
 
 ament_package()

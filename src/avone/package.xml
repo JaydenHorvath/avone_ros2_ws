@@ -17,8 +17,8 @@
 
   <depend>rclcpp_lifecycle</depend>
 
-  <depend>ignition-gazebo6</depend>
-  <depend>ignition-transport11</depend>
+  <!-- <depend>ignition-gazebo6</depend>
+  <depend>ignition-transport11</depend> -->
 
   <build_depend>geometry_msgs</build_depend>
 

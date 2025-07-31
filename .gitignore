@@ -15,3 +15,5 @@ log/
 robot_localization_debug.txt
 robot_localization_debug.txt
 src/ros_team_workspace/
+quanergy_client/
+quanergy_client_ros/
