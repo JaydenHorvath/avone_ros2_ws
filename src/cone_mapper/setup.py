@@ -38,6 +38,11 @@ setup(
               'conecenterline = cone_mapper.conecenterline:main',
               'yolobasedlandmark = cone_mapper.yolobasedlandmark:main',
               'lidarconemapper = cone_mapper.lidarconemapper:main',
+              'DEMOlidarconemapper = cone_mapper.DEMOlidarconemapper:main',
+              'debug_image = cone_mapper.debug_image:main',
+              'delaunay = cone_mapper.delaunay:main',
+              'nav2waypoints = cone_mapper.nav2waypoints:main',
+              'trackmapper = cone_mapper.trackmapper:main',
         ],
     },
 )

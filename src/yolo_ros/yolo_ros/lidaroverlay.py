@@ -24,9 +24,13 @@ class LidarImageOverlay(Node):
         # img_sub   = message_filters.Subscriber(self, Image,       '/camera/image_raw')
         # info_sub  = message_filters.Subscriber(self, CameraInfo,  '/camera/camera_info')
         # cloud_sub = message_filters.Subscriber(self, PointCloud2, '/cloud_no_ground_ransac')
-        img_sub   = message_filters.Subscriber(self, Image,       '/camera/image_raw')
-        info_sub  = message_filters.Subscriber(self, CameraInfo,  '/camera/camera_info')
-        cloud_sub = message_filters.Subscriber(self, PointCloud2, '/cloud_no_ground_ransac')
+        img_sub   = message_filters.Subscriber(self, Image,       '/camera/camera/color/image_raw')
+        info_sub  = message_filters.Subscriber(self, CameraInfo,  '/camera/camera/color/camera_info')
+
+     
+
+  
+        cloud_sub = message_filters.Subscriber(self, PointCloud2, '/quanergy/points')
 
         sync = message_filters.ApproximateTimeSynchronizer(
             [img_sub, info_sub, cloud_sub],

@@ -2,7 +2,12 @@
 
 cansend can0 0FA#01
 
+# odom to map 
+ros2 run tf2_ros static_transform_publisher \
+  0 0 0 0 0 0 map odom
 
+#Generate can bridge c and h files
+cantools generate_c_source --output ./generated AV1.dbc
 
 
 #quanergy lidar setup 
@@ -39,12 +44,52 @@ Jul 22 15:28:05 jay-legion dhcpd[38923]: Wrote 0 leases to leases file.
 jay@jay-legion:~/ros2_ws$ 
 
 
+MORE LIDAR setup
 
+
+# Stop DHCP first
+sudo systemctl stop isc-dhcp-server
+
+# Configure interface
+sudo ip link set dev enx6c6e070b25d8 up
+sudo ip addr flush dev enx6c6e070b25d8
+sudo ip addr add 192.168.1.1/24 dev enx6c6e070b25d8
+
+# Wait a moment
+sleep 2
+
+# Now start DHCP
+sudo systemctl start isc-dhcp-server
+
+# Wait and test
+
+sleep 5
+ping -c 3 192.168.1.100
+
+# Start ROS2
+cd ~/ros2_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch quanergy_client_ros client.launch.py host:=192.168.1.100
 
 
 
 
 ros2 launch quanergy_client_ros client.launch.py host:=192.168.1.100
+
+
+static tf for lidar 
+run tf2_ros static_transform_publisher   0 0 0 0 0 0   map quanergy
+
+
+ros2 run tf2_ros static_transform_publisher     2.3555 0 0.420     0 0 0     chassis quanergy
+
+ros2 run tf2_ros static_transform_publisher   0 0 -1.19 0 0 0   quanergy map
+ros2 run tf2_ros static_transform_publisher   0 0 0 0 0 0   odom map
+
+camera to lidar ??
+ros2 run tf2_ros static_transform_publisher   -1.52555 0 0.367895   0 0 0    quanergy camera_link
+
 
 #nav voxel markers
 ros2 run nav2_costmap_2d nav2_costmap_2d_markers   voxel_grid:=/local_costmap/voxel_grid   visualization_marker:=/voxel_markers
@@ -89,10 +134,16 @@ ros2 launch realsense2_camera rs_dual_camera_launch.py \
   ros2 launch realsense2_camera rs_launch.py \
   enable_color:=true \
   enable_depth:=true \
-  rgb_camera.profile:=640x480x30 \
-  depth_module.profile:=640x480x30 \
+  rgb_camera.profile:=1920x1080x30 \
+  depth_module.profile:=1920x1080x30 \
   pointcloud.enable:=true \
   align_depth.enable:=true
+
+  ros2 launch realsense2_camera rs_launch.py \
+    depth_module.color_profile:=1280x720x30 \
+    rgb_camera.color_profile:=1920x1080x30
+
+
 
 #keyboard teleop 
 

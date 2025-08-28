@@ -54,17 +54,17 @@ class YoloRosNode(Node):
         self.large_cone_y_thresh = 0.65  # meters; tune to your setup
 
         # Subscribers
-        self.image_sub = self.create_subscription(
-            Image, '/camera/image_raw', self.image_callback, 10)
-        self.info_sub  = self.create_subscription(
-            CameraInfo, '/camera/camera_info', self.caminfo_callback, 10)
-
         # self.image_sub = self.create_subscription(
-        #     Image, '/camera/camera/color/image_raw', self.image_callback, 10
-        # )
-        # self.info_sub = self.create_subscription(
-        #     CameraInfo, '/camera/camera/color/camera_info', self.caminfo_callback, 10
-        # )
+        #     Image, '/camera/image_raw', self.image_callback, 10)
+        # self.info_sub  = self.create_subscription(
+        #     CameraInfo, '/camera/camera_info', self.caminfo_callback, 10)
+
+        self.image_sub = self.create_subscription(
+            Image, '/camera/camera/color/image_raw', self.image_callback, 10
+        )
+        self.info_sub = self.create_subscription(
+            CameraInfo, '/camera/camera/color/camera_info', self.caminfo_callback, 10
+        )
 
 
         # Publishers

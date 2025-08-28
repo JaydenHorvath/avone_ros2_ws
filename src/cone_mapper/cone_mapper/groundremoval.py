@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import rclpy
 from rclpy.node import Node
-from rclpy.time import Time
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 
 from sensor_msgs.msg import PointCloud2
@@ -10,187 +10,96 @@ from sensor_msgs_py import point_cloud2
 from std_msgs.msg import Header
 
 import numpy as np
-import pcl
 
-class GroundRemovalRANSACNode(Node):
+class GroundRemovalHeightNode(Node):
+    """
+    Keep points by height only:
+      - keep points with z >= keep_above_z (and optionally z <= keep_below_z if set)
+    Assumes +Z is up in the input frame. If your LiDAR frame is different, set tf before this node.
+    """
     def __init__(self):
-        super().__init__('ground_removal_ransac_node')
+        super().__init__('ground_removal_height_node')
 
-        # ——— RANSAC parameters —————————————————————————————————
-        self.declare_parameter('dist_thresh', 0.1)
-        self.declare_parameter('max_iter',   100)
-        self.declare_parameter('downsample_leaf', 0.02)  # 2 cm voxels
+        # ---- Parameters -------------------------------------------------------
+        # Keep points whose z >= keep_above_z (default 0.05 m)
+        self.declare_parameter('keep_above_z', -0.9)
+        # Optional upper cap: keep points whose z <= keep_below_z (default: disabled = very large number)
+        self.declare_parameter('keep_below_z',  9999.0)
+        # Input/output topics
+        self.declare_parameter('input_topic',  '/quanergy/points')
+        self.declare_parameter('output_topic', '/cloud_no_ground_height')
+        # Max publish rate (Hz)
+        self.declare_parameter('max_hz', 10.0)
 
-        self.dist_thresh      = self.get_parameter('dist_thresh').get_parameter_value().double_value
-        self.max_iter         = self.get_parameter('max_iter').get_parameter_value().integer_value
-        self.downsample_leaf  = self.get_parameter('downsample_leaf').get_parameter_value().double_value
+        self.keep_above_z = float(self.get_parameter('keep_above_z').value)
+        self.keep_below_z = float(self.get_parameter('keep_below_z').value)
+        self.input_topic  = str(self.get_parameter('input_topic').value)
+        self.output_topic = str(self.get_parameter('output_topic').value)
+        self.max_period_ns = int(1e9 / float(self.get_parameter('max_hz').value))
 
-        # Initialize last_publish so throttle check won’t crash:
-        self.last_publish = self.get_clock().now()
+        self.last_pub_time = self.get_clock().now()
 
-        # Subscribe with QoS=BEST_EFFORT, depth=1 to avoid buffering old clouds:
+        # QoS: best effort, depth 1 to minimize lag on high-rate clouds
         qos = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
-            history=   QoSHistoryPolicy.KEEP_LAST,
-            depth=     1
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=1
         )
 
-        # self.pc_sub = self.create_subscription(
-        #     PointCloud2,
-        #     '/camera/camera/depth/color/points',  # ← adjust to your actual depth‐cloud topic
-        #     self.cloud_callback,
-        #     qos
-        # )
-        # self.pc_sub = self.create_subscription(
-        #     PointCloud2,
-        #     '/lidar/points',  # ← adjust to your actual depth‐cloud topic
-        #     self.cloud_callback,
-        #     qos
-        # )
+        self.sub = self.create_subscription(PointCloud2, self.input_topic, self.cloud_cb, qos)
+        self.pub = self.create_publisher(PointCloud2, self.output_topic, 10)
 
-        # self.pc_sub = self.create_subscription(
-        #     PointCloud2,
-        #     '/points_180',  # ← adjust to your actual depth‐cloud topic
-        #     self.cloud_callback,
-        #     qos
-        # )
-
-        self.pc_sub = self.create_subscription(
-            PointCloud2,
-            '/camera/rgbd/points',  # ← adjust to your actual depth‐cloud topic
-            self.cloud_callback,
-            qos
+        self.get_logger().info(
+            f"GroundRemovalHeightNode: keeping {self.keep_above_z:.3f} ≤ z ≤ {self.keep_below_z:.3f} "
+            f"from '{self.input_topic}' → '{self.output_topic}' @ ≤ {1e9/self.max_period_ns:.1f} Hz"
         )
 
-        # Publisher for the “no‐ground” cloud:
-        self.pc_pub = self.create_publisher(
-            PointCloud2,
-            '/cloud_no_ground_ransac',
-            10  # queue size for publishing
-        )
-
-        self.get_logger().info("GroundRemovalRANSACNode initialized. Throttling to 10 Hz, downsample_leaf=%.3f m" % self.downsample_leaf)
-
-    def cloud_callback(self, msg: PointCloud2):
-        # 0) Throttle: process at most 10 Hz
+    def cloud_cb(self, msg: PointCloud2):
+        # Throttle
         now = self.get_clock().now()
-        if (now - self.last_publish).nanoseconds < int(1e9 / 10):
+        if (now - self.last_pub_time).nanoseconds < self.max_period_ns:
             return
-        self.last_publish = now
+        self.last_pub_time = now
 
-        # 1) Read (x,y,z) tuples from PointCloud2, skipping NaNs
-        xyz_list = [
-            (pt[0], pt[1], pt[2])
-            for pt in point_cloud2.read_points(
-                msg,
-                field_names=('x', 'y', 'z'),
-                skip_nans=True
-            )
-        ]
-        if not xyz_list:
-            self.get_logger().warn('Received empty or all‐NaN PointCloud2')
+        # Extract xyz (skip NaNs). Using list → np array for simplicity/compatibility.
+        pts = [(x, y, z) for x, y, z in point_cloud2.read_points(
+            msg, field_names=('x', 'y', 'z'), skip_nans=True
+        )]
+
+        if not pts:
+            self.get_logger().warn("Received empty/all-NaN cloud; skipping.")
             return
 
-        # 2) Convert to an Nx3 float32 NumPy array
-        cloud_arr = np.asarray(xyz_list, dtype=np.float32)
+        cloud = np.asarray(pts, dtype=np.float32)
 
-        # ——— Crop out the car’s front via a fixed bounding box —————————————————
-        xmin, xmax =  0.0, 2.0    # forward
-        ymin, ymax = -0.8, 0.8    # left/right
-        zmin, zmax = -1.0, 0.0    # up/down
+        # Height mask: keep z in [keep_above_z, keep_below_z]
+        z = cloud[:, 2]
+        mask = (z >= self.keep_above_z) & (z <= self.keep_below_z)
+        kept = cloud[mask]
 
-        mask = ~(
-            (cloud_arr[:, 0] > xmin) & (cloud_arr[:, 0] < xmax) &
-            (cloud_arr[:, 1] > ymin) & (cloud_arr[:, 1] < ymax) &
-            (cloud_arr[:, 2] > zmin) & (cloud_arr[:, 2] < zmax)
-        )
-        cloud_arr = cloud_arr[mask]
-        # —————————————————————————————————————————————————————————————————————————
-
-        # 3) Build a PCL PointCloud from the cropped array
-        pcl_cloud = pcl.PointCloud(cloud_arr)
-
-        # 3a) Downsample with VoxelGrid
-        try:
-            vg = pcl_cloud.make_voxel_grid_filter()
-            vg.set_leaf_size(self.downsample_leaf,
-                             self.downsample_leaf,
-                             self.downsample_leaf)
-            pcl_cloud = vg.filter()
-        except Exception as e:
-            self.get_logger().warn(f"VoxelGrid downsampling failed: {e}")
-            # If downsample fails, just proceed with the full cropped cloud
-
-        # 4) Create the segmenter & configure RANSAC
-        seg = pcl_cloud.make_segmenter()
-        try:
-            seg.set_model_type(pcl.SACMODEL_PLANE)
-        except AttributeError:
-            seg.set_ModelType(pcl.SACMODEL_PLANE)
-
-        try:
-            seg.set_method_type(pcl.SAC_RANSAC)
-        except AttributeError:
-            seg.set_MethodType(pcl.SAC_RANSAC)
-
-        try:
-            seg.set_distance_threshold(self.dist_thresh)
-        except AttributeError:
-            seg.set_DistanceThreshold(self.dist_thresh)
-
-        try:
-            seg.set_max_iterations(self.max_iter)
-        except AttributeError:
-            seg.set_MaxIterations(self.max_iter)
-
-        # 5) Run segmentation
-        try:
-            inlier_indices, _ = seg.segment()
-        except Exception as e:
-            self.get_logger().error(f"RANSAC segmentation failed: {e}")
-            # If segmentation failed, re‐publish the cropped+downsampled cloud
-            header = Header()
-            header.stamp = msg.header.stamp
-            header.frame_id = msg.header.frame_id
-            pts = np.asarray(pcl_cloud, dtype=np.float32).tolist()
-            cloud_out = point_cloud2.create_cloud_xyz32(header, pts)
-            self.pc_pub.publish(cloud_out)
-            return
-
-        # 6) If no plane was found, re‐publish the cropped+downsampled cloud
-        if not inlier_indices:
-            header = Header()
-            header.stamp = msg.header.stamp
-            header.frame_id = msg.header.frame_id
-            pts = np.asarray(pcl_cloud, dtype=np.float32).tolist()
-            cloud_out = point_cloud2.create_cloud_xyz32(header, pts)
-            self.pc_pub.publish(cloud_out)
-            return
-
-        # 7) Extract everything except the plane (negative=True removes the ground)
-        cloud_filtered_pcl = pcl_cloud.extract(inlier_indices, negative=True)
-
-        # Convert the filtered PCL cloud back to a list of (x,y,z)
-        filtered_arr   = np.asarray(cloud_filtered_pcl, dtype=np.float32)
-        filtered_pts   = filtered_arr.tolist()
-
-        # 8) Publish the filtered “no‐ground” cloud
+        # If everything filtered, publish an empty cloud with same header
         header = Header()
         header.stamp = msg.header.stamp
         header.frame_id = msg.header.frame_id
-        new_cloud = point_cloud2.create_cloud_xyz32(header, filtered_pts)
-        self.pc_pub.publish(new_cloud)
 
+        if kept.size == 0:
+            # Publish truly empty XYZ32 cloud
+            out = point_cloud2.create_cloud_xyz32(header, [])
+            self.pub.publish(out)
+            self.get_logger().debug("All points filtered by height; published empty cloud.")
+            return
+
+        out = point_cloud2.create_cloud_xyz32(header, kept.tolist())
+        self.pub.publish(out)
 
 def main(args=None):
     rclpy.init(args=args)
-
-    node = GroundRemovalRANSACNode()
-    # Use a MultiThreadedExecutor to avoid blocking on slow callbacks:
-    executor = rclpy.executors.MultiThreadedExecutor()
-    executor.add_node(node)
-    executor.spin()
-    rclpy.shutdown()
+    node = GroundRemovalHeightNode()
+    try:
+        rclpy.spin(node)
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

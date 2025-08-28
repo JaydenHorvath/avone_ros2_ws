@@ -19,15 +19,23 @@ import tf2_ros
 from tf2_geometry_msgs import do_transform_point
 from tf2_ros import TransformException
 
+
 def pos_key(arr, precision=0.15):
     # For map persistence; bins positions to 15cm cubes for robustness to noise
     return tuple((np.array(arr[:3]) / precision).round().astype(int))
+
 
 class LidarConeMapper(Node):
     def __init__(self):
         super().__init__('lidar_cone_mapper')
 
-        self.ground_distance_threshold = 0.1
+        # -------------------- Filtering / clustering params --------------------
+        # Simple Z height filter in the incoming cloud frame (msg.header.frame_id)
+        self.declare_parameter('z_min', -0.9)   # meters
+        self.declare_parameter('z_max', 1.20)   # meters
+        self.z_min = float(self.get_parameter('z_min').value)
+        self.z_max = float(self.get_parameter('z_max').value)
+
         self.cluster_tol     = 0.5
         self.min_cluster_pts = 3
         self.max_cluster_pts = 2000
@@ -35,7 +43,7 @@ class LidarConeMapper(Node):
         self.tracking_tol    = 0.5
 
         # Time to keep markers visible after last detection (seconds)
-        self.marker_timeout = 0.3 # Adjust this value as needed
+        self.marker_timeout = 0.1 # Adjust as needed
 
         self.CLASS_ID_TO_COLOR = {
             0: (0.0, 0.0, 1.0),   # blue
@@ -53,26 +61,29 @@ class LidarConeMapper(Node):
         self.camera_frame      = None
         self.latest_detections = []
 
-        # Time-based marker storage: key = pos_key, value = {'position': np.array, 'color': tuple, 'last_seen': time}
+        # Time-based marker storage
         self.timed_cone_markers = {}
 
-        # Track marker IDs for cleanup
+        # Track marker IDs for cleanup (by category)
         self.current_marker_ids = {'blue': [], 'yellow': [], 'orange': [], 'unidentified': []}
 
+        # Subscriptions
         # self.create_subscription(PointCloud2, '/lidar/points', self.cloud_cb, 5)
         self.create_subscription(PointCloud2, '/quanergy/points', self.cloud_cb, 5)
         # self.create_subscription(CameraInfo, '/camera/camera_info', self.caminfo_cb, 10)
         self.create_subscription(CameraInfo, '/yolo/camera_info', self.caminfo_cb, 10)
         self.create_subscription(Detection2DArray, '/yolo/detections', self.yolo_cb, 10)
 
-        self.filtered_pub        = self.create_publisher(PointCloud2,   '/filtered_cloud',         10)
-        self.blue_marker_pub     = self.create_publisher(MarkerArray,   '/cone_landmarks_blue',    10)
-        self.yellow_marker_pub   = self.create_publisher(MarkerArray,   '/cone_landmarks_yellow',  10)
-        self.orange_marker_pub   = self.create_publisher(MarkerArray,   '/cone_landmarks_orange',  10)
-        self.unidentified_marker_pub = self.create_publisher(MarkerArray, '/cone_landmarks_unidentified', 10)
+        # Publishers
+        self.filtered_pub            = self.create_publisher(PointCloud2,   '/filtered_cloud',               10)
+        self.blue_marker_pub         = self.create_publisher(MarkerArray,   '/cone_landmarks_blue',          10)
+        self.yellow_marker_pub       = self.create_publisher(MarkerArray,   '/cone_landmarks_yellow',        10)
+        self.orange_marker_pub       = self.create_publisher(MarkerArray,   '/cone_landmarks_orange',        10)
+        self.unidentified_marker_pub = self.create_publisher(MarkerArray,   '/cone_landmarks_unidentified',  10)
 
-        self.get_logger().info(f'[LidarConeMapper] ready. Marker timeout: {self.marker_timeout}s')
+        self.get_logger().info(f'[LidarConeMapper] ready. Z filter: [{self.z_min:.2f}, {self.z_max:.2f}] m; Marker timeout: {self.marker_timeout}s')
 
+    # -------------------- Callbacks --------------------
     def caminfo_cb(self, msg: CameraInfo):
         self.latest_caminfo = msg
         self.camera_frame   = msg.header.frame_id
@@ -89,7 +100,7 @@ class LidarConeMapper(Node):
                 elif hasattr(c, 'position'):
                     u_center, v_center = float(c.position.x), float(c.position.y)
             if u_center is None or v_center is None:
-                if all(hasattr(bbox, a) for a in ('xmin','xmax','ymin','ymax')):
+                if all(hasattr(bbox, a) for a in ('xmin', 'xmax', 'ymin', 'ymax')):
                     u_center = 0.5 * (bbox.xmin + bbox.xmax)
                     v_center = 0.5 * (bbox.ymin + bbox.ymax)
                 else:
@@ -98,13 +109,14 @@ class LidarConeMapper(Node):
                 w, h = float(bbox.size_x), float(bbox.size_y)
             else:
                 w, h = float(bbox.xmax - bbox.xmin), float(bbox.ymax - bbox.ymin)
-            cid = -1; score = 0.0
+            cid = -1
+            score = 0.0
             if det.results:
                 hyp = det.results[0].hypothesis
                 try:
                     cid = int(hyp.class_id)
                     score = float(hyp.score)
-                except:
+                except Exception:
                     pass
             boxes.append({
                 'u0': u_center - w/2.0, 'u1': u_center + w/2.0,
@@ -114,41 +126,34 @@ class LidarConeMapper(Node):
             })
         self.latest_detections = boxes
 
+    # -------------------- Marker utils --------------------
     def cleanup_expired_markers(self, current_time):
-        """Remove markers that haven't been seen for longer than timeout"""
         expired_keys = []
         for key, marker_data in self.timed_cone_markers.items():
             if current_time - marker_data['last_seen'] > self.marker_timeout:
                 expired_keys.append(key)
-        
         for key in expired_keys:
             del self.timed_cone_markers[key]
 
     def get_color_category(self, color):
-        """Determine which category a color belongs to"""
-        if color == self.CLASS_ID_TO_COLOR[0]:  # Blue
+        if color == self.CLASS_ID_TO_COLOR[0]:
             return 'blue'
-        elif color == self.CLASS_ID_TO_COLOR[4]:  # Yellow
+        elif color == self.CLASS_ID_TO_COLOR[4]:
             return 'yellow'
-        elif color == self.CLASS_ID_TO_COLOR[1] or color == self.CLASS_ID_TO_COLOR[2]:  # Orange
+        elif color == self.CLASS_ID_TO_COLOR[1] or color == self.CLASS_ID_TO_COLOR[2]:
             return 'orange'
-        else:  # Unidentified/red
+        else:
             return 'unidentified'
 
     def publish_markers_by_category(self, t_now):
-        """Publish markers grouped by color category"""
-        # Group markers by category
         categories = {'blue': [], 'yellow': [], 'orange': [], 'unidentified': []}
-        
         for marker_data in self.timed_cone_markers.values():
             category = self.get_color_category(marker_data['color'])
             categories[category].append(marker_data)
 
-        # Clear previous marker IDs
         for cat in self.current_marker_ids:
             self.current_marker_ids[cat] = []
 
-        # Publish each category
         def publish_category_markers(positions_data, color, ns, publisher, base_id=0):
             ma = MarkerArray()
             marker_ids = []
@@ -165,49 +170,46 @@ class LidarConeMapper(Node):
                 m.pose.position.x = float(marker_data['position'][0])
                 m.pose.position.y = float(marker_data['position'][1])
                 m.pose.position.z = float(marker_data['position'][2])
-                
-                # Scale marker size based on age (optional: make older markers slightly smaller)
+
                 age = time.time() - marker_data['last_seen']
-                age_factor = max(0.7, 1.0 - (age / self.marker_timeout) * 0.3)  # Scale from 1.0 to 0.7
+                age_factor = max(0.7, 1.0 - (age / self.marker_timeout) * 0.3)
                 s = 0.30 * age_factor
                 m.scale.x = s; m.scale.y = s; m.scale.z = s
-                
-                # Make older markers slightly more transparent
-                alpha = max(0.5, 1.0 - (age / self.marker_timeout) * 0.3)  # Alpha from 0.8 to 0.5
+
+                alpha = max(0.5, 1.0 - (age / self.marker_timeout) * 0.3)
                 r, g, b = color
                 m.color.r, m.color.g, m.color.b, m.color.a = (r, g, b, alpha)
                 ma.markers.append(m)
-            
+
             publisher.publish(ma)
             return marker_ids
 
-        # Publish each category
         self.current_marker_ids['blue'] = publish_category_markers(
             categories['blue'], self.CLASS_ID_TO_COLOR[0], 'cones_blue', self.blue_marker_pub, 0)
-        
         self.current_marker_ids['yellow'] = publish_category_markers(
             categories['yellow'], self.CLASS_ID_TO_COLOR[4], 'cones_yellow', self.yellow_marker_pub, 0)
-        
         self.current_marker_ids['orange'] = publish_category_markers(
             categories['orange'], self.CLASS_ID_TO_COLOR[1], 'cones_orange', self.orange_marker_pub, 0)
-        
         self.current_marker_ids['unidentified'] = publish_category_markers(
             categories['unidentified'], (1.0, 0.0, 0.0), 'cones_unidentified', self.unidentified_marker_pub, 10000)
 
+    # -------------------- Main cloud callback --------------------
     def cloud_cb(self, msg: PointCloud2):
         current_time = time.time()
-        
+
+        # Read cloud to Nx3
         all_pts = np.array([
             (x, y, z) for (x, y, z) in point_cloud2.read_points(
-                msg, field_names=('x','y','z'), skip_nans=False)
+                msg, field_names=('x', 'y', 'z'), skip_nans=False)
         ], dtype=np.float32)
+
         if all_pts.size == 0:
-            # Even if no new points, clean up expired markers and republish
             self.cleanup_expired_markers(current_time)
             t_now = self.get_clock().now().to_msg()
             self.publish_markers_by_category(t_now)
             return
-            
+
+        # Drop NaN/Inf rows
         pts = all_pts[np.isfinite(all_pts).all(axis=1)]
         if len(pts) < self.min_cluster_pts:
             self.cleanup_expired_markers(current_time)
@@ -215,30 +217,24 @@ class LidarConeMapper(Node):
             self.publish_markers_by_category(t_now)
             return
 
-        cloud = pcl.PointCloud(pts)
-        seg   = cloud.make_segmenter_normals(ksearch=50)
-        seg.set_model_type(pcl.SACMODEL_PLANE)
-        seg.set_method_type(pcl.SAC_RANSAC)
-        seg.set_distance_threshold(self.ground_distance_threshold)
-        inliers, _ = seg.segment()
-        if not inliers:
-            self.cleanup_expired_markers(current_time)
-            t_now = self.get_clock().now().to_msg()
-            self.publish_markers_by_category(t_now)
-            return
-            
-        mask = np.ones(len(pts), bool)
-        mask[inliers] = False
-        pts_nog = pts[mask]
+        # -------------------- Z HEIGHT FILTER (replaces RANSAC) --------------------
+        # Keep points where z_min <= z <= z_max in the incoming cloud frame
+        z = pts[:, 2]
+        z_mask = (z >= self.z_min) & (z <= self.z_max)
+        pts_nog = pts[z_mask]
+
         if len(pts_nog) < self.min_cluster_pts:
+            # Still update persistence and republish any surviving markers
             self.cleanup_expired_markers(current_time)
             t_now = self.get_clock().now().to_msg()
             self.publish_markers_by_category(t_now)
             return
 
+        # Publish filtered cloud
         filtered = point_cloud2.create_cloud_xyz32(msg.header, pts_nog.tolist())
         self.filtered_pub.publish(filtered)
 
+        # -------------------- Clustering --------------------
         tree = pcl.PointCloud(pts_nog).make_kdtree()
         ec   = pcl.PointCloud(pts_nog).make_EuclideanClusterExtraction()
         ec.set_ClusterTolerance(self.cluster_tol)
@@ -246,17 +242,22 @@ class LidarConeMapper(Node):
         ec.set_MaxClusterSize(self.max_cluster_pts)
         ec.set_SearchMethod(tree)
         clusters = ec.Extract()
+
         if not clusters:
             self.cleanup_expired_markers(current_time)
             t_now = self.get_clock().now().to_msg()
             self.publish_markers_by_category(t_now)
             return
 
+        # Centroids
         raw_cents = [pts_nog[idxs].mean(axis=0) for idxs in clusters]
+
+        # Merge near-duplicate centroids by XY distance
         unique_cents = []
         for c in raw_cents:
             if not any(np.linalg.norm(c[:2] - uc[:2]) < self.xy_merge_tol for uc in unique_cents):
                 unique_cents.append(c)
+
         if not unique_cents:
             self.cleanup_expired_markers(current_time)
             t_now = self.get_clock().now().to_msg()
@@ -275,6 +276,7 @@ class LidarConeMapper(Node):
             self.publish_markers_by_category(t_now)
             return
 
+        # Camera projection (optional; for coloring only)
         cam_tf = None
         if self.latest_caminfo and self.camera_frame:
             try:
@@ -290,8 +292,8 @@ class LidarConeMapper(Node):
         # Clean up expired markers first
         self.cleanup_expired_markers(current_time)
 
-        override_colors = [None]*len(unique_cents)
-
+        # Determine override colors from YOLO projections (no filtering, only color)
+        override_colors = [None] * len(unique_cents)
         if cam_tf:
             for i, c in enumerate(unique_cents):
                 p_cam = PointStamped()
@@ -314,11 +316,10 @@ class LidarConeMapper(Node):
                 if best and best['class_id'] in self.CLASS_ID_TO_COLOR:
                     override_colors[i] = self.CLASS_ID_TO_COLOR[best['class_id']]
 
-        # Update marker storage with current detections
+        # Update timed markers in map/world frame
         for i, c in enumerate(unique_cents):
             col = override_colors[i] or self.default_color
 
-            # Transform to map frame
             p_map = PointStamped()
             p_map.header.frame_id = msg.header.frame_id
             p_map.header.stamp    = t_now
@@ -327,18 +328,18 @@ class LidarConeMapper(Node):
                 p_m = do_transform_point(p_map, tf_lidar_map)
             except TransformException:
                 continue
+
             pos_map = np.array([p_m.point.x, p_m.point.y, p_m.point.z])
             key = pos_key(pos_map)
-
-            # Update or add marker with current timestamp
             self.timed_cone_markers[key] = {
                 'position': pos_map,
                 'color': col,
                 'last_seen': current_time
             }
 
-        # Publish all current markers (including timed ones)
+        # Publish markers
         self.publish_markers_by_category(t_now)
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -350,6 +351,7 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

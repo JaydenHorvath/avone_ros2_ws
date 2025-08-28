@@ -74,6 +74,7 @@ private:
 
   // Dummy for testing 
   double dummy_state_{0.0}, dummy_cmd_{0.0};
+  
 
 
   // --- Command interface storage ---

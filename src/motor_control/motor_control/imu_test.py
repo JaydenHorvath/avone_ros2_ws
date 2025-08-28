@@ -2,111 +2,78 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Imu
-from geometry_msgs.msg import TransformStamped
-from tf2_ros import TransformBroadcaster
 import serial
 import math
 import numpy as np
-from ahrs.filters import Madgwick
 
-class ImuMadgwickPublisher(Node):
+class VN100Node(Node):
     def __init__(self):
-        super().__init__('imu_madgwick_publisher')
+        super().__init__('vn100_node')
 
-        # 1) Open serial port to the Leonardo
-        try:
-            self.serial_port = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
-        except serial.SerialException as e:
-            self.get_logger().error(f"Cannot open serial port: {e}")
-            raise SystemExit
+        # Open serial
+        self.ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
 
-        # 2) ROS publisher for IMU data
-        self.pub = self.create_publisher(Imu, 'imu/data', 10)
+        # Publisher
+        self.pub = self.create_publisher(Imu, 'imu/data_raw', 10)
 
-        # 3) TF broadcaster
-        self.tf_broadcaster = TransformBroadcaster(self)
-
-        # 4) Madgwick filter @100 Hz, initialise quaternion state
-        self.filter = Madgwick(frequency=100.0)
-        self.q = np.array([1.0, 0.0, 0.0, 0.0])
-
-        # 5) Timer @100 Hz
+        # Timer @100Hz
         self.create_timer(0.01, self.read_and_publish)
 
-        self.get_logger().info("IMU Madgwick node started. Waiting for data...")
-
     def read_and_publish(self):
-        # Read one line of raw data
-        raw = self.serial_port.readline().decode('utf-8', errors='ignore').strip()
-        self.get_logger().debug(f"[RAW ] → '{raw}'")
-        if not raw:
-            return
-
-        parts = raw.split(',')
-        if len(parts) != 6:
-            self.get_logger().warn(f"[PARSE] Expected 6 values, got {len(parts)}")
+        line = self.ser.readline().decode('utf-8', errors='ignore').strip()
+        if not line.startswith('$VNYMR'):
             return
 
         try:
-            ax, ay, az, gx, gy, gz = map(float, parts)
-        except ValueError as e:
-            self.get_logger().warn(f"[PARSE] {e}")
-            return
+            # Strip leading "$VNYMR," and split before checksum
+            body = line.split('*')[0]
+            parts = body.split(',')[1:]  # skip $VNYMR
+            if len(parts) != 12:
+                self.get_logger().warn(f"Got {len(parts)} values instead of 12: {parts}")
+                return
 
-        # Convert to SI units
-        ax /= 16384.0             # raw → g
-        ay /= 16384.0
-        az /= 16384.0
-        gx = math.radians(gx / 131.0)  # raw → °/s → rad/s
-        gy = math.radians(gy / 131.0)
-        gz = -math.radians(gz / 131.0)
+            # Parse values
+            roll, pitch, yaw = map(float, parts[0:3])
+            magx, magy, magz = map(float, parts[3:6])
+            accx, accy, accz = map(float, parts[6:9])
+            gyrox, gyroy, gyroz = map(float, parts[9:12])
 
-        # Update Madgwick filter (IMU-only) and save quaternion
-        # signature: updateIMU(q, gyr, acc) → ndarray([w, x, y, z])
-        self.q = self.filter.updateIMU(
-            self.q,
-            gyr=np.array([gx, gy, gz]),
-            acc=np.array([ax, ay, az])
-        )
-        w, x, y, z = self.q
+            # Build ROS IMU msg
+            msg = Imu()
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.header.frame_id = "imu_link"
 
-        # Build IMU message
-        msg = Imu()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = "imu_link"
-        msg.orientation.w = float(w)
-        msg.orientation.x = float(x)
-        msg.orientation.y = float(y)
-        msg.orientation.z = float(z)
-        msg.angular_velocity.x = gx
-        msg.angular_velocity.y = gy
-        msg.angular_velocity.z = gz
-        msg.linear_acceleration.x = ax * 9.81
-        msg.linear_acceleration.y = ay * 9.81
-        msg.linear_acceleration.z = az * 9.81
+            # Orientation → convert Euler (rad) to quaternion
+            cr = math.cos(math.radians(roll) * 0.5)
+            sr = math.sin(math.radians(roll) * 0.5)
+            cp = math.cos(math.radians(pitch) * 0.5)
+            sp = math.sin(math.radians(pitch) * 0.5)
+            cy = math.cos(math.radians(yaw) * 0.5)
+            sy = math.sin(math.radians(yaw) * 0.5)
 
-        # Publish IMU data
-        self.pub.publish(msg)
-        self.get_logger().info("[PUB  ] IMU msg published")
+            msg.orientation.w = cr*cp*cy + sr*sp*sy
+            msg.orientation.x = sr*cp*cy - cr*sp*sy
+            msg.orientation.y = cr*sp*cy + sr*cp*sy
+            msg.orientation.z = cr*cp*sy - sr*sp*cy
 
-        # Broadcast TF from base_link → imu_link
-        t = TransformStamped()
-        t.header.stamp = msg.header.stamp
-        t.header.frame_id = "base_link"
-        t.child_frame_id = "imu_link"
-        # If your IMU is offset, adjust the translation here:
-        t.transform.translation.x = 0.0
-        t.transform.translation.y = 0.0
-        t.transform.translation.z = -1.0
-        t.transform.rotation.w = float(w)
-        t.transform.rotation.x = float(x)
-        t.transform.rotation.y = float(y)
-        t.transform.rotation.z = float(z)
-        self.tf_broadcaster.sendTransform(t)
+            # Gyro (rad/s)
+            msg.angular_velocity.x = math.radians(gyrox)
+            msg.angular_velocity.y = math.radians(gyroy)
+            msg.angular_velocity.z = math.radians(gyroz)
+
+            # Accel (m/s²)
+            msg.linear_acceleration.x = accx
+            msg.linear_acceleration.y = accy
+            msg.linear_acceleration.z = accz
+
+            self.pub.publish(msg)
+
+        except Exception as e:
+            self.get_logger().warn(f"Parse error: {e}")
 
 def main(args=None):
     rclpy.init(args=args)
-    node = ImuMadgwickPublisher()
+    node = VN100Node()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

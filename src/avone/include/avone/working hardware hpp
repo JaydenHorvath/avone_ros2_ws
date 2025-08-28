@@ -20,6 +20,9 @@
 #include <vector>
 
 #include "avone/visibility_control.h"
+#include "avone/avone_can_interface.hpp"
+
+
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/handle.hpp"
 #include "hardware_interface/hardware_info.hpp"
@@ -63,8 +66,52 @@ public:
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
 private:
-  std::vector<double> hw_commands_;
-  std::vector<double> hw_states_;
+  // CAN interface
+  std::unique_ptr<AvoneCanInterface> can_iface_;
+
+  // Joint indices (still useful if you ever use vectors!)
+  size_t lsteer_idx_, rsteer_idx_, rlmotor_idx_, rrmotor_idx_;
+
+  // Dummy for testing 
+  double dummy_state_{0.0}, dummy_cmd_{0.0};
+
+
+  // --- Command interface storage ---
+  double lsteer_cmd_{0.0};
+  double rsteer_cmd_{0.0};
+  double rlmotor_cmd_{0.0};
+  double rrmotor_cmd_{0.0};
+
+  // --- State interface storage ---
+  double lsteer_position_{0.0};
+  double rsteer_position_{0.0};
+  double rlmotor_position_{0.0};
+  double rlmotor_velocity_{0.0};
+  double rrmotor_position_{0.0};
+  double rrmotor_velocity_{0.0};
+
+  // Add FLWheel/FRWheel if needed:
+  double flwheel_position_{0.0};
+  double frwheel_position_{0.0};
+
+  // Hardware parameters
+  double max_steer_angle_, min_steer_angle_;
+  int max_rpm_, can_baudrate_, read_timeout_ms_;
+  
+  uint32_t l_motor_can_id_;
+  uint32_t r_motor_can_id_;
+  uint32_t steer_can_id_;
+
+  uint32_t cmd_l_motor_can_id_;
+  uint32_t cmd_r_motor_can_id_;
+  uint32_t cmd_steer_can_id_;
+
+
+  std::string can_interface_;
+
+
+  rclcpp::Time last_read_time_;
+
 };
 
 }  // namespace avone

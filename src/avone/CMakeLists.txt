@@ -93,14 +93,6 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# CAN simulator executable
-add_executable(can_simulator src/can_simulator.cpp)
-ament_target_dependencies(
-  can_simulator
-  rclcpp
-  geometry_msgs
-)
-install(TARGETS can_simulator DESTINATION lib/${PROJECT_NAME})
 
 # twiststamped executable
 add_executable(twiststamped src/twiststamped.cpp)

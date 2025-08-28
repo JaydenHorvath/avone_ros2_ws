@@ -1,224 +1,175 @@
 #!/usr/bin/env python3
+import math
+from typing import Tuple
 
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image, CameraInfo
 from vision_msgs.msg import (
-    Detection2DArray,
-    Detection2D,
-    BoundingBox2D,
-    ObjectHypothesisWithPose,
+    Detection2D, Detection2DArray, BoundingBox2D, ObjectHypothesisWithPose
 )
-from geometry_msgs.msg import PoseArray, Pose
+from geometry_msgs.msg import PoseWithCovariance
 from cv_bridge import CvBridge
 from ultralytics import YOLO
-import numpy as np
-import cv2
 
-def iou(boxA, boxB):
-    xA = max(boxA[0], boxB[0])
-    yA = max(boxA[1], boxB[1])
-    xB = min(boxA[2], boxB[2])
-    yB = min(boxA[3], boxB[3])
-    inter = max(0, xB-xA) * max(0, yB-yA)
-    areaA = (boxA[2]-boxA[0]) * (boxA[3]-boxA[1])
-    areaB = (boxB[2]-boxB[0]) * (boxB[3]-boxB[1])
-    return inter / float(areaA + areaB - inter + 1e-8)
+# Optional: GPU / half-precision
+try:
+    import torch
+    _TORCH_OK = True
+except Exception:
+    _TORCH_OK = False
 
-def filter_yellow_with_orange_proximity(detections,
-                                        iou_thresh=0.25,
-                                        pixel_thresh=30,
-                                        z_thresh=0.2):
-    oranges = [d for d in detections if d['label'] in ('orange','large_orange')]
-    yellows = [d for d in detections if d['label']=='yellow']
-    others  = [d for d in detections if d['label'] not in ('orange','large_orange','yellow')]
-    keep = []
-    keep += oranges
-    for y in yellows:
-        y_box = y['bbox']
-        y_ctr = np.array([ (y_box[0]+y_box[2])/2, (y_box[1]+y_box[3])/2 ])
-        y_z   = y['pos'][2]
-        suppressed = False
-        for o in oranges:
-            o_box = o['bbox']
-            o_ctr = np.array([ (o_box[0]+o_box[2])/2, (o_box[1]+o_box[3])/2 ])
-            o_z   = o['pos'][2]
-            if iou(y_box,o_box)>iou_thresh or \
-               np.linalg.norm(y_ctr-o_ctr)<pixel_thresh or \
-               abs(y_z-o_z)<z_thresh:
-                suppressed = True
-                break
-        if not suppressed:
-            keep.append(y)
-    keep += others
-    return keep
+
+def round_up_to_multiple(n: int, m: int) -> int:
+    """Round up n to the nearest multiple of m."""
+    return ((n + m - 1) // m) * m
+
 
 class YoloRosNode(Node):
     def __init__(self):
         super().__init__('yolo_ros_node')
         self.bridge = CvBridge()
 
-        # --- YOLO model load ---
-        weights = '/home/jay/Documents/yolo11-tutorial/runs/detect/train18/weights/best.pt'
-        self.model = YOLO(weights)
+        # ---------------- Parameters ----------------
+        # Camera topics
+        self.declare_parameter('image_topic', '/camera/camera/color/image_raw')
+        self.declare_parameter('camera_info_topic', '/camera/camera/color/camera_info')
 
-        # --- class ↔ label ↔ visuals ↔ real heights ---
-        self.color_map = {0:'blue', 2:'orange', 1:'large_orange', 4:'yellow'}
-        self.visual_map = {
-            'blue': (255, 0, 0),
-            'yellow': (0,255,255),
-            'orange': (0,128,255),
-            'large_orange': (0,80,180),
-            'unknown': (128,128,128)
-        }
-        self.height_map = {
-            'blue': 0.325,
-            'yellow': 0.325,
-            'orange': 0.325,
-            'large_orange': 0.505
-        }
+        # Desired input size (will be rounded up to multiples of 32 for YOLO)
+        self.declare_parameter('img_width', 1920)
+        self.declare_parameter('img_height', 1080)
 
-        # --- large_orange box‐size filtering params ---
-        self.min_large_px = 50    # minimum pixel‐height
-        self.min_ar = 0.2          # min width/height
-        self.max_ar = 0.8          # max width/height
+        # Model + inference params
+        self.declare_parameter('model_path', '/home/jay/Documents/yolo11-tutorial/runs/detect/train17/weights/best.pt')
+        self.declare_parameter('conf', 0.25)
+        self.declare_parameter('iou', 0.45)
+        self.declare_parameter('use_gpu', True)     # set False to force CPU
+        self.declare_parameter('use_fp16', True)    # only effective if GPU available
 
-        # --- camera intrinsics (set once) ---
-        self.fx = self.fy = self.cx = self.cy = None
+        image_topic = self.get_parameter('image_topic').get_parameter_value().string_value
+        caminfo_topic = self.get_parameter('camera_info_topic').get_parameter_value().string_value
+        self.img_w = int(self.get_parameter('img_width').value)
+        self.img_h = int(self.get_parameter('img_height').value)
+        self.conf = float(self.get_parameter('conf').value)
+        self.iou = float(self.get_parameter('iou').value)
+        want_gpu = bool(self.get_parameter('use_gpu').value)
+        want_fp16 = bool(self.get_parameter('use_fp16').value)
+        model_path = self.get_parameter('model_path').get_parameter_value().string_value
 
-        # --- ROS subscriptions & publishers ---
-        self.create_subscription(CameraInfo,
-                                 '/camera/camera_info',
-                                 self.caminfo_cb, 10)
-        self.create_subscription(Image,
-                                 '/camera/image_raw',
-                                 self.image_cb, 10)
+        # Round to nearest /32 to prevent internal resizing surprises
+        self.imgsz: Tuple[int, int] = (
+            round_up_to_multiple(self.img_h, 32),
+            round_up_to_multiple(self.img_w, 32),
+        )
 
-        self.info_pub  = self.create_publisher(CameraInfo,
-                                               '/yolo/camera_info', 10)
-        self.det_pub   = self.create_publisher(Detection2DArray,
-                                               '/yolo/detections', 10)
-        self.pose_pub  = self.create_publisher(PoseArray,
-                                               '/cone_poses', 10)
-        self.image_pub = self.create_publisher(Image,
-                                               '/yolo/image', 10)
+        # ---------------- Subs/Pubs ----------------
+        self.image_sub = self.create_subscription(Image, image_topic, self.image_callback, 10)
+        self.info_sub = self.create_subscription(CameraInfo, caminfo_topic, self.caminfo_callback, 10)
 
-        self.conf_thresh = 0.7
-        self.get_logger().info('YOLO node with large_orange size filtering started')
+        self.image_pub = self.create_publisher(Image, '/yolo/image', 10)
+        self.info_pub  = self.create_publisher(CameraInfo, '/yolo/camera_info', 10)
+        self.det_pub   = self.create_publisher(Detection2DArray, '/yolo/detections', 10)
 
-    def caminfo_cb(self, msg:CameraInfo):
-        if self.fx is None:
-            self.fx, self.fy = msg.k[0], msg.k[4]
-            self.cx, self.cy = msg.k[2], msg.k[5]
-            self.get_logger().info(
-                f"Camera intrinsics fx={self.fx}, fy={self.fy}, cx={self.cx}, cy={self.cy}"
-            )
-        self.info_pub.publish(msg)
+        # ---------------- Model ----------------
+        self.model = YOLO(model_path)
 
-    def image_cb(self, img_msg:Image):
+        # Pick device
+        self.device = 'cpu'
+        self.half = False
+        if _TORCH_OK and want_gpu and torch.cuda.is_available():
+            self.device = 'cuda:0'
+            self.half = want_fp16
+        # Note: Ultralytics v8 picks device from args each call or from model.to()
         try:
-            frame = self.bridge.imgmsg_to_cv2(img_msg, 'bgr8')
+            # Move model once; half precision only valid on CUDA
+            self.model.to(self.device)
+            if self.half:
+                self.model.model.half()  # won’t error on non-CUDA if self.half=False
         except Exception as e:
-            self.get_logger().error(f"cv_bridge error: {e}")
-            return
+            self.get_logger().warn(f'Could not move model to {self.device} / FP16={self.half}: {e}')
+            self.device = 'cpu'
+            self.half = False
 
-        vis = frame.copy()
-        results = self.model(frame)[0]
+        self.get_logger().info(
+            f"YOLO node up. Target input ~{self.img_w}x{self.img_h} "
+            f"(rounded to {self.imgsz[1]}x{self.imgsz[0]}), device={self.device}, fp16={self.half}"
+        )
 
-        dets = []
-        for box in results.boxes:
-            conf = float(box.conf[0].item())
-            if conf < self.conf_thresh:
-                continue
+    # Just forward CameraInfo
+    def caminfo_callback(self, info_msg: CameraInfo):
+        self.info_pub.publish(info_msg)
 
-            cls_id = int(box.cls[0].item())
-            label  = self.color_map.get(cls_id,'unknown')
-            x1,y1,x2,y2 = box.xyxy[0].tolist()
-            h = y2 - y1
-            w = x2 - x1
+    def image_callback(self, img_msg: Image):
+        # Convert to OpenCV BGR8
+        cv_img = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding='bgr8')
 
-            # -- large_orange bbox filtering --
-            if label=='large_orange':
-                if h < self.min_large_px:
-                    continue
-                ar = (w/h) if h>0 else 0
-                if not (self.min_ar < ar < self.max_ar):
-                    continue
+        # If your camera already publishes 1920x1080, you’re set.
+        # YOLO will internally letterbox to imgsz=(H32,W32) but map boxes back to original size.
+        # If the camera publishes lower res, you can’t conjure real 1080p detail by upscaling;
+        # leave this as-is to avoid fake “1080p”.
+        try:
+            results = self.model(
+                cv_img,
+                imgsz=self.imgsz,     # (H, W), stride-aligned
+                conf=self.conf,
+                iou=self.iou,
+                device=self.device,
+                half=self.half,
+                verbose=False
+            )
+        except TypeError:
+            # Some Ultralytics builds prefer .predict(...)
+            results = self.model.predict(
+                source=cv_img,
+                imgsz=self.imgsz,
+                conf=self.conf,
+                iou=self.iou,
+                device=self.device,
+                half=self.half,
+                verbose=False
+            )
 
-            # -- estimate 3D Z from pixel height --
-            if self.fx and label in self.height_map and h>0:
-                Z = (self.fy * self.height_map[label]) / h
-                u = (x1+x2)/2.0;  v = (y1+y2)/2.0
-                X = (u - self.cx)*Z/self.fx
-                Y = (v - self.cy)*Z/self.fy
-            else:
-                X=Y=0.0; Z=float(h)
+        res = results[0]
 
-            dets.append({
-                'bbox': (x1,y1,x2,y2),
-                'conf': conf,
-                'label': label,
-                'pos': np.array([X,Y,Z])
-            })
+        # Annotated image (same size as original frame)
+        annotated = res.plot()
 
-        # suppress yellow near any orange
-        dets = filter_yellow_with_orange_proximity(dets)
+        # Publish annotated image
+        out = self.bridge.cv2_to_imgmsg(annotated, encoding='bgr8')
+        out.header = img_msg.header
+        self.image_pub.publish(out)
 
-        det_arr  = Detection2DArray()
+        # Build Detection2DArray in original pixel coordinates
+        det_arr = Detection2DArray()
         det_arr.header = img_msg.header
-        pose_arr = PoseArray()
-        pose_arr.header = img_msg.header
 
-        for d in dets:
-            x1,y1,x2,y2 = d['bbox']
-            X,Y,Z = d['pos']
-            label = d['label']
-            conf  = d['conf']
-            color = self.visual_map.get(label,(128,128,128))
+        if res.boxes is not None:
+            for box in res.boxes:
+                x1, y1, x2, y2 = [float(v) for v in box.xyxy[0].tolist()]
+                w = x2 - x1
+                h = y2 - y1
 
-            # draw
-            cv2.rectangle(vis, (int(x1),int(y1)),
-                               (int(x2),int(y2)), color, 2)
-            cv2.putText(vis,
-                        f"{label} {conf*100:.1f}% {Z:.2f}m",
-                        (int(x1),int(y1)-10),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5, color, 2)
+                det = Detection2D()
+                det.header = img_msg.header
 
-            # Detection2D
-            d2 = Detection2D()
-            d2.header = img_msg.header
-            bb = BoundingBox2D()
-            bb.center.position.x = (x1+x2)/2.0
-            bb.center.position.y = (y1+y2)/2.0
-            bb.size_x = x2 - x1
-            bb.size_y = y2 - y1
-            d2.bbox = bb
+                bb = BoundingBox2D()
+                bb.center.position.x = (x1 + x2) / 2.0
+                bb.center.position.y = (y1 + y2) / 2.0
+                bb.size_x = w
+                bb.size_y = h
+                det.bbox = bb
 
-            hyp = ObjectHypothesisWithPose()
-            hyp.hypothesis.class_id = label
-            hyp.hypothesis.score    = conf
-            hyp.pose.pose.position.x = float(X)
-            hyp.pose.pose.position.y = float(Y)
-            hyp.pose.pose.position.z = float(Z)
-            hyp.pose.pose.orientation.w = 1.0
-            d2.results = [hyp]
-            det_arr.detections.append(d2)
+                hyp = ObjectHypothesisWithPose()
+                # Class index as string; map to label if you have names
+                hyp.hypothesis.class_id = str(int(box.cls[0].item()))
+                hyp.hypothesis.score = float(box.conf[0].item())
+                hyp.pose = PoseWithCovariance()
+                det.results = [hyp]
 
-            # PoseArray
-            p = Pose()
-            p.position.x = float(X)
-            p.position.y = float(Y)
-            p.position.z = float(Z)
-            p.orientation.w = 1.0
-            pose_arr.poses.append(p)
+                det_arr.detections.append(det)
 
-        # publish
-        out_img = self.bridge.cv2_to_imgmsg(vis,'bgr8')
-        out_img.header = img_msg.header
-        self.image_pub.publish(out_img)
         self.det_pub.publish(det_arr)
-        self.pose_pub.publish(pose_arr)
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -229,5 +180,6 @@ def main(args=None):
         node.destroy_node()
         rclpy.shutdown()
 
-if __name__=='__main__':
+
+if __name__ == '__main__':
     main()
