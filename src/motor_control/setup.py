@@ -27,6 +27,9 @@ setup(
             'gps_sim = motor_control.gps_sim:main',
             'CAN_motorcontrollers = motor_control.CAN_motorcontrollers:main',
              'wheelspeedtest = motor_control.wheelspeedtest:main',
+             'gpsheading_to_imu = motor_control.gpsheading_to_imu:main',
+              'gpsodom = motor_control.gpsodom:main',
+    
         ],
     },
 )

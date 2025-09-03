@@ -9,6 +9,9 @@ ros2 run tf2_ros static_transform_publisher \
 #Generate can bridge c and h files
 cantools generate_c_source --output ./generated AV1.dbc
 
+# for NUC lidar 
+
+sudo arping -c 1 192.168.1.57
 
 #quanergy lidar setup 
 

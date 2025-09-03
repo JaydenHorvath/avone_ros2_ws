@@ -152,14 +152,6 @@ def generate_launch_description():
             'rgbdcamera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
             'rgbdcamera/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image',
             'rgbdcamera/image@sensor_msgs/msg/Image[ignition.msgs.Image',
-            'rgb_right/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
-            'rgb_right/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
-            'rgb_right/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image',
-            'rgb_right/image@sensor_msgs/msg/Image[ignition.msgs.Image',
-            'rgb_left/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
-            'rgb_left/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
-            'rgb_left/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image',
-            'rgb_left/image@sensor_msgs/msg/Image[ignition.msgs.Image',
             '/imu@sensor_msgs/msg/Imu[ignition.msgs.IMU',
             '/lidar@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan',
             '/lidar/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
@@ -167,9 +159,9 @@ def generate_launch_description():
             'camera/image_raw@sensor_msgs/msg/Image[ignition.msgs.Image',
             '/navsat1@sensor_msgs/msg/NavSatFix[ignition.msgs.NavSat',
             '/navsat2@sensor_msgs/msg/NavSatFix[ignition.msgs.NavSat',
-            '/depth/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
-            '/depth/image_raw@sensor_msgs/msg/Image[ignition.msgs.Image',
-            '/depth/image_raw/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
+            # '/depth/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
+            # '/depth/image_raw@sensor_msgs/msg/Image[ignition.msgs.Image',
+            # '/depth/image_raw/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
         ],
         remappings=[
             ('rgbdcamera/image', '/camera/rgbd/image_raw'),
@@ -192,7 +184,7 @@ def generate_launch_description():
             ])
         ),
         launch_arguments={
-            'gz_args': '-r -v1 /home/jay/ros2_ws/src/avone/worlds/smalltrack.world'
+            'gz_args': '-r -v1 /home/jay/ros2_ws/src/avone/worlds/random_cylinders.sdf'
         }.items()
     )
 
@@ -209,16 +201,16 @@ def generate_launch_description():
             # '-z', '0.1',
             # '--Y', '0'
 
-            # '-x', '0',
-            # '-y', '0',
-            # '-z', '0',
-            # '--Y', '0'
+            '-x', '0',
+            '-y', '0',
+            '-z', '0',
+            '--Y', '0'
 
             # small track
-            '-x', '-10.0',
-            '-y', '11',
-            '-z', '0.1',
-            '--Y', '0'
+            # '-x', '-10.0',
+            # '-y', '11',
+            # '-z', '0.1',
+            # '--Y', '0'
             # accel
             # '-x', '25.2118',
             # '-y', '-0.2167',

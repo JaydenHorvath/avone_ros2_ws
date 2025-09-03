@@ -48,7 +48,7 @@ controller_server:
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
       required_movement_radius: 0.5
-      movement_time_allowance: 1.5
+      movement_time_allowance: 3.0
     # Goal checker parameters
     #precise_goal_checker:
     #  plugin: "nav2_controller::SimpleGoalChecker"
@@ -58,44 +58,56 @@ controller_server:
     general_goal_checker:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance:    0.5   # keep your distance tolerance
+      xy_goal_tolerance:    0.8  # keep your distance tolerance
       yaw_goal_tolerance:   3.14  # allow any heading
       latch_xy_goal_tolerance: True  # once inside XY tol, latch successful
     # DWB parameters
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-      # Pure Pursuit tuning
-      proportional_speed: true         # enable scaling
-      deceleration_distance: 5.0  
-      min_speed: 0.05                  # m/s
-      max_speed: 2.0                   # m/s
-        # 1) Look‑ahead tuning
+
+      # --- Pure Pursuit tuning ---
+      proportional_speed: False
       desired_linear_vel: 2.0
-      lookahead_dist: 6.0
-      min_lookahead_dist: 2.0
-      max_lookahead_dist: 10.0
-      lookahead_time: 1.0
+      min_speed: 0.05
+      max_speed: 2.0
       allow_reversing: False
 
-      use_regulated_linear_velocity_scaling: True
-      use_cost_regulated_linear_velocity_scaling: True
+      # --- Goal approach slowdown ---
+      use_approach_linear_velocity_scaling: true
+      approach_velocity_scaling_dist: 5.0     # start slowing 10 m before goal
+      min_approach_linear_velocity: 0.1       # creep into the goal
 
-      regulated_linear_scaling_min_radius: 6.0
-      regulated_linear_scaling_min_speed: 0.5
+      # --- Lookahead tuning ---
+      lookahead_dist: 3.0
+      min_lookahead_dist: 0.5
+      max_lookahead_dist: 5.0
+      lookahead_time: 2.0
 
-      inflation_cost_scaling_factor: 10.0
+      # --- Velocity scaling (disable curvature scaling for now) ---
+      use_regulated_linear_velocity_scaling: False
+      use_cost_regulated_linear_velocity_scaling: False
+      regulated_linear_scaling_min_radius: 2.5
+      regulated_linear_scaling_min_speed: 0.2
 
+      # --- Costmap & collision behaviour ---
+      inflation_cost_scaling_factor: 3.0
+
+      # --- Heading rotation ---
       rotate_to_heading_angular_vel: 0.1
 
-      # kinematic limits
+      # --- Kinematic limits ---
       max_vel_x: 2.0
-      max_vel_theta: 1.5
+      max_vel_theta: 3.0
       acc_lim_x: 2.0
-      decel_lim_x: 4.0
+      decel_lim_x: 2.0
       max_angular_accel: 2.0
 
-      # goal tolerances
-  
+      # --- Goal tolerances ---
+      xy_goal_tolerance: 0.5
+      yaw_goal_tolerance: 3.14
+      latch_xy_goal_tolerance: false
+
+
 
 # GPS WPF CHANGE: Remove static layer
 local_costmap:
@@ -155,7 +167,7 @@ local_costmap:
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 1.0
+        inflation_radius: 2.0
         cost_scaling_factor: 5.0
 
 
@@ -223,7 +235,7 @@ global_costmap:
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 1.0
+        inflation_radius: 2.0
         cost_scaling_factor: 5.0
 
 
@@ -243,18 +255,18 @@ planner_server:
       plugin: "nav2_smac_planner/SmacPlannerHybrid"   # Smac plugin
 
       # --- General ---
-      tolerance: 0.3
+      tolerance: 3.0
       downsample_costmap: false
       allow_unknown: true
 
       # --- Ackermann feasibility ---
       motion_model_for_search: "DUBIN"     # ALL CAPS
-      minimum_turning_radius: 2.5   # set to your R_min (m) = L / tan(δ_max)
+      minimum_turning_radius: 2.0  # set to your R_min (m) = L / tan(δ_max)
 
       # --- Quality / smoothness ---
       angle_quantization_bins: 72
-      analytic_expansion_ratio: 10.0
-      analytic_expansion_max_length: 6.0
+      analytic_expansion_ratio: 0.0
+      analytic_expansion_max_length: 0.0
       smooth_path: true
 
 smoother_server:
