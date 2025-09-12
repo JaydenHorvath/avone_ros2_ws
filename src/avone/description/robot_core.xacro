@@ -51,8 +51,11 @@
         <visual>
             <origin xyz="2.2924 -0.00985747 0.0751" rpy="3.14159 0 1.5708"/>
             <geometry>
-                  <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/chassis.stl"/>
-                 <!-- <mesh filename="package://avone/description/assets/chassis.stl"/> --> 
+
+                  <mesh filename="package://avone/description/assets/chassis.stl"/>
+                  <!-- <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/chassis.stl"/> -->
+
+              
  
                  <!--  <box size="0.3 0.3 0.15"/> -->
             </geometry>
@@ -61,7 +64,7 @@
         <collision>
             <origin xyz="2.2924 -0.00985747 0.0751" rpy="3.14159 0 1.5708"/>
             <geometry>
-                    <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/chassis.stl"/>      
+                    <mesh filename="package://avone/description/assets/chassis.stl"/>      
                  <!--  <box size="0.3 0.3 0.15"/> -->
             </geometry>
         </collision>
@@ -74,7 +77,7 @@
     <visual>
       <origin xyz="-0.170629 -0.28192 0.105" rpy="3.14159 5.47382e-48 -0.0851102"/>
       <geometry>
-        <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/rear_suspension.stl"/>      
+        <mesh filename="package://avone/description/assets/rear_suspension.stl"/>      
         
       </geometry>
       <material name="blue"/>
@@ -82,7 +85,7 @@
     <collision>
       <origin xyz="-0.170629 -0.28192 0.105" rpy="3.14159 5.47382e-48 -0.0851102"/>
       <geometry>
-        <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/rear_suspension.stl"/>      
+        <mesh filename="package://avone/description/assets/rear_suspension.stl"/>      
       </geometry>
     </collision>
 
@@ -90,14 +93,14 @@
     <visual>
       <origin xyz="0.189017 0.312761 0.105" rpy="-3.14159 2.33363e-61 -3.05648"/>
       <geometry>
-        <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/rear_suspension.stl"/>      
+        <mesh filename="package://avone/description/assets/rear_suspension.stl"/>      
       </geometry>
       <material name="blue"/>
     </visual>
     <collision>
       <origin xyz="0.189017 0.312761 0.105" rpy="-3.14159 2.33363e-61 -3.05648"/>
       <geometry>
-        <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/rear_suspension.stl"/>      
+        <mesh filename="package://avone/description/assets/rear_suspension.stl"/>      
       </geometry>
     </collision>
 
@@ -105,14 +108,14 @@
     <visual>
       <origin xyz="1.6032 0.2935 0.075" rpy="3.14159 -1.54112e-16 1.5708"/>
       <geometry>
-        <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/front_suspension.stl"/>      
+        <mesh filename="package://avone/description/assets/front_suspension.stl"/>      
       </geometry>
       <material name="blue"/>
     </visual>
     <collision>
       <origin xyz="1.6032 0.2935 0.075" rpy="3.14159 -1.54112e-16 1.5708"/>
       <geometry>
-        <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/front_suspension.stl"/>      
+        <mesh filename="package://avone/description/assets/front_suspension.stl"/>      
       </geometry>
     </collision>
 
@@ -120,14 +123,14 @@
     <visual>
       <origin xyz="1.8748 -0.2935 0.075" rpy="-3.14159 1.54112e-16 -1.5708"/>
       <geometry>
-        <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/front_suspension.stl"/>      
+        <mesh filename="package://avone/description/assets/front_suspension.stl"/>      
       </geometry>
       <material name="blue"/>
     </visual>
     <collision>
       <origin xyz="1.8748 -0.2935 0.075" rpy="-3.14159 1.54112e-16 -1.5708"/>
       <geometry>
-        <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/front_suspension.stl"/>      
+        <mesh filename="package://avone/description/assets/front_suspension.stl"/>      
       </geometry>
     </collision>
   
@@ -140,14 +143,14 @@
     <visual>
       <origin xyz="-0.181377 0.297001 -0.105" rpy="6.30462e-15 0 -6.18615e-05"/>
       <geometry>
-        <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/rear_wheel_hub.stl"/>      
+        <mesh filename="package://avone/description/assets/rear_wheel_hub.stl"/>      
       </geometry>
       <material name="white"/>
     </visual>
     <collision>
       <origin xyz="-0.181377 0.297001 -0.105" rpy="6.30462e-15 0 -6.18615e-05"/>
       <geometry>
-        <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/rear_wheel_hub.stl"/>      
+        <mesh filename="package://avone/description/assets/rear_wheel_hub.stl"/>      
       </geometry>
     </collision>
  
@@ -159,14 +162,14 @@
     <visual>
       <origin xyz="0.181423 -0.296978 -0.105" rpy="3.10966e-15 7.00787e-15 -3.14153"/>
       <geometry>
-        <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/rear_wheel_hub.stl"/>      
+        <mesh filename="package://avone/description/assets/rear_wheel_hub.stl"/>      
       </geometry>
       <material name="white"/>
     </visual>
     <collision>
       <origin xyz="0.181423 -0.296978 -0.105" rpy="3.10966e-15 7.00787e-15 -3.14153"/>
       <geometry>
-        <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/rear_wheel_hub.stl"/>      
+        <mesh filename="package://avone/description/assets/rear_wheel_hub.stl"/>      
       </geometry>
     </collision>
   </link>
@@ -205,7 +208,7 @@
         <visual>
             <origin xyz="-8.09391e-17 7.65875e-18 0.17" rpy="1.5708 0 0"/>
             <geometry>
-                    <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/wheel.stl"/>      
+                    <mesh filename="package://avone/description/assets/wheel.stl"/>      
                  <!--  <box size="0.3 0.3 0.15"/> -->
 
             </geometry>
@@ -214,7 +217,7 @@
         <collision>
             <origin xyz="-8.09391e-17 7.65875e-18 0.17" rpy="1.5708 0 0"/>
             <geometry>
-                     <!--<mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/wheel.stl"/>    -->  
+                     <!--<mesh filename="package://avone/description/assets/wheel.stl"/>    -->  
                                         <sphere radius="0.203"/>    
                  <!--  <box size="0.3 0.3 0.15"/> -->
             </geometry>
@@ -247,7 +250,7 @@
         <visual>
             <origin xyz="-1.59877e-17 7.65404e-18 0.17" rpy="1.5708 0 0"/>
             <geometry>
-                    <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/wheel.stl"/>      
+                    <mesh filename="package://avone/description/assets/wheel.stl"/>      
                  <!--  <box size="0.3 0.3 0.15"/> -->
             </geometry>
             <material name="black"/>
@@ -288,7 +291,7 @@
         <visual>
             <origin xyz="-0.290639 0.1358 0.18" rpy="-3.14159 0 0"/>
             <geometry>
-                    <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/front_wheel_hub.stl"/>      
+                    <mesh filename="package://avone/description/assets/front_wheel_hub.stl"/>      
                  <!--  <box size="0.3 0.3 0.15"/> -->
             </geometry>
             <material name="white"/>
@@ -296,7 +299,7 @@
         <collision>
             <origin xyz="-0.290639 0.1358 0.18" rpy="-3.14159 0 0"/>
             <geometry>
-                    <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/front_wheel_hub.stl"/>      
+                    <mesh filename="package://avone/description/assets/front_wheel_hub.stl"/>      
                  <!--  <box size="0.3 0.3 0.15"/> -->
             </geometry>
         </collision>
@@ -325,7 +328,7 @@
         <visual>
             <origin xyz="2.22045e-16 0 0.17" rpy="1.5708 0 1.5708"/>
             <geometry>
-                    <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/wheel.stl"/>      
+                    <mesh filename="package://avone/description/assets/wheel.stl"/>      
                  <!--  <box size="0.3 0.3 0.15"/> -->
             </geometry>
             <material name="black"/>
@@ -333,7 +336,7 @@
         <collision>
             <origin xyz="2.22045e-16 0 0.17" rpy="1.5708 0 1.5708"/>
             <geometry>
-                   <!--<mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/wheel.stl"/>    -->  
+                   <!--<mesh filename="package://avone/description/assets/wheel.stl"/>    -->  
                                         <sphere radius="0.203"/>    
                  <!--  <box size="0.3 0.3 0.15"/> -->
             </geometry>
@@ -368,7 +371,7 @@
         <visual>
         <origin xyz="-0.290639 0.1358 0.18" rpy="3.14159 0 0"/>
         <geometry>
-                    <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/front_wheel_hub.stl"/>      
+                    <mesh filename="package://avone/description/assets/front_wheel_hub.stl"/>      
                  <!--  <box size="0.3 0.3 0.15"/> -->
         </geometry>
         <material name="white"/>
@@ -376,7 +379,7 @@
         <collision>
         <origin xyz="-0.290639 0.1358 0.18" rpy="3.14159 0 0"/>
         <geometry>
-                    <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/front_wheel_hub.stl"/>      
+                    <mesh filename="package://avone/description/assets/front_wheel_hub.stl"/>      
                  <!--  <box size="0.3 0.3 0.15"/> -->
         </geometry>
         </collision>
@@ -406,7 +409,7 @@
         <visual>
         <origin xyz="0 0 0.17" rpy="1.5708 0 0"/>
         <geometry>
-                    <mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/wheel.stl"/>      
+                    <mesh filename="package://avone/description/assets/wheel.stl"/>      
                  <!--  <box size="0.3 0.3 0.15"/> -->
         </geometry>
         <material name="black"/>
@@ -414,7 +417,7 @@
         <collision>
         <origin xyz="0 0 0.17" rpy="1.5708 0 0"/>
         <geometry>
-                      <!--<mesh filename="file:///home/jay/ros2_ws/src/avone/description/assets/wheel.stl"/>    -->  
+                      <!--<mesh filename="package://avone/description/assets/wheel.stl"/>    -->  
                                         <sphere radius="0.203"/>   
                  <!--  <box size="0.3 0.3 0.15"/> -->
         </geometry>
