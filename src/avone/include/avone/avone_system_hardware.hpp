@@ -1,34 +1,28 @@
 // Copyright (c) 2025, Jay
-// Copyright (c) 2025, Stogl Robotics Consulting UG (haftungsbeschränkt) (template)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Copyright (c) 2025, Stogl Robotics...
+// Apache 2.0
 
 #ifndef AVONE__AVONE_SYSTEM_HARDWARE_HPP_
 #define AVONE__AVONE_SYSTEM_HARDWARE_HPP_
 
 #include <string>
 #include <vector>
+#include <memory>
 
 #include "avone/visibility_control.h"
 #include "avone/avone_can_interface.hpp"
-
 
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/handle.hpp"
 #include "hardware_interface/hardware_info.hpp"
 #include "hardware_interface/types/hardware_interface_return_values.hpp"
 #include "rclcpp/macros.hpp"
+#include "rclcpp/rclcpp.hpp"
 #include "rclcpp_lifecycle/state.hpp"
+
+#include "std_msgs/msg/bool.hpp"
+#include "sensor_msgs/msg/point_cloud2.hpp"
+#include "sensor_msgs/msg/laser_scan.hpp"
 
 namespace avone
 {
@@ -66,16 +60,16 @@ public:
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
 private:
+  // ---- Helpers ----
+  bool compute_r2d_ready_(const rclcpp::Time & now) const;
+  void publish_and_send_r2d_(const rclcpp::Time & now);
+
+private:
   // CAN interface
   std::unique_ptr<AvoneCanInterface> can_iface_;
 
-  // Joint indices (still useful if you ever use vectors!)
-  size_t lsteer_idx_, rsteer_idx_, rlmotor_idx_, rrmotor_idx_;
-
-  // Dummy for testing 
-  double dummy_state_{0.0}, dummy_cmd_{0.0};
-  
-
+  // Joint indices (kept if you later rely on indexes)
+  size_t lsteer_idx_{0}, rsteer_idx_{0}, rlmotor_idx_{0}, rrmotor_idx_{0};
 
   // --- Command interface storage ---
   double lsteer_cmd_{0.0};
@@ -90,29 +84,62 @@ private:
   double rlmotor_velocity_{0.0};
   double rrmotor_position_{0.0};
   double rrmotor_velocity_{0.0};
-
-  // Add FLWheel/FRWheel if needed:
   double flwheel_position_{0.0};
   double frwheel_position_{0.0};
 
   // Hardware parameters
-  double max_steer_angle_, min_steer_angle_;
-  int max_rpm_, can_baudrate_, read_timeout_ms_;
-  
-  uint32_t l_motor_can_id_;
-  uint32_t r_motor_can_id_;
-  uint32_t steer_can_id_;
+  double max_steer_angle_{0.0}, min_steer_angle_{0.0};
+  int    max_rpm_{0}, can_baudrate_{0}, read_timeout_ms_{0};
 
-  uint32_t cmd_l_motor_can_id_;
-  uint32_t cmd_r_motor_can_id_;
-  uint32_t cmd_steer_can_id_;
+  uint32_t l_motor_can_id_{0};
+  uint32_t r_motor_can_id_{0};
+  uint32_t steer_can_id_{0};
 
+  uint32_t cmd_l_motor_can_id_{0};
+  uint32_t cmd_r_motor_can_id_{0};
+  uint32_t cmd_steer_can_id_{0};
 
   std::string can_interface_;
 
+  // ---- R2D / Watchdogs parameters ----
+  bool require_rlmotor_{true};
+  bool require_rrmotor_{true};
+  bool require_steer_{true};
+  bool require_lidar_{true};
 
-  rclcpp::Time last_read_time_;
+  int  startup_validation_ms_{800};
+  int  link_loss_timeout_ms_{250};
 
+  std::string lidar_topic_{"/lidar"};
+  std::string lidar_ros_type_{"sensor_msgs/msg/PointCloud2"};
+  int  lidar_timeout_ms_{300};
+
+  std::string r2d_topic_{"/ready_to_drive"};
+  bool r2d_can_heartbeat_{true};
+  uint32_t r2d_can_id_{0x110};
+  int  r2d_can_period_ms_{50};
+
+
+
+
+  // ---- R2D runtime state ----
+  bool r2d_ready_{false};
+  rclcpp::Time last_rlmotor_rx_{0,0,RCL_SYSTEM_TIME};
+  rclcpp::Time last_rrmotor_rx_{0,0,RCL_SYSTEM_TIME};
+  rclcpp::Time last_steer_rx_{0,0,RCL_SYSTEM_TIME};
+  rclcpp::Time last_lidar_rx_{0,0,RCL_SYSTEM_TIME};
+
+  rclcpp::Time last_r2d_tx_{0,0,RCL_SYSTEM_TIME};
+
+  // ---- ROS node for pub/sub (spun in read() via spin_some) ----
+  rclcpp::Node::SharedPtr node_;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr r2d_pub_;
+
+  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_pc_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr    lidar_scan_sub_;
+
+  // Last read time (if needed)
+  rclcpp::Time last_read_time_{0,0,RCL_SYSTEM_TIME};
 };
 
 }  // namespace avone

@@ -27,21 +27,21 @@ def generate_launch_description():
         # ----------------------------------------------------
         # 2) Local EKF: wheel odom + IMU → /odometry/local
         # ----------------------------------------------------
-        # Node(
-        #     package='robot_localization',
-        #     executable='ekf_node',
-        #     name='ekf_filter_node_odom',
-        #     output='screen',
-        #     parameters=[
-        #         {'use_sim_time': use_sim_time},
-        #         ekf_yaml
-        #     ],
-        #     remappings=[
-        #         # this makes the node’s internal "odometry/filtered"
-        #         # subscribe to "/odometry/local"
-        #         ('odometry/filtered', '/odometry/local'),
-        #     ]
-        # ),
+        Node(
+            package='robot_localization',
+            executable='ekf_node',
+            name='ekf_filter_node_odom',
+            output='screen',
+            parameters=[
+                {'use_sim_time': use_sim_time},
+                ekf_yaml
+            ],
+            remappings=[
+                # this makes the node’s internal "odometry/filtered"
+                # subscribe to "/odometry/local"
+                ('odometry/filtered', '/odometry/local'),
+            ]
+        ),
 
         # ----------------------------------------------------
         # 3) NavSat Transform: GPS → /odometry/gps
@@ -81,20 +81,20 @@ def generate_launch_description():
         # ----------------------------------------------------
         # 4) Global EKF: fuse /odometry/local + /odometry/gps
         # ----------------------------------------------------
-        # Node(
-        #     package='robot_localization',
-        #     executable='ekf_node',
-        #     name='ekf_filter_node_map',
-        #     output='screen',
-        #     parameters=[
-        #         {'use_sim_time': use_sim_time},
-        #         map_ekf_yaml
-        #     ],
-        #     remappings=[
-        #         # this makes the node’s internal "odometry/filtered"
-        #         # subscribe to "/odometry/local"
-        #         ('odometry/filtered', '/odometry/global'),
-        #     ]
-        #     # inputs are defined in your map_ekf.yaml (odom0=/odometry/local, odom1=/odometry/gps)
-        # ),
+        Node(
+            package='robot_localization',
+            executable='ekf_node',
+            name='ekf_filter_node_map',
+            output='screen',
+            parameters=[
+                {'use_sim_time': use_sim_time},
+                map_ekf_yaml
+            ],
+            remappings=[
+                # this makes the node’s internal "odometry/filtered"
+                # subscribe to "/odometry/local"
+                ('odometry/filtered', '/odometry/global'),
+            ]
+            # inputs are defined in your map_ekf.yaml (odom0=/odometry/local, odom1=/odometry/gps)
+        ),
     ])

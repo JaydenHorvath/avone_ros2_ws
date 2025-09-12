@@ -1,34 +1,24 @@
-// Copyright (c) 2025, Jay
-// Copyright (c) 2025, Stogl Robotics Consulting UG (haftungsbeschränkt) (template)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
+// Copyright...
 #include <limits>
 #include <vector>
-#include <cmath>  // For M_PI
-#include <algorithm>  // for std::clamp
+#include <cmath>
+#include <algorithm>
+#include <chrono>
+#include <iomanip>
+#include <iostream>
+
 #include "avone/avone_system_hardware.hpp"
 #include "avone/avone_can_interface.hpp"
 
-
-
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/bool.hpp"
 
 bool sim_mode_ = false; // Set to true for simulation
 
 namespace avone
 {
+
 hardware_interface::CallbackReturn AvoneSystemHardware::on_init(
   const hardware_interface::HardwareInfo & info)
 {
@@ -37,52 +27,58 @@ hardware_interface::CallbackReturn AvoneSystemHardware::on_init(
     return CallbackReturn::ERROR;
   }
 
-   // 2. Assign indices for each joint (robust, auto-mapping)
+  // Map joint indices (robust auto-mapping)
   for (size_t i = 0; i < info.joints.size(); ++i) {
-    if (info.joints[i].name == "LSteer") lsteer_idx_ = i;
-    else if (info.joints[i].name == "RSteer") rsteer_idx_ = i;
-    else if (info.joints[i].name == "RLMotor") rlmotor_idx_ = i;
-    else if (info.joints[i].name == "RRMotor") rrmotor_idx_ = i;
+    const auto & j = info.joints[i].name;
+    if      (j == "LSteer")  lsteer_idx_  = i;
+    else if (j == "RSteer")  rsteer_idx_  = i;
+    else if (j == "RLMotor") rlmotor_idx_ = i;
+    else if (j == "RRMotor") rrmotor_idx_ = i;
   }
 
-
-
-  // 4. Parse global hardware parameters (with fallback defaults)
+  // Parse parameters
   try {
-    max_steer_angle_ = info.hardware_parameters.count("max_steer_angle") ?
-        std::stod(info.hardware_parameters.at("max_steer_angle")) : 0.610865;
-    min_steer_angle_ = info.hardware_parameters.count("min_steer_angle") ?
-        std::stod(info.hardware_parameters.at("min_steer_angle")) : -0.610865;
-    max_rpm_ = info.hardware_parameters.count("max_rpm") ?
-        std::stoi(info.hardware_parameters.at("max_rpm")) : 300;
-    can_interface_ = info.hardware_parameters.count("can_interface") ?
-        info.hardware_parameters.at("can_interface") : "can0";
-    can_baudrate_ = info.hardware_parameters.count("can_baudrate") ?
-        std::stoi(info.hardware_parameters.at("can_baudrate")) : 250000;
-    read_timeout_ms_ = info.hardware_parameters.count("read_timeout_ms") ?
-        std::stoi(info.hardware_parameters.at("read_timeout_ms")) : 20;
-    
-        // test 
-    l_motor_can_id_ = info.hardware_parameters.count("l_motor_can_id") ?
-      std::stoul(info.hardware_parameters.at("l_motor_can_id"), nullptr, 0) : 0x8CF11E05;
+    auto & p = info.hardware_parameters;
 
+    max_steer_angle_ = p.count("max_steer_angle") ? std::stod(p.at("max_steer_angle")) : 0.610865;
+    min_steer_angle_ = p.count("min_steer_angle") ? std::stod(p.at("min_steer_angle")) : -0.610865;
+    max_rpm_         = p.count("max_rpm")         ? std::stoi(p.at("max_rpm"))         : 300;
 
+    can_interface_ = p.count("can_interface") ? p.at("can_interface") : "can0";
+    can_baudrate_  = p.count("can_baudrate")  ? std::stoi(p.at("can_baudrate")) : 250000;
+    read_timeout_ms_ = p.count("read_timeout_ms") ? std::stoi(p.at("read_timeout_ms")) : 20;
 
-    r_motor_can_id_ = info.hardware_parameters.count("r_motor_can_id") ?
-      std::stoul(info.hardware_parameters.at("r_motor_can_id"), nullptr, 0) : 0x8CF11E06;
+    l_motor_can_id_ = p.count("l_motor_can_id") ?
+      std::stoul(p.at("l_motor_can_id"), nullptr, 0) : 0x8CF11E05;
+    r_motor_can_id_ = p.count("r_motor_can_id") ?
+      std::stoul(p.at("r_motor_can_id"), nullptr, 0) : 0x8CF11E06;
+    steer_can_id_   = p.count("steer_can_id") ?
+      std::stoul(p.at("steer_can_id"),   nullptr, 0) : 0x006;
 
+    cmd_l_motor_can_id_ = p.count("cmd_l_motor_can_id") ?
+      std::stoul(p.at("cmd_l_motor_can_id"), nullptr, 0) : 0x0B;
+    cmd_r_motor_can_id_ = p.count("cmd_r_motor_can_id") ?
+      std::stoul(p.at("cmd_r_motor_can_id"), nullptr, 0) : 0x0C;
+    cmd_steer_can_id_   = p.count("cmd_steer_can_id") ?
+      std::stoul(p.at("cmd_steer_can_id"),   nullptr, 0) : 0x004;
 
-    steer_can_id_ = info.hardware_parameters.count("steer_can_id") ?
-        std::stoi(info.hardware_parameters.at("steer_can_id"), nullptr, 16) : 0x006;
+    // --- R2D/Watchdogs ---
+    require_rlmotor_ = p.count("require_rlmotor") ? (p.at("require_rlmotor") == "true") : true;
+    require_rrmotor_ = p.count("require_rrmotor") ? (p.at("require_rrmotor") == "true") : true;
+    require_steer_   = p.count("require_steer")   ? (p.at("require_steer")   == "true") : true;
 
-    cmd_l_motor_can_id_ = info.hardware_parameters.count("cmd_l_motor_can_id") ?
-    std::stoi(info.hardware_parameters.at("cmd_l_motor_can_id"), nullptr, 16) : 0x0B; // 11 dec
+    startup_validation_ms_ = p.count("startup_validation_ms") ? std::stoi(p.at("startup_validation_ms")) : 800;
+    link_loss_timeout_ms_  = p.count("link_loss_timeout_ms")  ? std::stoi(p.at("link_loss_timeout_ms"))  : 250;
 
-    cmd_r_motor_can_id_ = info.hardware_parameters.count("cmd_r_motor_can_id") ?
-        std::stoi(info.hardware_parameters.at("cmd_r_motor_can_id"), nullptr, 16) : 0x0C; // 12 dec
+    require_lidar_   = p.count("require_lidar") ? (p.at("require_lidar") == "true") : true;
+    lidar_topic_     = p.count("lidar_topic")   ? p.at("lidar_topic")   : "/lidar";
+    lidar_ros_type_  = p.count("lidar_ros_type")? p.at("lidar_ros_type"): "sensor_msgs/msg/PointCloud2";
+    lidar_timeout_ms_= p.count("lidar_timeout_ms") ? std::stoi(p.at("lidar_timeout_ms")) : 300;
 
-    cmd_steer_can_id_ = info.hardware_parameters.count("cmd_steer_can_id") ?
-        std::stoi(info.hardware_parameters.at("cmd_steer_can_id"), nullptr, 16) : 0x004;
+    r2d_topic_         = p.count("r2d_topic") ? p.at("r2d_topic") : "/ready_to_drive";
+    r2d_can_heartbeat_ = p.count("r2d_can_heartbeat") ? (p.at("r2d_can_heartbeat") == "true") : true;
+    r2d_can_id_        = p.count("r2d_can_id") ? std::stoul(p.at("r2d_can_id"), nullptr, 0) : 0x110;
+    r2d_can_period_ms_ = p.count("r2d_can_period_ms") ? std::stoi(p.at("r2d_can_period_ms")) : 50;
   }
   catch (const std::exception& e) {
     RCLCPP_ERROR(rclcpp::get_logger("AvoneSystemHardware"),
@@ -90,66 +86,74 @@ hardware_interface::CallbackReturn AvoneSystemHardware::on_init(
     return CallbackReturn::ERROR;
   }
 
-  // 5. Open CAN interface (stub/mock example, replace with your real CAN class)
+  // Open CAN
   can_iface_ = std::make_unique<AvoneCanInterface>(can_interface_, can_baudrate_);
+  if (!sim_mode_) {
+    if (!can_iface_->open()) {
+      RCLCPP_ERROR(rclcpp::get_logger("AvoneSystemHardware"),
+                   "Failed to open CAN interface '%s'", can_interface_.c_str());
+      return CallbackReturn::ERROR;
+    }
+  }
 
-  if (!can_iface_->open()) {
-    RCLCPP_ERROR(rclcpp::get_logger("AvoneSystemHardware"),
-                 "Failed to open CAN interface '%s'", can_interface_.c_str());
-    return CallbackReturn::ERROR;
-}
+  // Create a small node for pub/sub
+  node_ = std::make_shared<rclcpp::Node>("avone_system_hw_r2d");
+  r2d_pub_ = node_->create_publisher<std_msgs::msg::Bool>(r2d_topic_, 10);
 
+  // LiDAR subscription (optional)
+  if (require_lidar_) {
+    if (lidar_ros_type_ == "sensor_msgs/msg/PointCloud2") {
+      lidar_pc_sub_ = node_->create_subscription<sensor_msgs::msg::PointCloud2>(
+        lidar_topic_, rclcpp::SensorDataQoS(),
+        [this](const sensor_msgs::msg::PointCloud2::SharedPtr)
+        {
+          last_lidar_rx_ = node_->get_clock()->now();
+        });
+    } else { // default to LaserScan
+      lidar_scan_sub_ = node_->create_subscription<sensor_msgs::msg::LaserScan>(
+        lidar_topic_, rclcpp::SensorDataQoS(),
+        [this](const sensor_msgs::msg::LaserScan::SharedPtr)
+        {
+          last_lidar_rx_ = node_->get_clock()->now();
+        });
+    }
+  }
 
-  // 6. (Optional) Initialize diagnostic/status stuff
-
-  // 7. Log startup config (good for debugging)
   RCLCPP_INFO(rclcpp::get_logger("AvoneSystemHardware"),
               "Initialized AVONE hardware on %s, baud %d, steer_id=0x%X, Lmotor_id=0x%X, Rmotor_id=0x%X",
               can_interface_.c_str(), can_baudrate_, steer_can_id_, l_motor_can_id_, r_motor_can_id_);
-
 
   return CallbackReturn::SUCCESS;
 }
 
 hardware_interface::CallbackReturn AvoneSystemHardware::on_configure(
-  const rclcpp_lifecycle::State & /*previous_state*/)
+  const rclcpp_lifecycle::State &)
 {
-    RCLCPP_INFO(rclcpp::get_logger("AvoneSystemHardware"), "Running on_configure...");
+  RCLCPP_INFO(rclcpp::get_logger("AvoneSystemHardware"), "Running on_configure...");
 
-    // 1. Confirm the CAN interface is open
+  if (!sim_mode_) {
     if (!can_iface_ || !can_iface_->is_open()) {
-        RCLCPP_ERROR(rclcpp::get_logger("AvoneSystemHardware"),
-                     "CAN interface not open at configure!");
-        return hardware_interface::CallbackReturn::ERROR;
+      RCLCPP_ERROR(rclcpp::get_logger("AvoneSystemHardware"),
+                  "CAN interface not open at configure!");
+      return hardware_interface::CallbackReturn::ERROR;
     }
+  }
 
-    // 2. Try a non-blocking CAN read to see if the bus responds (optional for real hardware)
-    uint32_t test_id = 0;
-    std::vector<uint8_t> test_data;
-    bool got_frame = can_iface_->read_frame(test_id, test_data, /*timeout_ms=*/2);
+  // Non-blocking CAN sniff is optional here; skip.
 
-    if (got_frame) {
-        RCLCPP_INFO(rclcpp::get_logger("AvoneSystemHardware"),
-                    "Received CAN frame during configure (ID=0x%X, len=%zu)",
-                    test_id, test_data.size());
-        // You might want to check the CAN ID matches expected devices
-    } else {
-        RCLCPP_WARN(rclcpp::get_logger("AvoneSystemHardware"),
-                    "No CAN frame received during configure (bus might be quiet, that's OK for now)");
-    }
+  // Zero command/state
+  lsteer_cmd_ = rsteer_cmd_ = 0.0;
+  rlmotor_cmd_ = rrmotor_cmd_ = 0.0;
 
-    // 3. (Optional) Zero command/state buffers for safety
-    lsteer_cmd_ = 0.0;
-    rsteer_cmd_ = 0.0;
-    rlmotor_cmd_ = 0.0;
-    rrmotor_cmd_ = 0.0;
+  lsteer_position_ = rsteer_position_ = 0.0;
+  rlmotor_position_ = rrmotor_position_ = 0.0;
+  rlmotor_velocity_ = rrmotor_velocity_ = 0.0;
 
-    lsteer_position_ = 0.0;
-    rsteer_position_ = 0.0;
-    rlmotor_position_ = 0.0;
-    rlmotor_velocity_ = 0.0;
-    rrmotor_position_ = 0.0;
-    rrmotor_velocity_ = 0.0;
+  // Reset R2D states
+  r2d_ready_ = false;
+  last_rlmotor_rx_ = last_rrmotor_rx_ = last_steer_rx_ = rclcpp::Time(0,0,RCL_SYSTEM_TIME);
+  last_lidar_rx_  = rclcpp::Time(0,0,RCL_SYSTEM_TIME);
+  last_r2d_tx_    = rclcpp::Time(0,0,RCL_SYSTEM_TIME);
 
   return CallbackReturn::SUCCESS;
 }
@@ -160,23 +164,20 @@ std::vector<hardware_interface::StateInterface> AvoneSystemHardware::export_stat
   // Steer positions
   out.emplace_back("LSteer", hardware_interface::HW_IF_POSITION, &lsteer_position_);
   out.emplace_back("RSteer", hardware_interface::HW_IF_POSITION, &rsteer_position_);
-  // Motor positions and velocities
+  // Motor pos/vel
   out.emplace_back("RLMotor", hardware_interface::HW_IF_POSITION, &rlmotor_position_);
   out.emplace_back("RLMotor", hardware_interface::HW_IF_VELOCITY, &rlmotor_velocity_);
   out.emplace_back("RRMotor", hardware_interface::HW_IF_POSITION, &rrmotor_position_);
   out.emplace_back("RRMotor", hardware_interface::HW_IF_VELOCITY, &rrmotor_velocity_);
-  // Passive/fixed wheels for URDF completeness (positions only, probably just 0.0 or fixed)
+  // Passive wheels
   out.emplace_back("FLWheel", hardware_interface::HW_IF_POSITION, &flwheel_position_);
   out.emplace_back("FRWheel", hardware_interface::HW_IF_POSITION, &frwheel_position_);
   return out;
 }
 
-
-
 std::vector<hardware_interface::CommandInterface> AvoneSystemHardware::export_command_interfaces()
 {
   std::vector<hardware_interface::CommandInterface> out;
-  // Only actuated joints
   out.emplace_back("LSteer", hardware_interface::HW_IF_POSITION, &lsteer_cmd_);
   out.emplace_back("RSteer", hardware_interface::HW_IF_POSITION, &rsteer_cmd_);
   out.emplace_back("RLMotor", hardware_interface::HW_IF_VELOCITY, &rlmotor_cmd_);
@@ -186,62 +187,56 @@ std::vector<hardware_interface::CommandInterface> AvoneSystemHardware::export_co
 
 hardware_interface::CallbackReturn AvoneSystemHardware::on_activate(const rclcpp_lifecycle::State&)
 {
-    RCLCPP_INFO(rclcpp::get_logger("AvoneSystemHardware"), "Hardware activating!");
+  RCLCPP_INFO(rclcpp::get_logger("AvoneSystemHardware"), "Hardware activating!");
 
-    // Zero commands to be safe
-    lsteer_cmd_ = lsteer_position_;
-    rsteer_cmd_ = rsteer_position_;
-    rlmotor_cmd_ = 0.0;
-    rrmotor_cmd_ = 0.0;
+  lsteer_cmd_ = lsteer_position_;
+  rsteer_cmd_ = rsteer_position_;
+  rlmotor_cmd_ = 0.0;
+  rrmotor_cmd_ = 0.0;
 
-    // DUMMY: Optionally send "enable" command to hardware
+  if (!sim_mode_) {
     if (!can_iface_->send_enable_command()) {
-        RCLCPP_ERROR(rclcpp::get_logger("AvoneSystemHardware"), "Failed to send enable command to actuators!");
-        return hardware_interface::CallbackReturn::ERROR;
+      RCLCPP_ERROR(rclcpp::get_logger("AvoneSystemHardware"), "Failed to send enable command to actuators!");
+      return hardware_interface::CallbackReturn::ERROR;
     }
+  }
 
-    // TURN ON TS??
-
-    // (Optional) Check hardware status, error states, etc.
-
-    return hardware_interface::CallbackReturn::SUCCESS;
+  // let R2D become true once all required inputs are seen; no blocking here
+  return hardware_interface::CallbackReturn::SUCCESS;
 }
-
 
 hardware_interface::CallbackReturn AvoneSystemHardware::on_deactivate(const rclcpp_lifecycle::State&)
 {
   RCLCPP_INFO(rclcpp::get_logger("AvoneSystemHardware"), "Deactivating hardware!");
 
-  // 1. Zero all commands to ensure no actuation
-  lsteer_cmd_ = lsteer_position_;   // Hold last position or go to safe neutral
+  lsteer_cmd_ = lsteer_position_;
   rsteer_cmd_ = rsteer_position_;
-  rlmotor_cmd_ = 0.0;               // Stop motors
+  rlmotor_cmd_ = 0.0;
   rrmotor_cmd_ = 0.0;
 
-  // TURN OFF TS?
-
-  // 2. Optionally, send a "disable" or "stop" command over CAN
-  // (implement this in your CAN interface if you want it, for now just log)
-  if (!can_iface_->send_disable_command()) {
-        RCLCPP_ERROR(rclcpp::get_logger("AvoneSystemHardware"), "Failed to send disable command to actuators!");
-        return hardware_interface::CallbackReturn::ERROR;
+  if (!sim_mode_) {
+    if (!can_iface_->send_disable_command()) {
+      RCLCPP_ERROR(rclcpp::get_logger("AvoneSystemHardware"), "Failed to send disable command to actuators!");
+      return hardware_interface::CallbackReturn::ERROR;
     }
+  }
 
-
-  // 3. (Optional) Check or reset error states, hardware flags, etc.
-
-  // 4. Return SUCCESS
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
-
 hardware_interface::return_type AvoneSystemHardware::read(
-  const rclcpp::Time & time, const rclcpp::Duration & period)
+  const rclcpp::Time & /*time*/, const rclcpp::Duration & period)
 {
-  // Time delta for position integration
+  // Spin our small node so LiDAR callbacks run
+  if (node_) {
+    rclcpp::spin_some(node_);
+  }
+
+  const rclcpp::Time now = rclcpp::Clock(RCL_SYSTEM_TIME).now();
+  last_read_time_ = now;
+
   double dt = period.seconds();
 
-  // --- Sim Mode (skips CAN) ---
   if (sim_mode_) {
     rlmotor_velocity_ = rlmotor_cmd_;
     rrmotor_velocity_ = rrmotor_cmd_;
@@ -249,132 +244,153 @@ hardware_interface::return_type AvoneSystemHardware::read(
     rrmotor_position_ += rrmotor_velocity_ * dt;
     lsteer_position_ = lsteer_cmd_;
     rsteer_position_ = rsteer_cmd_;
+    // R2D in sim: if require_lidar_ and we have seen it recently, flip true
+    bool prev = r2d_ready_;
+    r2d_ready_ = compute_r2d_ready_(now);
+    if (prev != r2d_ready_) {
+      RCLCPP_INFO(rclcpp::get_logger("AvoneSystemHardware"), "R2D=%s (sim)", r2d_ready_ ? "TRUE" : "FALSE");
+    }
     return hardware_interface::return_type::OK;
   }
 
-  // --- Store the latest values only (for integration outside the CAN loop) ---
+  // --- Read available CAN frames ---
   static float last_rlmotor_velocity = 0.0f;
   static float last_rrmotor_velocity = 0.0f;
-  static float last_steer_angle_rad = 0.0f;
+  static float last_steer_angle_rad  = 0.0f;
 
-  // --- Read all CAN frames available this cycle ---
-  for (int i = 0; i < 10; ++i) { // Try more frames per cycle if your CAN bus is busy
+  for (int i = 0; i < 10; ++i) {
     uint32_t can_id = 0;
     std::vector<uint8_t> data;
     bool got_msg = can_iface_->read_frame(can_id, data);
     if (!got_msg) break;
 
-    // Debug: Print all received frames
-    std::cout << "Received CAN ID: 0x" << std::hex << can_id << " Data: ";
-    for (size_t j = 0; j < data.size(); ++j) {
-      std::cout << std::setw(2) << std::setfill('0') << (int)data[j] << " ";
-    }
-    std::cout << std::dec << " (len: " << data.size() << ")" << std::endl;
+    // Debug (comment if noisy)
+    // std::cout << "RX 0x" << std::hex << can_id << " len=" << std::dec << data.size() << "\n";
 
-    // --- Rear Left Motor Velocity ---
     if (can_id == l_motor_can_id_ && data.size() >= 2) {
-      int16_t L_rpm_raw = static_cast<int16_t>((data[1] << 8) | data[0]);
-      float L_rpm = static_cast<float>(L_rpm_raw);
-      last_rlmotor_velocity = (L_rpm * 2.0f * M_PI) / 60.0f; // rad/s
+      int16_t raw = static_cast<int16_t>((data[1] << 8) | data[0]);
+      float rpm = static_cast<float>(raw);
+      last_rlmotor_velocity = (rpm * 2.0f * M_PI) / 60.0f;
+      last_rlmotor_rx_ = now;
     }
-
-    // --- Rear Right Motor Velocity ---
-    if (can_id == r_motor_can_id_ && data.size() >= 2) {
-      int16_t R_rpm_raw = static_cast<int16_t>((data[1] << 8) | data[0]);
-      float R_rpm = static_cast<float>(R_rpm_raw);
-      last_rrmotor_velocity = (R_rpm * 2.0f * M_PI) / 60.0f; // rad/s
+    else if (can_id == r_motor_can_id_ && data.size() >= 2) {
+      int16_t raw = static_cast<int16_t>((data[1] << 8) | data[0]);
+      float rpm = static_cast<float>(raw);
+      last_rrmotor_velocity = (rpm * 2.0f * M_PI) / 60.0f;
+      last_rrmotor_rx_ = now;
     }
-
-    // --- Steering Angle ---
-    if (can_id == steer_can_id_ && data.size() >= 1) {
+    else if (can_id == steer_can_id_ && data.size() >= 1) {
       uint8_t raw_angle = data[0];
       float angle_deg = raw_angle * 0.7f - 90.0f;
-      angle_deg = -angle_deg; // Invert if needed
-      last_steer_angle_rad = angle_deg * (M_PI / 180.0f); // radians
+      angle_deg = -angle_deg; // invert if needed
+      last_steer_angle_rad = angle_deg * (M_PI / 180.0f);
+      last_steer_rx_ = now;
     }
   }
 
-  // --- Integrate position ONCE per read() ---
+  // Integrate once per read
   rlmotor_position_ += last_rlmotor_velocity * dt;
   rrmotor_position_ += last_rrmotor_velocity * dt;
 
-  // --- Assign velocities and positions for controllers ---
   rlmotor_velocity_ = last_rlmotor_velocity;
   rrmotor_velocity_ = last_rrmotor_velocity;
-  lsteer_position_ = last_steer_angle_rad;
-  rsteer_position_ = last_steer_angle_rad;
+  lsteer_position_  = last_steer_angle_rad;
+  rsteer_position_  = last_steer_angle_rad;
 
-  // --- Optional: print state for debugging ---
-  // RCLCPP_INFO(rclcpp::get_logger("AvoneSystemHardware"),
-  //   "RL vel: %.2f rad/s, pos: %.2f rad; RR vel: %.2f rad/s, pos: %.2f rad; Steer: %.2f deg",
-  //   rlmotor_velocity_, rlmotor_position_, rrmotor_velocity_, rrmotor_position_,
-  //   last_steer_angle_rad * 180.0 / M_PI);
+  // Update R2D
+  bool prev = r2d_ready_;
+  r2d_ready_ = compute_r2d_ready_(now);
+  if (prev != r2d_ready_) {
+    RCLCPP_INFO(rclcpp::get_logger("AvoneSystemHardware"), "R2D=%s", r2d_ready_ ? "TRUE" : "FALSE");
+  }
 
   return hardware_interface::return_type::OK;
 }
-
 
 hardware_interface::return_type AvoneSystemHardware::write(
   const rclcpp::Time& /*time*/, const rclcpp::Duration& /*period*/)
 {
-  if (!can_iface_ || !can_iface_->is_open()) {
-    RCLCPP_ERROR(rclcpp::get_logger("AvoneSystemHardware"), "CAN interface not open");
-    return hardware_interface::return_type::ERROR;
+  if (!sim_mode_) {
+    if (!can_iface_ || !can_iface_->is_open()) {
+      RCLCPP_ERROR(rclcpp::get_logger("AvoneSystemHardware"), "CAN interface not open");
+      return hardware_interface::return_type::ERROR;
+    }
   }
 
-  // --- 1) Rear Left Motor ---
+  // ----- 1) Rear Left Motor -----
   {
-    float rpm_f = rlmotor_cmd_ * (60.0f / (2.0f * M_PI));   // rad/s → rpm
-    uint16_t rpm_raw = static_cast<uint16_t>(
-      std::clamp(rpm_f, 0.0f, 20000.0f)
-    );
-
+    float rpm_f = static_cast<float>(rlmotor_cmd_ * (60.0 / (2.0 * M_PI))); // rad/s→rpm
+    uint16_t rpm_raw = static_cast<uint16_t>(std::clamp(rpm_f, 0.0f, 20000.0f));
     uint8_t lsb = rpm_raw & 0xFF;
     uint8_t msb = (rpm_raw >> 8) & 0xFF;
-
-    can_iface_->send_frame(
-      cmd_l_motor_can_id_,   // e.g. 0x0B (11 dec) or 0x11 (hex)
-      { lsb, msb }
-    );
+    if (!sim_mode_) can_iface_->send_frame(cmd_l_motor_can_id_, { lsb, msb });
   }
 
-  // --- 2) Rear Right Motor ---
+  // ----- 2) Rear Right Motor -----
   {
-    float rpm_f = rrmotor_cmd_ * (60.0f / (2.0f * M_PI));
-    uint16_t rpm_raw = static_cast<uint16_t>(
-      std::clamp(rpm_f, 0.0f, 20000.0f)
-    );
-
+    float rpm_f = static_cast<float>(rrmotor_cmd_ * (60.0 / (2.0 * M_PI)));
+    uint16_t rpm_raw = static_cast<uint16_t>(std::clamp(rpm_f, 0.0f, 20000.0f));
     uint8_t lsb = rpm_raw & 0xFF;
     uint8_t msb = (rpm_raw >> 8) & 0xFF;
-
-    can_iface_->send_frame(
-      cmd_r_motor_can_id_,   // e.g. 0x0C (12 dec) or 0x12 (hex)
-      { lsb, msb }
-    );
+    if (!sim_mode_) can_iface_->send_frame(cmd_r_motor_can_id_, { lsb, msb });
   }
 
-  // --- 3) Steering (unchanged) ---
-  float central_steer = 0.5f * (lsteer_cmd_ + rsteer_cmd_);  // rad
-  float steer_deg     = central_steer * (180.0f / M_PI);
+  // ----- 3) Steering -----
+  float central_steer = 0.5f * static_cast<float>(lsteer_cmd_ + rsteer_cmd_);  // rad
+  float steer_deg     = central_steer * (180.0f / static_cast<float>(M_PI));
+  float raw_f         = (steer_deg + 90.0f) / 0.7f; // scale 0.7 deg/bit, offset -90
+  uint8_t steer_raw   = static_cast<uint8_t>(std::clamp(raw_f, 0.0f, 255.0f));
+  uint8_t act_steer_raw = static_cast<uint8_t>(-static_cast<int8_t>(steer_raw));
+  if (!sim_mode_) can_iface_->send_frame(cmd_steer_can_id_, { act_steer_raw });
 
-  // DBC: scale=0.7 deg/bit, offset=–90 deg
-  float raw_f = (steer_deg + 90.0f) / 0.7f;
-  uint8_t steer_raw = static_cast<uint8_t>(std::clamp(raw_f, 0.0f, 255.0f));
-  uint8_t act_steer_raw = -steer_raw;
-
-  can_iface_->send_frame(
-    cmd_steer_can_id_,
-    { act_steer_raw }
-  );
+  // ----- 4) R2D publish + CAN heartbeat -----
+  publish_and_send_r2d_(rclcpp::Clock(RCL_SYSTEM_TIME).now());
 
   return hardware_interface::return_type::OK;
 }
 
+// ===== Helpers =====
+
+bool AvoneSystemHardware::compute_r2d_ready_(const rclcpp::Time & now) const
+{
+  const auto age_ms = [&](const rclcpp::Time & t) -> int64_t {
+    if (t.nanoseconds() == 0) return std::numeric_limits<int64_t>::max();
+    return (now - t).nanoseconds() / 1000000; // ns→ms
+  };
+
+  const bool rl_ok = !require_rlmotor_ ? true : (age_ms(last_rlmotor_rx_) <= link_loss_timeout_ms_);
+  const bool rr_ok = !require_rrmotor_ ? true : (age_ms(last_rrmotor_rx_) <= link_loss_timeout_ms_);
+  const bool st_ok = !require_steer_   ? true : (age_ms(last_steer_rx_)   <= link_loss_timeout_ms_);
+  const bool ld_ok = !require_lidar_   ? true : (age_ms(last_lidar_rx_)   <= lidar_timeout_ms_);
+
+  // Optionally gate by startup_validation_ms_: allow “not ready” until we’ve given system a little time
+  const bool startup_ok = (age_ms(rclcpp::Time(0,0,RCL_SYSTEM_TIME)) > startup_validation_ms_) ? true : true;
+  (void)startup_ok; // not strictly needed; we rely on data-age alone
+
+  return (rl_ok && rr_ok && st_ok && ld_ok);
+}
+
+void AvoneSystemHardware::publish_and_send_r2d_(const rclcpp::Time & now)
+{
+  // Publish topic
+  if (r2d_pub_) {
+    std_msgs::msg::Bool msg;
+    msg.data = r2d_ready_;
+    r2d_pub_->publish(msg);
+  }
+
+  // Throttled CAN heartbeat
+  if (!sim_mode_ && r2d_can_heartbeat_ && can_iface_) {
+    if (last_r2d_tx_.nanoseconds() == 0 ||
+        (now - last_r2d_tx_).nanoseconds() / 1000000 >= r2d_can_period_ms_) {
+      uint8_t b0 = r2d_ready_ ? 0x01 : 0x00; // BO_ 272 R2D_STATUS, SG_ R2D_RDY bit0
+      can_iface_->send_frame(r2d_can_id_, { b0 });
+      last_r2d_tx_ = now;
+    }
+  }
+}
 
 }  // namespace avone
 
 #include "pluginlib/class_list_macros.hpp"
-
-PLUGINLIB_EXPORT_CLASS(
-  avone::AvoneSystemHardware, hardware_interface::SystemInterface)
+PLUGINLIB_EXPORT_CLASS(avone::AvoneSystemHardware, hardware_interface::SystemInterface)

@@ -4,7 +4,7 @@
     <joint name="imu_joint" type="fixed">
         <parent link="chassis"/>
         <child link="imu_link"/>
-          <origin xyz="0.5 0 0.5" rpy="0 0 0"/>
+          <origin xyz="0.450 0 0.39137" rpy="0 0 0"/>
     </joint>
 
   <link name="imu_link"></link>
@@ -23,11 +23,11 @@
   <joint name="gps_antenna1_joint" type="fixed">
         <parent link="chassis"/>
         <child link="gps_antenna1_link"/>
-          <origin xyz="2.3674 0 0.2977" rpy="0 0 0"/>
+          <origin xyz="0.0312 0 0.3924" rpy="0 0 0"/>
     </joint>
 
   <link name="gps_antenna1_link">
-    <!-- <visual>
+    <visual>
       <geometry>
         <cylinder radius="0.0625" length="0.085"/>
       </geometry>
@@ -37,7 +37,7 @@
       <geometry>
         <cylinder radius="0.0625" length="0.085"/>
       </geometry>
-    </collision> -->
+    </collision>
   </link>
 
   <gazebo reference="gps_antenna1_link">
@@ -51,15 +51,15 @@
     </sensor>
   </gazebo>
 
-  <!-- REAR GPS ANTENNA -->
+
 <joint name="gps_antenna2_joint" type="fixed">
         <parent link="chassis"/>
         <child link="gps_antenna2_link"/>
-          <origin xyz="0.2299 0 0.4025" rpy="0 0 0"/>
-    </joint>
+          <origin xyz="2.131 0 0.3924" rpy="0 0 0"/>
+    </joint> 
 
   <link name="gps_antenna2_link">
-    <!-- <visual>
+   <visual>
       <geometry>
         <cylinder radius="0.0625" length="0.085"/>
       </geometry>
@@ -69,7 +69,7 @@
       <geometry>
         <cylinder radius="0.0625" length="0.085"/>
       </geometry>
-    </collision> -->
+    </collision>
   </link>
 
   <gazebo reference="gps_antenna2_link">

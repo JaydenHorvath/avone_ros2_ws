@@ -23,11 +23,11 @@ class StepRpmCanNode(Node):
         # ---- Right wheel params ----
         self.declare_parameter('start_rpm_right', 60.0)
         self.declare_parameter('target_rpm_right', 120.0)
-        self.declare_parameter('step_size_right', 20.0)
+        self.declare_parameter('step_size_right',20.0)
         self.declare_parameter('rmotor_can_id', 0x00B)      # 11 dec
 
         # ---- Left wheel params ----
-        self.declare_parameter('start_rpm_left', 80.0)
+        self.declare_parameter('start_rpm_left', 60.0)
         self.declare_parameter('target_rpm_left', 120.0)
         self.declare_parameter('step_size_left', 20.0)
         self.declare_parameter('lmotor_can_id', 0x00C)      # 12 dec

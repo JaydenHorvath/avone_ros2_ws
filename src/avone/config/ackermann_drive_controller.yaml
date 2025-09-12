@@ -21,22 +21,22 @@ ackermann_steering_controller:
     rear_wheels_radius: 0.203
     front_steering: true
     reference_timeout: 2.0
-    rear_wheels_names: ['RRMotor', 'RLMotor']
-    front_wheels_names: ['LSteer', 'RSteer']
+    rear_wheels_names: ['RRMotor','RLMotor']
+    front_wheels_names: ['LSteer',  'RSteer']
     # false for joystick control
     use_stamped_vel: true
 
-    open_loop: false
+    open_loop: true
     velocity_rolling_window_size: 10
     base_frame_id: base_link
     odom_frame_id: odom
 
     # false for localalised sim
-    enable_odom_tf: false
+    enable_odom_tf: true
     
     twist_covariance_diagonal: [0.05, 0.05, 0.0, 0.0, 0.0, 0.5]
     pose_covariance_diagonal: [0.05, 0.05, 0.0, 0.0, 0.0, 0.5]
-    position_feedback: false
-    publish_rate: 50.0   # Hz, or whatever rate you want
+    position_feedback: true
+    publish_rate: 100.0   # Hz, or whatever rate you want
 
 
