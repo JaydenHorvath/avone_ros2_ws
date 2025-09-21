@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'avone_nav'
+package_name = 'avone_dash'
 
 setup(
     name=package_name,
@@ -20,8 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'collision_detection = avone_nav.collision_detection:main',
-             'nav2_cancel = avone_nav.nav2_cancel:main',
+            'dashboard = avone_dash.dashboard:main',
         ],
     },
 )

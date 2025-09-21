@@ -14,10 +14,10 @@
       <param name="read_timeout_ms">20</param>
       <param name="l_motor_can_id">0x8CF11E05</param>
       <param name="r_motor_can_id">0x8CF11E06</param>
-      <param name="steer_can_id">0x006</param>
+      <param name="steer_can_id">0x0D</param>
       <param name="cmd_l_motor_can_id">0x0B</param>
-      <param name="cmd_r_motor_can_id">0x0C</param>
-      <param name="cmd_steer_can_id">0x004</param>
+      <param name="cmd_r_motor_can_id">0x0A</param>
+      <param name="cmd_steer_can_id">0x09</param>
 
       <!-- NEW: safety/watchdog controls -->
       <!-- Which feedback signals are required before arming & during run -->

@@ -11,8 +11,8 @@ bt_navigator:
     use_sim_time: true              # if you’re in Gazebo or replaying bags
     global_frame: map               # frame your goals are expressed in
     robot_base_frame: base_link     # your robot’s footprint frame
-    # odom_topic: /odometry/global    # where to get your velocity
-    odom_topic: /ackermann_steering_controller/odometry
+    odom_topic: /odometry/global    # where to get your velocity
+    # odom_topic: /ackermann_steering_controller/odometry
     # how often the BT engine ticks
     bt_loop_duration: 10          # seconds
 
@@ -65,6 +65,10 @@ controller_server:
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
 
+
+      acceleration_limit: 0.1      # m/s² — gentle take-off
+      deceleration_limit: 0.8      # m/s² — stronger braking
+
       # --- Pure Pursuit tuning ---
       proportional_speed: False
       desired_linear_vel: 2.0
@@ -98,8 +102,8 @@ controller_server:
       # --- Kinematic limits ---
       max_vel_x: 0.5
       max_vel_theta: 0.5
-      acc_lim_x: 0.5
-      decel_lim_x: 0.5
+      # acc_lim_x: 0.1
+      # decel_lim_x: 0.5
       max_angular_accel: 0.5
 
       # --- Goal tolerances ---
@@ -355,15 +359,14 @@ waypoint_follower:
 
 velocity_smoother:
   ros__parameters:
-    smoothing_frequency: 20.0
+    smoothing_frequency: 20.0     # Hz
     scale_velocities: False
-    feedback: "OPEN_LOOP"
-    max_velocity: [10.0, 0.0, 1.0]
-    min_velocity: [-10.0, 0.0, -1.0]
-    max_accel: [2.0, 0.0, 0.5]
-    max_decel: [-2.0, 0.0, -0.5]
-    odom_topic: /ackermann_steering_controller/odometry
-    # odom_topic: /odometry/global 
+    feedback: "OPEN_LOOP"         # try CLOSED_LOOP later with odometry/global
+    max_velocity: [2.0, 0.0, 0.5] # [x, y, theta] max
+    min_velocity: [-2.0, 0.0, -0.5]
+    max_accel: [0.5, 0.0, 0.3]    # slower accel for smooth take-off
+    max_decel: [-0.8, 0.0, -0.5]  # faster braking than acceleration
+    odom_topic: /odometry/global
     odom_duration: 0.1
     deadband_velocity: [0.02, 0.0, 0.0]
     velocity_timeout: 0.05

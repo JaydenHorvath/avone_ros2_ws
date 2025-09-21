@@ -12,7 +12,7 @@ class HeadingToImu(Node):
         self.imu_frame = self.get_parameter('imu_frame').value
 
         self.sub = self.create_subscription(QuaternionStamped, '/heading', self.cb, 10)
-        self.pub = self.create_publisher(Imu, '/imu/data', 10)
+        self.pub = self.create_publisher(Imu, '/imuGPS/data', 10)
 
     def cb(self, msg: QuaternionStamped):
         imu = Imu()

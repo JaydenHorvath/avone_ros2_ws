@@ -20,6 +20,7 @@ setup(
         'console_scripts': [
             'fix_to_odom = avone_gps.fix_to_odom:main',
             'heading_to_imu = avone_gps.heading_to_imu:main',
+            'imu_start = avone_gps.imu_start:main',
         ],
     },
 )

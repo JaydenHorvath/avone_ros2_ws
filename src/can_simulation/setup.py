@@ -22,6 +22,8 @@ setup(
         'console_scripts': [
             'steer_id = can_simulation.steer_id:main',
             'wheel_vel_test = can_simulation.wheel_vel_test:main',
+            'test_cantoros = can_simulation.test_cantoros:main',
+            'steer_pid_tune = can_simulation.steer_pid_tune:main',
 
         ],  
     },

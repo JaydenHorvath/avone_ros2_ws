@@ -1,0 +1,11 @@
+avone_can_dashboard:
+  ros__parameters:
+    featured_refs:
+      - /av1/avone_state/drive_state
+      - /av1/msgid_0x6b0/pack_soc 
+      # - /av1/brkprs_f/brkprs_f
+      # - /av1/avg_wheelspeed/avg_wheelspeed
+    featured_cols: 2
+    featured_height: 7
+    show_bars: true
+    bar_width: 26
