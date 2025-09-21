@@ -10,7 +10,7 @@ class DbcCanBridge(Node):
         super().__init__('dbc_can_bridge')
         
         # Load your specific DBC file
-        dbc_path = '/home/jay/Arduino/libraries/NUCAN/DBC Files/AV1.dbc'
+        dbc_path = 'AV1.dbc'
         
         # Check if file exists
         if not os.path.exists(dbc_path):
