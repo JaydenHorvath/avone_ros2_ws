@@ -14,7 +14,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
 
-bool sim_mode_ = false; // Set to true for simulation
+bool sim_mode_ = true; // Set to true for simulation
 
 namespace avone
 {

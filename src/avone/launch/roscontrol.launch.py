@@ -371,9 +371,8 @@ def generate_launch_description():
         # 10) robot_localization Nodes
         # ---------------------------------------------------- 
         static_map_tf,
-         ekf_local_node,
-           navsat_transform_node,
-         ekf_map_node,
+        
+          
     #    tf_odometry_relay,
         # ----------------------------------------------------
         # 11) RViz (delayed)

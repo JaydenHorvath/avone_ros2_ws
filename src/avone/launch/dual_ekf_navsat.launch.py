@@ -63,7 +63,7 @@ def generate_launch_description():
             # ]
             remappings=[
                 # GPS fix topic from your GPS driver
-                ('gps/fix', '/fix'),
+                ('gps/fix', '/navsat1'),
 
                 # Local odometry input (from EKF or controller)
                 ('odometry/filtered', '/odometry/local'),

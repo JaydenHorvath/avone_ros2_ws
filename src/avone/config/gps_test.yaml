@@ -1,6 +1,6 @@
 nmea_navsat_driver:
   ros__parameters:
-    serial_port: /dev/ttyUSB0
+    port: /dev/ttyUSB1
     baud: 115200
     frame_id: gps
     sentence_id: [GGA, RMC, HDT]
