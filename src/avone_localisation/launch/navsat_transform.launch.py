@@ -28,7 +28,7 @@ def generate_launch_description():
                 ('gps/fix', '/navsat1'),
                 ('odometry/filtered', '/odometry/local'),
                 ('odometry/gps', '/odometry/gps'),
-                ('imu/data', '/heading'),
+                ('imu/data', '/imu'),
             ]
         ),
     ])
