@@ -18,6 +18,8 @@ def generate_launch_description():
     pkg_path = os.path.join(get_package_share_directory('avone'))
     xacro_file = os.path.join(pkg_path, 'description', 'robot.urdf.xacro')
     robot_description_config = xacro.process_file(xacro_file)
+    rviz_config_path = os.path.expanduser('~/ros2_ws/src/avone/config/bringup.rviz')
+
 
 
     
@@ -47,9 +49,22 @@ def generate_launch_description():
             # RViz Node (without config file)
 
 
+     # Optional static map->odom transform
+    static_map_tf = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='static_odom_to_map',
+        output='screen',
+        arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom']
+    )
 
-
-
+    rviz_node = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        output='log',
+        arguments=['-d', rviz_config_path],
+    )
 
 
 
@@ -61,7 +76,8 @@ def generate_launch_description():
 
         node_robot_state_publisher,
         node_joint_state_publisher,
-        # node_rviz,
+        static_map_tf,
+        rviz_node,
         
         
     ])
