@@ -95,7 +95,7 @@ def generate_launch_description():
             
         ],
          remappings=[
-            ('gps/fix', '/navsat1'),
+            ('gps/fix', '/navsat1/fix_noisy'),
             ('odometry/filtered', '/odometry/local'),
             ('odometry/gps', '/odometry/gps'),
          ]
@@ -283,24 +283,21 @@ def generate_launch_description():
         output='screen'
     )
 
-    teleop_twist_joy_node = Node(
-        package='teleop_twist_joy',
-        executable='teleop_node',
-        name='teleop_twist_joy_node',
-        output='screen',
-        parameters=[{
-            'stamp': True,
-            'axis_linear.x': 1,
-            'scale_linear.x': 2.0,
-            'axis_angular.yaw': 3,
-            'scale_angular.yaw': 0.75,
-            'enable_button': 4,
-            'repeat_rate': 50.0
-        }],
-        # remappings=[
-        #     ('/cmd_vel', '/ackermann_steering_controller/reference')
-        # ]
-    )
+    # teleop_twist_joy_node = Node(
+    #     package='teleop_twist_joy',
+    #     executable='teleop_node',
+    #     name='teleop_twist_joy_node',
+    #     output='screen',
+    #     parameters=[{
+    #         'stamp': True,
+    #         'axis_linear.x': 1,
+    #         'scale_linear.x': 2.0,
+    #         'axis_angular.yaw': 3,
+    #         'scale_angular.yaw': 0.5,
+    #         'enable_button': 4,
+    #         'repeat_rate': 50.0
+    #     }],
+    # )
 
     # -------------------------------------------------------------------------
     # Build the combined LaunchDescription
@@ -371,6 +368,9 @@ def generate_launch_description():
         # 10) robot_localization Nodes
         # ---------------------------------------------------- 
         static_map_tf,
+        ekf_local_node,
+        ekf_map_node,
+        navsat_transform_node,
         
           
     #    tf_odometry_relay,
@@ -384,5 +384,5 @@ def generate_launch_description():
         # ----------------------------------------------------
         joy_node,
         twiststamped_node,
-        teleop_twist_joy_node,
+        # teleop_twist_joy_node,
     ])

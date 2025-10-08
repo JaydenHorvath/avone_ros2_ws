@@ -26,6 +26,8 @@ setup(
         'console_scripts': [
 
             'drive_state_led = avone_utils.drive_state_led:main',
+            'CAN_to_ROS = avone_utils.CAN_to_ROS:main',
+            'cmd_vel_filter = avone_utils.cmd_vel_filter:main',
 
         ],
     },

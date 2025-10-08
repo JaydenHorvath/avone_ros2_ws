@@ -47,6 +47,10 @@
       <update_rate>50</update_rate>
       <topic>navsat1</topic>
 
+    <noise type="gaussian">
+      <mean>0.0</mean>
+      <stddev>10</stddev>
+    </noise>
      
     </sensor>
   </gazebo>

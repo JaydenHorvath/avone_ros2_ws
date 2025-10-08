@@ -9,7 +9,7 @@ from ament_index_python.packages import get_package_share_directory
 def generate_launch_description():
     # Resolve path to Nav2 config inside the package
     nav2_config = os.path.join(
-        get_package_share_directory('avone'),
+        get_package_share_directory('avone_nav'),
         'config',
         'Nav2_cost.yaml'
     )
@@ -38,4 +38,6 @@ def generate_launch_description():
             arguments=['/cmd_vel', '/ackermann_steering_controller/reference'],
             output='screen'
         )
+
+        
     ])

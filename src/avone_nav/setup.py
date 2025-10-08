@@ -1,4 +1,6 @@
 from setuptools import find_packages, setup
+import os
+from glob import glob
 
 package_name = 'avone_nav'
 
@@ -10,6 +12,12 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        # Install launch files
+        (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
+        # Install config files
+        (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
+        # Install Behaviour Tree files
+        (os.path.join('share', package_name, 'behaviour_trees'), glob('behaviour_trees/*.xml')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -21,7 +29,7 @@ setup(
     entry_points={
         'console_scripts': [
             'collision_detection = avone_nav.collision_detection:main',
-             'nav2_cancel = avone_nav.nav2_cancel:main',
+            'nav2_cancel = avone_nav.nav2_cancel:main',
         ],
     },
 )

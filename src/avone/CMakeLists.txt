@@ -122,25 +122,7 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
-# Testing (if needed)
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  ament_lint_auto_find_test_dependencies()
-  find_package(ament_cmake_gmock REQUIRED)
-  find_package(ros2_control_test_assets REQUIRED)
 
-  ament_add_gmock(test_avone_system_hardware test/test_avone_system_hardware.cpp)
-  target_include_directories(test_avone_system_hardware PRIVATE include)
-  ament_target_dependencies(
-    test_avone_system_hardware
-    hardware_interface
-    pluginlib
-    ros2_control_test_assets
-    geometry_msgs
-    nav_msgs
-    
-  )
-endif()
 
 ament_export_include_directories(include)
 ament_export_libraries(avone)

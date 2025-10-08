@@ -21,6 +21,9 @@ setup(
             'fix_to_odom = avone_gps.fix_to_odom:main',
             'heading_to_imu = avone_gps.heading_to_imu:main',
             'imu_start = avone_gps.imu_start:main',
+            'gps_topics_vis = avone_gps.gps_topics_vis:main',
+            'vel_cov_repub= avone_gps.vel_cov_repub:main',
+            'gps_imu_sim = avone_gps.gps_imu_sim:main',
         ],
     },
 )

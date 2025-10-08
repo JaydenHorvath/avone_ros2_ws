@@ -284,9 +284,9 @@
         <child link="front_right_wheel_hub"/>
         <axis xyz="0 0 -1"/>
         <limit  effort="33.4" 
-          velocity="1.745" 
-          lower="-1.308" 
-          upper="1.308"/>
+          velocity="1.0" 
+          lower="-0.610865" 
+          upper="0.610865"/>
          
           <dynamics damping="0.1" friction="0.05"/>
     </joint>
@@ -364,9 +364,9 @@
         <child link="front_left_wheel_hub"/>
         <axis xyz="0 0 -1"/>
          <limit  effort="33.4" 
-          velocity="1.745" 
-          lower="-1.308" 
-          upper="1.308"/>
+          velocity="1.0" 
+          lower="-0.610865" 
+          upper="0.610865"/>
          
           <dynamics damping="0.1" friction="0.05"/>
     </joint>

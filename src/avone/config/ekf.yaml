@@ -35,4 +35,3 @@ ekf_filter_node_odom:
     publish_odometry_frame: false
     transform_tolerance: 0.2  # tolerate up to 0.5s of “old” transforms
 
-

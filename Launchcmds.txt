@@ -372,3 +372,10 @@ controller_server:
       yaw_goal_tolerance:      0.20
 
     # … your local_costmap, planner_server, etc. …
+
+
+
+
+    rosbag 
+ros2 bag play ict_carpark_1 --topics /fix /heading /vel --clock
+

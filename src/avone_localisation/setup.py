@@ -24,5 +24,11 @@ setup(
     description='AVONE localisation launch files for EKF and NavSat',
     license='Apache-2.0',
     tests_require=['pytest'],
-    entry_points={},
+    entry_points={
+        'console_scripts': [
+            'fix_to_odom = avone_localisation.fix_to_odom:main',
+            'heading_to_imu = avone_localisation.heading_to_imu:main',
+            'imu_start = avone_localisation.imu_start:main',
+        ],
+    },
 )

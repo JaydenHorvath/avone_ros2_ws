@@ -1,29 +1,41 @@
 import rclpy
 from rclpy.node import Node
 import serial
-from std_msgs.msg import Int32  # drive_state encoded as uint8
+from std_msgs.msg import Int32
 
 class LedMatrixNode(Node):
-    def __init__(self):
-        super().__init__('led_matrix_node')
+    def init(self):
+        super().init('led_matrix_node')
 
-        # open serial to ESP32-S3
+        # Serial setup
         self.ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
 
-        # subscribe to drive state CAN-decoded topic
+        # Last known drive state
+        self.latest_state = None
+
+        # Subscribe to the drive state topic
         self.sub = self.create_subscription(
             Int32,
-            '/av1/avone_state/drive_state',   # adjust to your topic name
+            '/av1/avone_state/drive_state',
             self.state_callback,
             10
         )
 
+        # ---- Set frequency (Hz) ----
+        freq_hz = 5.0   # change this value to your desired frequency
+        self.timer = self.create_timer(1.0 / freq_hz, self.publish_state)
+
+        self.get_logger().info(f"LED Matrix Node started at {freq_hz} Hz")
+
     def state_callback(self, msg: Int32):
-        state = msg.data
-        # just send the integer state over serial
-        cmd = f"STATE {state}\n"
-        self.get_logger().info(f"DriveState={state}")
-        self.ser.write(cmd.encode())
+        # Store the most recent state (don’t send yet)
+        self.latest_state = msg.data
+
+    def publish_state(self):
+        if self.latest_state is not None:
+            cmd = f"STATE {self.latest_state}\n"
+            self.ser.write(cmd.encode())
+            self.get_logger().info(f"Sent DriveState={self.latest_state}")
 
 def main(args=None):
     rclpy.init(args=args)
@@ -32,5 +44,5 @@ def main(args=None):
     node.destroy_node()
     rclpy.shutdown()
 
-if __name__ == '__main__':
+if name == 'main':
     main()
