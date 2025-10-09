@@ -96,10 +96,10 @@ class AvoneDashboard(Node):
         self.bar_width: int = int(self.get_parameter("bar_width").value)
 
         # 🔧 Hardcode your DBC file path here (or add a 'dbc_file' param if you prefer)
-        dbc_file = "/home/jay/Arduino/libraries/NUCAN/DBC Files/AV1.dbc"
+        dbc_path = '/home/avone/NUTEAMSGIT/NUCAN/DBC Files/AV1.dbc'
 
         self.groups: Dict[str, Group] = {}
-        self._load_dbc(dbc_file)
+        self._load_dbc(dbc_path)
 
         # Launch curses UI
         self._stop_event = threading.Event()
