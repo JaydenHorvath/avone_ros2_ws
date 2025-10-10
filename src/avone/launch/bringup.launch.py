@@ -83,12 +83,12 @@ def generate_launch_description():
         output='screen'
     )
 
-    twiststamped_node = Node(
-        package='avone',
-        executable='twiststamped',
-        name='twiststamped',
-        output='screen'
-    )
+    # twiststamped_node = Node(
+    #     package='avone',
+    #     executable='twiststamped',
+    #     name='twiststamped',
+    #     output='screen'
+    # )
 
     joy_node = Node(
         package='joy',
@@ -97,21 +97,30 @@ def generate_launch_description():
         output='screen'
     )
 
-    teleop_twist_joy_node = Node(
-        package='teleop_twist_joy',
-        executable='teleop_node',
-        name='teleop_twist_joy_node',
-        output='screen',
-        parameters=[{
-            'stamp': True,
-            'axis_linear.x': 1,
-            'scale_linear.x': 2.0,
-            'axis_angular.yaw': 3,
-            'scale_angular.yaw': 0.5,
-            'enable_button': 4,
-            'repeat_rate': 50.0
-        }],
+    cmd_filter_node = Node(
+        package='avone_utils',
+        executable='cmd_vel_filter',
+        name='cmd_vel_filter',
+        output='screen'
+
+
     )
+
+    # teleop_twist_joy_node = Node(
+    #     package='teleop_twist_joy',
+    #     executable='teleop_node',
+    #     name='teleop_twist_joy_node',
+    #     output='screen',
+    #     parameters=[{
+    #         'stamp': True,
+    #         'axis_linear.x': 1,
+    #         'scale_linear.x': 2.0,
+    #         'axis_angular.yaw': 3,
+    #         'scale_angular.yaw': 0.5,
+    #         'enable_button': 4,
+    #         'repeat_rate': 50.0
+    #     }],
+    # )
 
     static_map_tf = Node(
         package='tf2_ros',
@@ -146,8 +155,9 @@ def generate_launch_description():
         tf_odometry_relay,
         # twiststamped_node,
         joy_node,
-        teleop_twist_joy_node,
+        # teleop_twist_joy_node,
         static_map_tf,
+        cmd_filter_node,
     ]
 
     return LaunchDescription(nodes)

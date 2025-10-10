@@ -20,7 +20,9 @@ bt_navigator:
     default_nav_to_pose_bt_xml: $(find-pkg-share avone_nav)/behaviour_trees/avone_bt.xml
     global_frame: map                      # Frame of goals
     robot_base_frame: base_link            # Robot’s main reference frame
-    odom_topic: /odometry/global           # Velocity source for BT
+    odom_topic: /ackermann_steering_controller/odometry
+
+    # odom_topic: /odometry/global           # Velocity source for BT
     bt_loop_duration: 10                   # Tick rate of behavior tree (Hz^-1)
 
     # Single navigator plugin (no NavThroughPoses)
@@ -70,7 +72,7 @@ controller_server:
       acceleration_limit: 0.1              # m/s² (gentle take-off)
       deceleration_limit: 0.8              # m/s² (stronger braking)
       desired_linear_vel: 2.0              # target cruising speed (m/s)
-      min_speed: 0.05
+      min_speed: 0.1
       max_speed: 2.0
       allow_reversing: False
 
@@ -80,6 +82,7 @@ controller_server:
       min_approach_linear_velocity: 0.5    # Crawl speed at goal
 
       # --- Lookahead Control ---
+      use_velocity_scaled_lookahead: true
       lookahead_dist: 3.0
       min_lookahead_dist: 0.5
       max_lookahead_dist: 5.0
@@ -99,8 +102,8 @@ controller_server:
 
       # --- Kinematic Limits ---
       max_vel_x: 0.5                       # Final forward velocity cap
-      max_vel_theta: 0.5                   # Max rotational velocity
-      max_angular_accel: 0.5               # Rotational acceleration (rad/s²)
+      max_vel_theta: 0.3                   # Max rotational velocity
+      max_angular_accel: 0.2               # Rotational acceleration (rad/s²)
 
       # --- Goal Tolerances ---
       xy_goal_tolerance: 0.5
@@ -285,9 +288,9 @@ velocity_smoother:
     feedback: "OPEN_LOOP"                  # Use time-based smoothing (no odom feedback)
     max_velocity: [2.0, 0.0, 0.5]          # [vx, vy, ω]
     min_velocity: [-2.0, 0.0, -0.5]
-    max_accel: [0.5, 0.0, 0.3]             # Acceleration limits (m/s², rad/s²)
-    max_decel: [-0.8, 0.0, -0.5]           # Deceleration limits
-    odom_topic: /odometry/global
+    max_accel: [0.5, 0.0, 0.15]             # Acceleration limits (m/s², rad/s²)
+    max_decel: [-0.8, 0.0, -0.15]           # Deceleration limits
+    odom_topic: /ackermann_steering_controller/odometry
     odom_duration: 0.1
     deadband_velocity: [0.02, 0.0, 0.0]
     velocity_timeout: 0.05
