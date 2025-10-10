@@ -144,7 +144,7 @@ def generate_launch_description():
         delay_rviz_after_jsb,
         delay_ctrl_after_jsb,
         tf_odometry_relay,
-        twiststamped_node,
+        # twiststamped_node,
         joy_node,
         teleop_twist_joy_node,
         static_map_tf,

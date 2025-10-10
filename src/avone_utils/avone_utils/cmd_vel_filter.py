@@ -1,36 +1,54 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, TwistStamped
 
-class CmdVelFilter(Node):
+class CmdVelToAckermann(Node):
     def __init__(self):
-        super().__init__('cmd_vel_filter')
+        super().__init__('cmd_vel_to_ackermann')
 
+        # Subscribes to unfiltered velocity command
         self.sub = self.create_subscription(
-            Twist, '/cmd_vel_raw', self.cmd_callback, 10)
-        self.pub = self.create_publisher(
-            Twist, 'cmd_vel', 10)
+            Twist,
+            '/cmd_vel',
+            self.cmd_callback,
+            10
+        )
 
-        self.min_linear = 0.05  # m/s deadband
-        self.max_steer_scale =  1.9 #angular scaling factor
+        # Publishes filtered, stamped command to the Ackermann controller
+        self.pub = self.create_publisher(
+            TwistStamped,
+            '/ackermann_steering_controller/reference',
+            10
+        )
+
+        # Parameters
+        self.min_linear = 0.1     # m/s deadband to ignore angular commands at low speeds
+        self.max_steer_scale = 1.0  # angular scaling factor (reduce if steering spikes)
 
     def cmd_callback(self, msg: Twist):
-        filtered = Twist()
-        filtered.linear.x = msg.linear.x
+        # Create a stamped message
+        stamped = TwistStamped()
+        stamped.header.stamp = self.get_clock().now().to_msg()
+        stamped.header.frame_id = 'base_link'
 
+        # Filter linear velocity
+        stamped.twist.linear.x = msg.linear.x
+
+        # Apply angular filtering
         if abs(msg.linear.x) < self.min_linear:
-            # Ignore angular command if car is nearly stopped
-            filtered.angular.z = 0.0
+            # When nearly stopped, suppress steering
+            stamped.twist.angular.z = 0.0
         else:
-            # Scale angular input based on forward speed
-            filtered.angular.z = msg.angular.z * abs(msg.linear.x) * self.max_steer_scale
+            # Scale angular input proportionally to forward speed
+            stamped.twist.angular.z = msg.angular.z * abs(msg.linear.x) * self.max_steer_scale
 
-        self.pub.publish(filtered)
+        # Publish the stamped command
+        self.pub.publish(stamped)
 
 def main(args=None):
     rclpy.init(args=args)
-    node = CmdVelFilter()
+    node = CmdVelToAckermann()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()

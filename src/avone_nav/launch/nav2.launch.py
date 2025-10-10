@@ -30,14 +30,14 @@ def generate_launch_description():
             }.items()
         ),
 
-        # Relay /cmd_vel to ackermann topic
-        Node(
-            package='topic_tools',
-            executable='relay',
-            name='cmd_vel_relay',
-            arguments=['/cmd_vel', '/ackermann_steering_controller/reference'],
-            output='screen'
-        )
+        # # Relay /cmd_vel to ackermann topic
+        # Node(
+        #     package='topic_tools',
+        #     executable='relay',
+        #     name='cmd_vel_relay',
+        #     arguments=['/cmd_vel', '/ackermann_steering_controller/reference'],
+        #     output='screen'
+        # )
 
         
     ])
