@@ -1,11 +1,13 @@
-from setuptools import find_packages, setup
+from setuptools import setup
+import os
+from glob import glob
 
 package_name = 'avone_dash'
 
 setup(
     name=package_name,
     version='0.0.0',
-    packages=find_packages(exclude=['test']),
+    packages=[package_name],
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -13,10 +15,10 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='jay',
-    maintainer_email='c3350128@uon.edu.au',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    maintainer='your_name',
+    maintainer_email='your_email@example.com',
+    description='AVONE Dashboard',
+    license='Apache License 2.0',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [

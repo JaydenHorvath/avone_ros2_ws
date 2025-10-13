@@ -1,247 +1,261 @@
 #!/usr/bin/env python3
+import sys
+import os
+import threading
+import cantools
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Bool, Float32, Float64, Int32, UInt8, UInt16, UInt32
-import cantools
-import curses
-import threading
-import time
-import re
-from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
 
-MSG_TYPES = {
-    "Bool": Bool,
-    "Float32": Float32,
-    "Float64": Float64,
-    "Int32": Int32,
-    "UInt8": UInt8,
-    "UInt16": UInt16,
-    "UInt32": UInt32,
-}
+# ROS2 message types
+from std_msgs.msg import (
+    Bool, Int8, UInt8, Int16, UInt16, Int32, UInt32, Float32, Float64
+)
+
+# PyQt5 imports
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QProgressBar,
+    QScrollArea, QGroupBox, QGridLayout, QPushButton
+)
+from PyQt5.QtCore import Qt, QObject, pyqtSignal, QEvent
+from PyQt5.QtGui import QFont, QKeySequence
 
 
-@dataclass
-class Item:
-    name: str
-    topic: str
-    type: str
-    value: Any = None
-    last_update: float = 0.0
-
-    def as_text(self) -> str:
-        if self.value is None:
-            return "—"
-        if isinstance(self.value, float):
-            return f"{self.value:.2f}"
-        return str(self.value)
+# ---------- Thread-safe signal bridge ----------
+class SignalBridge(QObject):
+    update_signal = pyqtSignal(str, object, dict)
 
 
-@dataclass
-class Group:
-    title: str
-    items: Dict[str, Item] = field(default_factory=dict)
-
-
-class AvoneLiveDashboard(Node):
-    def __init__(self):
-        super().__init__("avone_live_dashboard")
-
-        self.declare_parameters(
-            "",
-            [
-                ("dbc_file", "/home/avone/NUTEAMSGIT/NUCAN/DBC Files/AV1.dbc"),
-                ("refresh_rate_hz", 10.0),
-                ("timeout_sec", 0.5),
-            ],
-        )
-
-        self.dbc_file = self.get_parameter("dbc_file").value
-        self.refresh_rate = float(self.get_parameter("refresh_rate_hz").value)
-        self.timeout_sec = float(self.get_parameter("timeout_sec").value)
-
-        self.groups: Dict[str, Group] = {}
-        self._stop_event = threading.Event()
-        self._subscriptions = set()
+# ---------- ROS2 Node ----------
+class AVONEDashboard(Node):
+    def __init__(self, bridge, dbc_path):
+        super().__init__('avone_dashboard')
+        self.bridge = bridge
 
         # Load DBC
-        self._load_dbc()
+        try:
+            self.db = cantools.database.load_file(dbc_path)
+            self.get_logger().info(f'Loaded DBC file: {dbc_path}')
+        except Exception as e:
+            self.get_logger().error(f'Failed to load DBC file: {e}')
+            sys.exit(1)
 
-        # Periodically rescan for ROS topics
-        self.create_timer(1.0, self._rescan_topics)
+        self.signal_values = {}
+        self.callback_count = {}
 
-        # Launch curses UI
-        self.ui_thread = threading.Thread(target=self._run_curses, daemon=True)
-        self.ui_thread.start()
+        self._parse_dbc()
+        self._create_subscriptions()
+        self.create_timer(5.0, self._report_stats)
 
-    # ---------- Setup ----------
-
-    def _load_dbc(self):
-        self.db = cantools.database.load_file(self.dbc_file)
-        self.get_logger().info(f"Loaded {len(self.db.messages)} messages from {self.dbc_file}")
-
+    def _parse_dbc(self):
+        """Record DBC structure (group by message)"""
         for msg in self.db.messages:
-            group = Group(title=msg.name)
             for sig in msg.signals:
-                topic = f"/av1/{msg.name.lower()}/{sig.name.lower()}"
-                group.items[sig.name] = Item(name=sig.name, topic=topic, type="unknown")
-            self.groups[msg.name] = group
+                self.signal_values[f"{msg.name}/{sig.name}"] = {
+                    'name': sig.name,
+                    'message': msg.name,
+                    'unit': sig.unit or '',
+                    'min': sig.minimum,
+                    'max': sig.maximum,
+                    'choices': getattr(sig, 'choices', None),
+                    'value': None,
+                }
 
-    # ---------- Topic Matching & Subscriptions ----------
+    def _create_subscriptions(self):
+        type_map = {
+            'bool': Bool, 'int8': Int8, 'uint8': UInt8,
+            'int16': Int16, 'uint16': UInt16,
+            'int32': Int32, 'uint32': UInt32,
+            'float32': Float32, 'float64': Float64
+        }
+        topics = dict(self.get_topic_names_and_types())
 
-    def _normalize(self, s: str):
-        """Simplify name for fuzzy matching."""
-        return re.sub(r'[^a-z0-9]', '', s.lower())
+        for key, info in self.signal_values.items():
+            msg, sig = info['message'], info['name']
+            topic = f'/av1/{msg.lower()}/{sig.lower()}'
+            self.callback_count[key] = 0
 
-    def _rescan_topics(self):
-        """Continuously detect live topics and attach subscribers."""
-        all_topics = dict(self.get_topic_names_and_types())
-        for g in self.groups.values():
-            for item in g.items.values():
-                if item.topic in self._subscriptions:
-                    continue  # already subscribed
+            msg_type = Float32  # default
+            if topic in topics:
+                full = topics[topic][0]
+                base = full.split('/')[-1].lower()
+                msg_type = type_map.get(base, Float32)
 
-                # Try exact match first
-                if item.topic in all_topics:
-                    ros_type = all_topics[item.topic][0]
-                else:
-                    # Try fuzzy matching
-                    norm_item = self._normalize(item.topic)
-                    match = next(
-                        (
-                            (name, types[0])
-                            for name, types in all_topics.items()
-                            if self._normalize(name).endswith(norm_item)
-                        ),
-                        None,
-                    )
-                    if not match:
-                        continue
-                    ros_name, ros_type = match
-                    item.topic = ros_name  # update to actual
-
-                msg_type_name = ros_type.split("/")[-1]
-                msg_type = MSG_TYPES.get(msg_type_name)
-                if not msg_type:
-                    continue
-
-                self.create_subscription(msg_type, item.topic, self._make_callback(item), 10)
-                self._subscriptions.add(item.topic)
-                item.type = msg_type_name
-                self.get_logger().info(f"Subscribed to {item.topic} ({msg_type_name})")
-
-    def _make_callback(self, item: Item):
-        def cb(msg):
-            item.value = getattr(msg, "data", None)
-            item.last_update = time.time()
-        return cb
-
-    # ---------- Curses UI ----------
-
-    def _run_curses(self):
-        curses.wrapper(self._draw_loop)
-
-    def _draw_loop(self, stdscr):
-        curses.curs_set(0)
-        curses.start_color()
-        curses.use_default_colors()
-        curses.init_pair(1, curses.COLOR_GREEN, -1)
-        curses.init_pair(2, curses.COLOR_YELLOW, -1)
-        curses.init_pair(3, curses.COLOR_RED, -1)
-        curses.init_pair(4, curses.COLOR_CYAN, -1)
-        curses.init_pair(5, curses.COLOR_MAGENTA, -1)
-
-        last_refresh = 0.0
-        scroll_offset = 0
-        period = 1.0 / max(1e-3, self.refresh_rate)
-
-        while not self._stop_event.is_set():
-            now = time.time()
-            if now - last_refresh < period:
-                time.sleep(0.01)
-                continue
-            last_refresh = now
-
-            stdscr.erase()
-            max_y, max_x = stdscr.getmaxyx()
-
-            # Layout columns
-            if max_x >= 180:
-                cols = 3
-            elif max_x >= 110:
-                cols = 2
-            else:
-                cols = 1
-            col_width = max_x // cols
-
-            stdscr.addstr(0, 0, "AV.ONE – Live ROS2 Dashboard (q to quit)", curses.A_BOLD | curses.color_pair(4))
-
-            lines = []
-            for g in self.groups.values():
-                lines.append(("group", g.title))
-                for item in g.items.values():
-                    lines.append(("item", item))
-
-            visible_lines = lines[scroll_offset:scroll_offset + max_y - 3]
-
-            per_col = len(visible_lines) // cols + (len(visible_lines) % cols > 0)
-
-            for c in range(cols):
-                start = c * per_col
-                end = min(start + per_col, len(visible_lines))
-                col_x = c * col_width
-                local_row = 2
-                for entry_type, content in visible_lines[start:end]:
-                    if local_row >= max_y - 2:
-                        break
-                    if entry_type == "group":
-                        stdscr.addstr(local_row, col_x, f"[ {content} ]", curses.A_BOLD | curses.color_pair(5))
-                        local_row += 1
-                    else:
-                        item = content
-                        val_txt = item.as_text()
-                        label = f"{item.name:>18}: {val_txt}"
-                        age = now - item.last_update if item.last_update else 999
-                        if age > 1.5:
-                            color = curses.color_pair(3)
-                        elif age > 0.5:
-                            color = curses.color_pair(2)
-                        else:
-                            color = curses.color_pair(1)
-                        stdscr.addstr(local_row, col_x, label[:col_width - 2], color)
-                        local_row += 1
-                local_row += 1
-
-            stdscr.refresh()
-            stdscr.nodelay(True)
             try:
-                ch = stdscr.getch()
-                if ch in (ord('q'), ord('Q')):
-                    self._stop_event.set()
-                    break
-                elif ch == curses.KEY_DOWN and scroll_offset < len(lines) - (max_y - 3):
-                    scroll_offset += 1
-                elif ch == curses.KEY_UP and scroll_offset > 0:
-                    scroll_offset -= 1
+                self.create_subscription(
+                    msg_type, topic,
+                    lambda m, k=key: self._callback(m, k), 10
+                )
+                self.get_logger().info(f"Subscribed: {topic} ({msg_type.__name__})")
+            except Exception as e:
+                self.get_logger().warn(f"Failed {topic}: {e}")
+
+    def _callback(self, msg, key):
+        if key not in self.signal_values:
+            return
+        val = getattr(msg, 'data', msg)
+        self.signal_values[key]['value'] = val
+        self.callback_count[key] += 1
+        self.bridge.update_signal.emit(key, val, self.signal_values[key])
+
+    def _report_stats(self):
+        active = sum(1 for v in self.callback_count.values() if v > 0)
+        total = len(self.callback_count)
+        self.get_logger().info(f"Active signals: {active}/{total}")
+
+
+# ---------- GUI ----------
+class DashboardGUI(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("AV.ONE Dashboard (Grouped)")
+        self.setGeometry(100, 100, 1600, 1000)
+        self.signal_widgets = {}
+
+        self.bridge = SignalBridge()
+        self.bridge.update_signal.connect(self._update_signal)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        container = QWidget()
+        self.layout = QVBoxLayout(container)
+        scroll.setWidget(container)
+        self.setCentralWidget(scroll)
+
+        self._apply_dark_theme()
+        self._install_exit_shortcut()
+
+    def _install_exit_shortcut(self):
+        """Press Q or Esc to quit cleanly"""
+        quit_button = QPushButton("Exit (Q/Esc)")
+        quit_button.clicked.connect(self._exit_app)
+        quit_button.setFixedWidth(150)
+        quit_button.setStyleSheet("background-color:#b33a3a; color:white; font-weight:bold;")
+        self.layout.addWidget(quit_button)
+        self.addAction(self._make_shortcut("Q", self._exit_app))
+        self.addAction(self._make_shortcut("Escape", self._exit_app))
+
+    def _make_shortcut(self, key, func):
+        from PyQt5.QtWidgets import QAction
+        act = QAction(self)
+        act.setShortcut(QKeySequence(key))
+        act.triggered.connect(func)
+        return act
+
+    def _exit_app(self):
+        QApplication.quit()
+
+    def build_ui(self, signal_values):
+        """Group signals by DBC message"""
+        grouped = {}
+        for key, info in signal_values.items():
+            msg = info['message']
+            grouped.setdefault(msg, []).append(info)
+
+        for msg, sig_list in grouped.items():
+            group = QGroupBox(msg)
+            group.setFont(QFont('Arial', 11, QFont.Bold))
+            grid = QGridLayout()
+            row = 0
+
+            for sig in sorted(sig_list, key=lambda x: x['name']):
+                name_lbl = QLabel(sig['name'])
+                name_lbl.setMinimumWidth(300)
+
+                value_lbl = QLabel('--')
+                value_lbl.setAlignment(Qt.AlignRight)
+                unit_lbl = QLabel(sig['unit'])
+                unit_lbl.setMinimumWidth(60)
+
+                bar = None
+                if sig['min'] is not None and sig['max'] is not None:
+                    bar = QProgressBar()
+                    try:
+                        bar.setMinimum(int(sig['min']))
+                        bar.setMaximum(int(sig['max']))
+                    except Exception:
+                        pass
+                    bar.setTextVisible(False)
+                    bar.setMinimumWidth(240)
+                    grid.addWidget(bar, row, 1)
+                    grid.addWidget(value_lbl, row, 2)
+                    grid.addWidget(unit_lbl, row, 3)
+                else:
+                    grid.addWidget(value_lbl, row, 1)
+                    grid.addWidget(unit_lbl, row, 2)
+
+                grid.addWidget(name_lbl, row, 0)
+                self.signal_widgets[f"{msg}/{sig['name']}"] = {
+                    'value_label': value_lbl,
+                    'bar': bar,
+                    'choices': sig['choices']
+                }
+                row += 1
+
+            group.setLayout(grid)
+            self.layout.addWidget(group)
+
+        self.layout.addStretch()
+
+    def _update_signal(self, key, val, info):
+        if key not in self.signal_widgets:
+            return
+        w = self.signal_widgets[key]
+        lbl = w.get('value_label')
+        if not lbl:
+            return
+
+        # Show enum choices if exist, otherwise raw ROS value
+        choices = w.get('choices')
+        if choices:
+            try:
+                lbl.setText(str(choices.get(int(val), int(val))))
+            except Exception:
+                lbl.setText(str(val))
+        else:
+            lbl.setText(f"{val:.2f}" if isinstance(val, float) else str(val))
+
+        bar = w.get('bar')
+        if bar:
+            try:
+                bar.setValue(int(val))
             except Exception:
                 pass
 
-    def destroy_node(self):
-        self._stop_event.set()
-        return super().destroy_node()
+    def _apply_dark_theme(self):
+        self.setStyleSheet("""
+            QMainWindow { background-color: #1e1e1e; }
+            QWidget { background-color: #1e1e1e; color: #e0e0e0; }
+            QGroupBox { border: 1px solid #3d3d3d; border-radius: 5px; padding: 8px; margin-top: 1ex; }
+            QLabel { color: #e0e0e0; }
+            QProgressBar { border: 1px solid #3d3d3d; background-color: #2d2d2d; }
+            QProgressBar::chunk { background-color: #2196F3; }
+        """)
 
 
+# ---------- Main ----------
 def main():
     rclpy.init()
-    node = AvoneLiveDashboard()
+    dbc_path = '/home/avone/NUTEAMSGIT/NUCAN/DBC Files/AV1.dbc'
+    if not os.path.exists(dbc_path):
+        print("DBC file not found:", dbc_path)
+        sys.exit(1)
+
+    app = QApplication(sys.argv)
+    gui = DashboardGUI()
+    gui.show()
+
+    node = AVONEDashboard(gui.bridge, dbc_path)
+    gui.build_ui(node.signal_values)
+
+    ros_thread = threading.Thread(target=lambda: rclpy.spin(node), daemon=True)
+    ros_thread.start()
+
     try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+        sys.exit(app.exec_())
     finally:
         node.destroy_node()
         rclpy.shutdown()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
