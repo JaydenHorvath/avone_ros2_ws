@@ -1,11 +1,13 @@
+#!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
 import serial
 from std_msgs.msg import Int32
 
+
 class LedMatrixNode(Node):
-    def init(self):
-        super().init('led_matrix_node')
+    def __init__(self):
+        super().__init__('led_matrix_node')
 
         # Serial setup
         self.ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
@@ -37,6 +39,7 @@ class LedMatrixNode(Node):
             self.ser.write(cmd.encode())
             self.get_logger().info(f"Sent DriveState={self.latest_state}")
 
+
 def main(args=None):
     rclpy.init(args=args)
     node = LedMatrixNode()
@@ -44,5 +47,6 @@ def main(args=None):
     node.destroy_node()
     rclpy.shutdown()
 
-if name == 'main':
+
+if __name__ == '__main__':
     main()
