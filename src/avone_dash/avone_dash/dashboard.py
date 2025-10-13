@@ -2,6 +2,7 @@
 import sys
 import os
 import threading
+import collections
 import cantools
 import rclpy
 from rclpy.node import Node
@@ -16,8 +17,11 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QProgressBar,
     QScrollArea, QGroupBox, QGridLayout, QPushButton
 )
-from PyQt5.QtCore import Qt, QObject, pyqtSignal, QEvent
+from PyQt5.QtCore import Qt, QObject, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont, QKeySequence
+
+# PyQtGraph for live plotting
+import pyqtgraph as pg
 
 
 # ---------- Thread-safe signal bridge ----------
@@ -31,7 +35,6 @@ class AVONEDashboard(Node):
         super().__init__('avone_dashboard')
         self.bridge = bridge
 
-        # Load DBC
         try:
             self.db = cantools.database.load_file(dbc_path)
             self.get_logger().info(f'Loaded DBC file: {dbc_path}')
@@ -47,7 +50,6 @@ class AVONEDashboard(Node):
         self.create_timer(5.0, self._report_stats)
 
     def _parse_dbc(self):
-        """Record DBC structure (group by message)"""
         for msg in self.db.messages:
             for sig in msg.signals:
                 self.signal_values[f"{msg.name}/{sig.name}"] = {
@@ -105,11 +107,12 @@ class AVONEDashboard(Node):
 
 # ---------- GUI ----------
 class DashboardGUI(QMainWindow):
-    def __init__(self):
+    def __init__(self, enable_plots=True):
         super().__init__()
-        self.setWindowTitle("AV.ONE Dashboard (Grouped)")
+        self.setWindowTitle("AV.ONE Dashboard (Grouped + Plots)")
         self.setGeometry(100, 100, 1600, 1000)
         self.signal_widgets = {}
+        self.enable_plots = enable_plots
 
         self.bridge = SignalBridge()
         self.bridge.update_signal.connect(self._update_signal)
@@ -124,13 +127,18 @@ class DashboardGUI(QMainWindow):
         self._apply_dark_theme()
         self._install_exit_shortcut()
 
+        # Timer to update plots
+        self.plot_timer = QTimer()
+        self.plot_timer.timeout.connect(self._refresh_plots)
+        self.plot_timer.start(200)  # 5 Hz refresh rate
+
     def _install_exit_shortcut(self):
-        """Press Q or Esc to quit cleanly"""
         quit_button = QPushButton("Exit (Q/Esc)")
         quit_button.clicked.connect(self._exit_app)
         quit_button.setFixedWidth(150)
         quit_button.setStyleSheet("background-color:#b33a3a; color:white; font-weight:bold;")
         self.layout.addWidget(quit_button)
+
         self.addAction(self._make_shortcut("Q", self._exit_app))
         self.addAction(self._make_shortcut("Escape", self._exit_app))
 
@@ -145,7 +153,6 @@ class DashboardGUI(QMainWindow):
         QApplication.quit()
 
     def build_ui(self, signal_values):
-        """Group signals by DBC message"""
         grouped = {}
         for key, info in signal_values.items():
             msg = info['message']
@@ -158,24 +165,23 @@ class DashboardGUI(QMainWindow):
             row = 0
 
             for sig in sorted(sig_list, key=lambda x: x['name']):
+                key = f"{msg}/{sig['name']}"
                 name_lbl = QLabel(sig['name'])
-                name_lbl.setMinimumWidth(300)
+                name_lbl.setMinimumWidth(250)
 
                 value_lbl = QLabel('--')
                 value_lbl.setAlignment(Qt.AlignRight)
                 unit_lbl = QLabel(sig['unit'])
                 unit_lbl.setMinimumWidth(60)
 
+                # Optional progress bar
                 bar = None
                 if sig['min'] is not None and sig['max'] is not None:
                     bar = QProgressBar()
-                    try:
-                        bar.setMinimum(int(sig['min']))
-                        bar.setMaximum(int(sig['max']))
-                    except Exception:
-                        pass
+                    bar.setMinimum(int(sig['min']))
+                    bar.setMaximum(int(sig['max']))
                     bar.setTextVisible(False)
-                    bar.setMinimumWidth(240)
+                    bar.setMinimumWidth(150)
                     grid.addWidget(bar, row, 1)
                     grid.addWidget(value_lbl, row, 2)
                     grid.addWidget(unit_lbl, row, 3)
@@ -183,11 +189,28 @@ class DashboardGUI(QMainWindow):
                     grid.addWidget(value_lbl, row, 1)
                     grid.addWidget(unit_lbl, row, 2)
 
+                # Optional live plot
+                plot_widget = None
+                data_buffer = None
+                if self.enable_plots:
+                    plot_widget = pg.PlotWidget()
+                    plot_widget.setYRange(-1, 1)  # auto-adjust later
+                    plot_widget.setFixedHeight(100)
+                    plot_widget.showGrid(x=True, y=True, alpha=0.3)
+                    plot_curve = plot_widget.plot(pen=pg.mkPen('#00BFFF', width=2))
+                    data_buffer = collections.deque(maxlen=100)
+                    grid.addWidget(plot_widget, row, 4, 1, 1)
+                else:
+                    plot_curve = None
+
                 grid.addWidget(name_lbl, row, 0)
-                self.signal_widgets[f"{msg}/{sig['name']}"] = {
+                self.signal_widgets[key] = {
                     'value_label': value_lbl,
                     'bar': bar,
-                    'choices': sig['choices']
+                    'choices': sig['choices'],
+                    'plot_widget': plot_widget,
+                    'plot_curve': plot_curve,
+                    'data_buffer': data_buffer
                 }
                 row += 1
 
@@ -200,28 +223,47 @@ class DashboardGUI(QMainWindow):
         if key not in self.signal_widgets:
             return
         w = self.signal_widgets[key]
-        lbl = w.get('value_label')
+        lbl = w['value_label']
         if not lbl:
             return
 
-        # Show enum choices if exist, otherwise raw ROS value
-        choices = w.get('choices')
+        choices = w['choices']
         if choices:
-            try:
-                lbl.setText(str(choices.get(int(val), int(val))))
-            except Exception:
-                lbl.setText(str(val))
+            lbl.setText(str(choices.get(int(val), int(val))))
         else:
             lbl.setText(f"{val:.2f}" if isinstance(val, float) else str(val))
 
-        bar = w.get('bar')
+        bar = w['bar']
         if bar:
             try:
                 bar.setValue(int(val))
             except Exception:
                 pass
 
+        if self.enable_plots and w['data_buffer'] is not None:
+            try:
+                w['data_buffer'].append(float(val))
+            except Exception:
+                pass
+
+    def _refresh_plots(self):
+        """Update all live plots"""
+        if not self.enable_plots:
+            return
+        for w in self.signal_widgets.values():
+            if w['plot_curve'] and w['data_buffer']:
+                data = list(w['data_buffer'])
+                w['plot_curve'].setData(data)
+                if data:
+                    ymin, ymax = min(data), max(data)
+                    if ymin == ymax:
+                        ymin -= 0.5
+                        ymax += 0.5
+                    w['plot_widget'].setYRange(ymin, ymax)
+
     def _apply_dark_theme(self):
+        pg.setConfigOption('background', '#1e1e1e')
+        pg.setConfigOption('foreground', '#e0e0e0')
         self.setStyleSheet("""
             QMainWindow { background-color: #1e1e1e; }
             QWidget { background-color: #1e1e1e; color: #e0e0e0; }
@@ -241,7 +283,7 @@ def main():
         sys.exit(1)
 
     app = QApplication(sys.argv)
-    gui = DashboardGUI()
+    gui = DashboardGUI(enable_plots=True)  # toggle live plots here
     gui.show()
 
     node = AVONEDashboard(gui.bridge, dbc_path)
