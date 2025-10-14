@@ -29,6 +29,7 @@ setup(
             'CAN_to_ROS = avone_utils.CAN_to_ROS:main',
             'cmd_vel_filter = avone_utils.cmd_vel_filter:main',
             'sensor_heartbeat = avone_utils.sensor_heartbeat:main',
+            'ros_cmd_heartbeat = avone_utils.ros_cmd_heartbeat:main',
 
         ],
     },
