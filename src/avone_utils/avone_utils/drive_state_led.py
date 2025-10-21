@@ -1,52 +1,66 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
+from std_msgs.msg import Int32, Bool
 import serial
-from std_msgs.msg import Int32
 
-
-class LedMatrixNode(Node):
+class DriveStateLED(Node):
     def __init__(self):
-        super().__init__('led_matrix_node')
+        super().__init__('drive_state_led')
 
-        # Serial setup
-        self.ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
+        # --- Parameters ---
+        self.declare_parameter('port', '/dev/ttyACM0')
+        self.declare_parameter('baud', 115200)
+        port = self.get_parameter('port').value
+        baud = self.get_parameter('baud').value
 
-        # Last known drive state
-        self.latest_state = None
+        # --- Serial init ---
+        try:
+            self.ser = serial.Serial(port, baud, timeout=1)
+            self.get_logger().info(f'✅ Connected to ESP32 on {port} @ {baud}')
+        except Exception as e:
+            self.get_logger().error(f'❌ Failed to open serial port: {e}')
+            raise SystemExit
 
-        # Subscribe to the drive state topic
-        self.sub = self.create_subscription(
-            Int32,
-            '/av1/avone_state/drive_state',
-            self.state_callback,
-            10
-        )
+        # --- Subscriptions ---
+        self.create_subscription(Int32, '/av1/avone_state/drive_state/', self.cb_drive_state, 10)
+        self.create_subscription(Bool,  '/av1/fault_status/fault_latched', self.cb_fault_latched, 10)
 
-        # ---- Set frequency (Hz) ----
-        freq_hz = 5.0   # change this value to your desired frequency
-        self.timer = self.create_timer(1.0 / freq_hz, self.publish_state)
+        # --- Track last values to avoid spam ---
+        self.last_state = None
+        self.last_fault = None
 
-        self.get_logger().info(f"LED Matrix Node started at {freq_hz} Hz")
+    # --- Callbacks ---
+    def cb_drive_state(self, msg: Int32):
+        if msg.data != self.last_state:
+            self.last_state = msg.data
+            line = f'STATE {msg.data}\n'
+            try:
+                self.ser.write(line.encode())
+                self.get_logger().info(f'Sent → {line.strip()}')
+            except Exception as e:
+                self.get_logger().warn(f'Write error: {e}')
 
-    def state_callback(self, msg: Int32):
-        # Store the most recent state (don’t send yet)
-        self.latest_state = msg.data
-
-    def publish_state(self):
-        if self.latest_state is not None:
-            cmd = f"STATE {self.latest_state}\n"
-            self.ser.write(cmd.encode())
-            self.get_logger().info(f"Sent DriveState={self.latest_state}")
-
+    def cb_fault_latched(self, msg: Bool):
+        if msg.data != self.last_fault:
+            self.last_fault = msg.data
+            line = f'FAULT {int(msg.data)}\n'
+            try:
+                self.ser.write(line.encode())
+                self.get_logger().info(f'Sent → {line.strip()}')
+            except Exception as e:
+                self.get_logger().warn(f'Write error: {e}')
 
 def main(args=None):
     rclpy.init(args=args)
-    node = LedMatrixNode()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
-
+    node = DriveStateLED()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        node.get_logger().info('Shutting down drive_state_led node...')
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
