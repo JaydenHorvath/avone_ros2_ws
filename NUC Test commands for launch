@@ -16,7 +16,7 @@ sudo ip link set can0 up
 ros2 run can_simulation test_cantoros
 ros2 launch avone bringup.launch.py
 ros2 run nmea_navsat_driver nmea_serial_driver \
-  --ros-args -p port:=/dev/ttyUSB1 -p baud:=115200 -p frame_id:=gps_antenna1_link
+  --ros-args -p port:=/dev/ttyUSB1 -p baud:=115200 -p frame_id:=base_link
 ros2 run avone_gps imu_start
 
 ros2 launch avone dual_ekf
@@ -41,3 +41,16 @@ ros2 run avone_nav nav2_cancel
 
 
 rviz2 -d ~/ros2_ws/src/avone_localisation/config/odom_viz.rviz
+
+
+
+LIDAR
+
+# clear any old IPs
+sudo ip addr flush dev enx6c6e070b25d8
+
+# give your laptop an address in the same subnet (just not .57)
+sudo ip addr add 192.168.2.10/24 dev enx6c6e070b25d8
+
+# bring the interface up
+sudo ip link set enx6c6e070b25d8 up

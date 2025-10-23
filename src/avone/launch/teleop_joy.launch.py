@@ -51,7 +51,7 @@ def generate_launch_description():
                 'enable_button': 4,
                 'require_enable_button': True
             }],
-            remappings=[('/cmd_vel', '/cmd_vel_raw')]
+            # remappings=[('/cmd_vel', '/cmd_vel_raw')]
         ),
         Node(
             package='avone_utils',

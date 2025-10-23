@@ -7,7 +7,7 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
-    use_sim_time = LaunchConfiguration('use_sim_time', default='false')
+    use_sim_time = LaunchConfiguration('use_sim_time', default='true')
 
     # Path to your YAML config (assuming it's inside `config/` of your package)
     config_file = PathJoinSubstitution([
@@ -19,24 +19,10 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             'use_sim_time',
-            default_value='false',
+            default_value='true',
             description='Use simulation (Gazebo) clock'
         ),
-        # for testing with rosbag
-        # Node(
-        #     package='robot_localization',
-        #     executable='navsat_transform_node',
-        #     name='navsat_transform_node',
-        #     output='screen',
-        #     parameters=[config_file, {'use_sim_time': use_sim_time}],
-        #     remappings=[
-        #         ('gps/fix', '/fix'),
-        #         ('imu', '/imu/sim'),   
-        #         ('odometry/filtered', '/odometry/sim'),
-        #         ('odometry/gps', '/odometry/gps_new'),
-                
-        #     ]
-        # ),
+
         Node(
             package='robot_localization',
             executable='navsat_transform_node',
@@ -45,9 +31,9 @@ def generate_launch_description():
             parameters=[config_file, {'use_sim_time': use_sim_time}],
             remappings=[
                 ('gps/fix', '/fix'),
-                ('imu', '/imu_gps'),   
-                ('odometry/filtered', '/odometry/local'),
-                ('odometry/gps', '/odometry/gps'),
+                ('imu', '/imu/sim'),   
+                ('odometry/filtered', '/odometry/sim'),
+                ('odometry/gps', '/odometry/gps_new'),
                 
             ]
         ),

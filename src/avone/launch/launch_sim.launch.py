@@ -41,7 +41,7 @@ def generate_launch_description():
             ])
         ),
         launch_arguments={
-            'gz_args': '-r -v1 /home/jay/ros2_ws/src/avone/worlds/smalltrack.world'
+            'gz_args': '-r -v1 /home/jay/ros2_ws/src/avone/worlds/cone_generated.sdf'
         }.items()
     )
 

@@ -1,6 +1,6 @@
 ekf_filter_node_map:
   ros__parameters:
-    use_sim_time: false
+    use_sim_time: true
     frequency: 30.0
     sensor_timeout: 0.1
     two_d_mode: false
@@ -17,24 +17,24 @@ ekf_filter_node_map:
     publish_tf:     true
     publish_odometry_frame: true
 
-    odom0: /odometry/local
-    odom0_config: [false, false, false,
-              false, false, false,
-              true,  true,  true,
-              false, false, true,
-              false, false, false]
-    odom0_queue_size: 10
-    odom0_differential: false
-    odom0_relative: false
+    # odom0: /odometry/local
+    # odom0_config: [false, false, false,
+    #           false, false, false,
+    #           true,  true,  true,
+    #           false, false, true,
+    #           false, false, false]
+    # odom0_queue_size: 10
+    # odom0_differential: false
+    # odom0_relative: false
 
-    odom1: /odometry/gps
+    odom1: /odometry/gps_new
     odom1_config: [true,  true,  false,
                 false, false, false,
-                false, false, false,
+                true, true, false,
                 false, false, false,
                 false, false, false]
     odom1_queue_size: 10
-    odom1_differential: false
+    odom1_differential: true
     odom1_relative: false
 
     imu0: /imu_gps
@@ -51,15 +51,15 @@ ekf_filter_node_map:
 
 
 
-    # twist0: /vel_cov  # Use TwistStamped directly - no converter needed!
-    # twist0_config: [
-    #   false, false, false, # positions
-    #   false, false, false, # orientation
-    #   true, true, false,   # x, y, z linear velocities (enable x, y)
-    #   false, false, false,  # roll, pitch, yaw angular velocities (enable yaw)
-    #   false, false, false
-    # ]
-    # twist0_queue_size: 10
-    # twist0_differential: false  # Set to true if this is relative motion, false for absolute velocity
+    twist0: /vel_cov  # Use TwistStamped directly - no converter needed!
+    twist0_config: [
+      false, false, false, # positions
+      false, false, false, # orientation
+      true, true, false,   # x, y, z linear velocities (enable x, y)
+      false, false, false,  # roll, pitch, yaw angular velocities (enable yaw)
+      false, false, false
+    ]
+    twist0_queue_size: 10
+    twist0_differential: false  # Set to true if this is relative motion, false for absolute velocity
 
 

@@ -12,12 +12,12 @@ def generate_launch_description():
     # ---- Launch args (optional; add more as you like) ----
     use_sim_time = LaunchConfiguration('use_sim_time')
     can_interface = LaunchConfiguration('can_interface')
-    require_lidar = LaunchConfiguration('require_lidar')
+ 
 
     declare_args = [
         DeclareLaunchArgument('use_sim_time', default_value='false'),
         DeclareLaunchArgument('can_interface', default_value='can0'),
-        DeclareLaunchArgument('require_lidar', default_value='true'),
+     
     ]
 
     # ---- Paths ----
@@ -33,7 +33,6 @@ def generate_launch_description():
         xacro_file, ' ',
         'use_sim_time:=', use_sim_time, ' ',
         'can_interface:=', can_interface, ' ',
-        'require_lidar:=', require_lidar,
     ])
 
     robot_description = {
@@ -106,21 +105,21 @@ def generate_launch_description():
 
     )
 
-    # teleop_twist_joy_node = Node(
-    #     package='teleop_twist_joy',
-    #     executable='teleop_node',
-    #     name='teleop_twist_joy_node',
-    #     output='screen',
-    #     parameters=[{
-    #         'stamp': True,
-    #         'axis_linear.x': 1,
-    #         'scale_linear.x': 2.0,
-    #         'axis_angular.yaw': 3,
-    #         'scale_angular.yaw': 0.5,
-    #         'enable_button': 4,
-    #         'repeat_rate': 50.0
-    #     }],
-    # )
+    teleop_twist_joy_node = Node(
+        package='teleop_twist_joy',
+        executable='teleop_node',
+        name='teleop_twist_joy_node',
+        output='screen',
+        parameters=[{
+            'stamp': True,
+            'axis_linear.x': 1,
+            'scale_linear.x': 2.0,
+            'axis_angular.yaw': 3,
+            'scale_angular.yaw': 0.5,
+            'enable_button': 4,
+            'repeat_rate': 50.0
+        }],
+    )
 
     static_map_tf = Node(
         package='tf2_ros',
@@ -155,7 +154,7 @@ def generate_launch_description():
         tf_odometry_relay,
         # twiststamped_node,
         joy_node,
-        # teleop_twist_joy_node,
+        teleop_twist_joy_node,
         static_map_tf,
         cmd_filter_node,
     ]

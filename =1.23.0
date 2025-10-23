@@ -1,7 +1,0 @@
-Defaulting to user installation because normal site-packages is not writeable
-Requirement already satisfied: numpy in /usr/lib/python3/dist-packages (1.21.5)
-Collecting numpy
-  Downloading numpy-2.2.6-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (16.8 MB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.8/16.8 MB 12.6 MB/s eta 0:00:00
-Installing collected packages: numpy
-Successfully installed numpy-2.2.6

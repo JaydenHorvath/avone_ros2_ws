@@ -6,8 +6,8 @@
       <plugin>avone/AvoneSystemHardware</plugin>
 
       <!-- Your existing params -->
-      <param name="max_steer_angle">1.3</param>
-      <param name="min_steer_angle">-1.3</param>
+      <param name="max_steer_angle">0.610865</param>
+      <param name="min_steer_angle">-0.610865</param>
       <param name="max_rpm">350</param>
       <param name="can_interface">can0</param>
       <param name="can_baudrate">250000</param>
@@ -18,35 +18,6 @@
       <param name="cmd_l_motor_can_id">0x0B</param>
       <param name="cmd_r_motor_can_id">0x0A</param>
       <param name="cmd_steer_can_id">0x09</param>
-
-      <!-- NEW: safety/watchdog controls -->
-      <!-- Which feedback signals are required before arming & during run -->
-      <param name="require_rlmotor">false</param>
-      <param name="require_rrmotor">false</param>
-      <param name="require_steer">false</param>
-
-      <!-- Activation: wait up to this long for first feedback frames -->
-      <param name="startup_validation_ms">800</param>
-
-      <!-- Runtime: max allowed age for any required signal -->
-      <param name="link_loss_timeout_ms">250</param>
-
-
-            <!-- LiDAR watchdog -->
-      <param name="require_lidar">false</param>
-      <param name="lidar_topic">/lidar</param>
-      <!-- Choose the actual ROS 2 type your stack publishes: -->
-      <param name="lidar_ros_type">sensor_msgs/msg/PointCloud2</param>
-      <!-- or -->
-      <!-- <param name="lidar_ros_type">sensor_msgs/msg/LaserScan</param> -->
-      <param name="lidar_timeout_ms">300</param>
-
-
-      <!-- Ready-To-Drive signalling -->
-      <param name="r2d_topic">/ready_to_drive</param>
-      <param name="r2d_can_heartbeat">true</param>
-      <param name="r2d_can_id">0x110</param>
-      <param name="r2d_can_period_ms">50</param>
 
 
     </hardware>

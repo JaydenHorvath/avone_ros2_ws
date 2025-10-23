@@ -11,7 +11,7 @@ def generate_launch_description():
     nav2_config = os.path.join(
         get_package_share_directory('avone_nav'),
         'config',
-        'Nav2_cost.yaml'
+        'nav2_config.yaml'
     )
 
     return LaunchDescription([
@@ -25,19 +25,9 @@ def generate_launch_description():
                 )
             ),
             launch_arguments={
-                'use_sim_time': 'true',
+                'use_sim_time': 'false',
                 'params_file': nav2_config
             }.items()
         ),
-
-        # # Relay /cmd_vel to ackermann topic
-        # Node(
-        #     package='topic_tools',
-        #     executable='relay',
-        #     name='cmd_vel_relay',
-        #     arguments=['/cmd_vel', '/ackermann_steering_controller/reference'],
-        #     output='screen'
-        # )
-
         
     ])

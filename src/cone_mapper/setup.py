@@ -34,7 +34,7 @@ setup(
             'conelandmarkmapper = cone_mapper.conelandmarkmapper:main',
               'groundremoval = cone_mapper.groundremoval:main',
               'lidargroundremoval = cone_mapper.lidargroundremoval:main',
-              'groundremovalright = cone_mapper.groundremovalright:main',
+              'clustering_cone = cone_mapper.clustering_cone:main',
               'conecenterline = cone_mapper.conecenterline:main',
               'yolobasedlandmark = cone_mapper.yolobasedlandmark:main',
               'lidarconemapper = cone_mapper.lidarconemapper:main',
@@ -43,6 +43,8 @@ setup(
               'delaunay = cone_mapper.delaunay:main',
               'nav2waypoints = cone_mapper.nav2waypoints:main',
               'trackmapper = cone_mapper.trackmapper:main',
+              'cone_export = cone_mapper.cone_export:main',
+              'coneselector = cone_mapper.coneselector:main',
         ],
     },
 )

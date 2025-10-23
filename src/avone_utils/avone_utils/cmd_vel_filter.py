@@ -23,8 +23,8 @@ class CmdVelToAckermann(Node):
         )
 
         # Parameters
-        self.min_linear = 0.1     # m/s deadband to ignore angular commands at low speeds
-        self.max_steer_scale = 1.0  # angular scaling factor (reduce if steering spikes)
+        self.min_linear = 0.1       # m/s deadband to ignore angular commands at low speeds
+        self.max_steer_scale = 1.0  # angular scaling factor
 
     def cmd_callback(self, msg: Twist):
         # Create a stamped message
@@ -32,16 +32,17 @@ class CmdVelToAckermann(Node):
         stamped.header.stamp = self.get_clock().now().to_msg()
         stamped.header.frame_id = 'base_link'
 
-        # Filter linear velocity
-        stamped.twist.linear.x = msg.linear.x
+        # --- Filter linear velocity (no reverse allowed) ---
+        linear_x = max(0.0, msg.linear.x)
+        stamped.twist.linear.x = linear_x
 
-        # Apply angular filtering
-        if abs(msg.linear.x) < self.min_linear:
+        # --- Apply angular filtering ---
+        if linear_x < self.min_linear:
             # When nearly stopped, suppress steering
             stamped.twist.angular.z = 0.0
         else:
             # Scale angular input proportionally to forward speed
-            stamped.twist.angular.z = msg.angular.z * abs(msg.linear.x) * self.max_steer_scale
+            stamped.twist.angular.z = msg.angular.z * linear_x * self.max_steer_scale
 
         # Publish the stamped command
         self.pub.publish(stamped)
