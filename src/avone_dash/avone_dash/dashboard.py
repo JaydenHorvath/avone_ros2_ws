@@ -15,13 +15,26 @@ from std_msgs.msg import (
 # PyQt5 imports
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QProgressBar,
-    QScrollArea, QGroupBox, QGridLayout, QPushButton
+    QScrollArea, QGroupBox, QGridLayout, QPushButton, QTabWidget, QAction
 )
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont, QKeySequence
 
 # PyQtGraph for live plotting
 import pyqtgraph as pg
+
+
+# =====================================================
+# 🧭 MANUAL CLASSIFICATION MAP
+# =====================================================
+CLASS_MAP = {
+    'Drive': ['DRIVE_STATE', 'THROTTLE', 'BRAKE', 'RPM', 'GEAR'],
+    'Faults': ['FAULT', 'ERROR', 'TIMEOUT', 'ERR'],
+    'Sensors': [ 'IMU', 'GPS'],
+    'Motors': ['MOTOR', 'CURR', 'VOLT'],
+    'System': [ 'STATE', 'HEARTBEAT', 'HB'],
+}
+# Any message not matching a keyword above goes into “Misc”
 
 
 # ---------- Thread-safe signal bridge ----------
@@ -109,20 +122,16 @@ class AVONEDashboard(Node):
 class DashboardGUI(QMainWindow):
     def __init__(self, enable_plots=True):
         super().__init__()
-        self.setWindowTitle("AV.ONE Dashboard (Grouped + Plots)")
-        self.setGeometry(100, 100, 1600, 1000)
+        self.setWindowTitle("AV.ONE Dashboard (Tabbed)")
+        self.setGeometry(100, 100, 1700, 1000)
         self.signal_widgets = {}
         self.enable_plots = enable_plots
 
         self.bridge = SignalBridge()
         self.bridge.update_signal.connect(self._update_signal)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        container = QWidget()
-        self.layout = QVBoxLayout(container)
-        scroll.setWidget(container)
-        self.setCentralWidget(scroll)
+        self.tabs = QTabWidget()
+        self.setCentralWidget(self.tabs)
 
         self._apply_dark_theme()
         self._install_exit_shortcut()
@@ -130,20 +139,20 @@ class DashboardGUI(QMainWindow):
         # Timer to update plots
         self.plot_timer = QTimer()
         self.plot_timer.timeout.connect(self._refresh_plots)
-        self.plot_timer.start(200)  # 5 Hz refresh rate
+        self.plot_timer.start(200)
 
+    # ---------- Exit Shortcuts ----------
     def _install_exit_shortcut(self):
         quit_button = QPushButton("Exit (Q/Esc)")
         quit_button.clicked.connect(self._exit_app)
         quit_button.setFixedWidth(150)
         quit_button.setStyleSheet("background-color:#b33a3a; color:white; font-weight:bold;")
-        self.layout.addWidget(quit_button)
-
+        self.addToolBarBreak()
+        self.addToolBar("Exit").addWidget(quit_button)
         self.addAction(self._make_shortcut("Q", self._exit_app))
         self.addAction(self._make_shortcut("Escape", self._exit_app))
 
     def _make_shortcut(self, key, func):
-        from PyQt5.QtWidgets import QAction
         act = QAction(self)
         act.setShortcut(QKeySequence(key))
         act.triggered.connect(func)
@@ -152,73 +161,94 @@ class DashboardGUI(QMainWindow):
     def _exit_app(self):
         QApplication.quit()
 
+    # ---------- UI Build ----------
     def build_ui(self, signal_values):
-        grouped = {}
+        # Classify messages
+        classified = {k: [] for k in CLASS_MAP.keys()}
+        classified["Misc"] = []
+
         for key, info in signal_values.items():
             msg = info['message']
-            grouped.setdefault(msg, []).append(info)
+            found = False
+            for class_name, keywords in CLASS_MAP.items():
+                if any(kw in msg.upper() for kw in keywords):
+                    classified[class_name].append(info)
+                    found = True
+                    break
+            if not found:
+                classified["Misc"].append(info)
 
-        for msg, sig_list in grouped.items():
-            group = QGroupBox(msg)
-            group.setFont(QFont('Arial', 11, QFont.Bold))
-            grid = QGridLayout()
-            row = 0
+        # Build each tab
+        for class_name, signals in classified.items():
+            tab_scroll = QScrollArea()
+            tab_scroll.setWidgetResizable(True)
+            tab_container = QWidget()
+            layout = QVBoxLayout(tab_container)
 
-            for sig in sorted(sig_list, key=lambda x: x['name']):
-                key = f"{msg}/{sig['name']}"
-                name_lbl = QLabel(sig['name'])
-                name_lbl.setMinimumWidth(250)
+            # Group by message name
+            grouped = {}
+            for info in signals:
+                grouped.setdefault(info['message'], []).append(info)
 
-                value_lbl = QLabel('--')
-                value_lbl.setAlignment(Qt.AlignRight)
-                unit_lbl = QLabel(sig['unit'])
-                unit_lbl.setMinimumWidth(60)
+            for msg, sig_list in grouped.items():
+                group = QGroupBox(msg)
+                group.setFont(QFont('Arial', 11, QFont.Bold))
+                grid = QGridLayout()
+                row = 0
 
-                # Optional progress bar
-                bar = None
-                if sig['min'] is not None and sig['max'] is not None:
-                    bar = QProgressBar()
-                    bar.setMinimum(int(sig['min']))
-                    bar.setMaximum(int(sig['max']))
-                    bar.setTextVisible(False)
-                    bar.setMinimumWidth(150)
-                    grid.addWidget(bar, row, 1)
-                    grid.addWidget(value_lbl, row, 2)
-                    grid.addWidget(unit_lbl, row, 3)
-                else:
-                    grid.addWidget(value_lbl, row, 1)
-                    grid.addWidget(unit_lbl, row, 2)
+                for sig in sorted(sig_list, key=lambda x: x['name']):
+                    key = f"{msg}/{sig['name']}"
+                    name_lbl = QLabel(sig['name'])
+                    name_lbl.setMinimumWidth(250)
+                    value_lbl = QLabel('--')
+                    value_lbl.setAlignment(Qt.AlignRight)
+                    unit_lbl = QLabel(sig['unit'])
+                    unit_lbl.setMinimumWidth(60)
 
-                # Optional live plot
-                plot_widget = None
-                data_buffer = None
-                if self.enable_plots:
-                    plot_widget = pg.PlotWidget()
-                    plot_widget.setYRange(-1, 1)  # auto-adjust later
-                    plot_widget.setFixedHeight(100)
-                    plot_widget.showGrid(x=True, y=True, alpha=0.3)
-                    plot_curve = plot_widget.plot(pen=pg.mkPen('#00BFFF', width=2))
-                    data_buffer = collections.deque(maxlen=100)
-                    grid.addWidget(plot_widget, row, 4, 1, 1)
-                else:
-                    plot_curve = None
+                    # Progress bar
+                    bar = None
+                    if sig['min'] is not None and sig['max'] is not None:
+                        bar = QProgressBar()
+                        bar.setMinimum(int(sig['min']))
+                        bar.setMaximum(int(sig['max']))
+                        bar.setTextVisible(False)
+                        bar.setMinimumWidth(150)
+                        grid.addWidget(bar, row, 1)
+                        grid.addWidget(value_lbl, row, 2)
+                        grid.addWidget(unit_lbl, row, 3)
+                    else:
+                        grid.addWidget(value_lbl, row, 1)
+                        grid.addWidget(unit_lbl, row, 2)
 
-                grid.addWidget(name_lbl, row, 0)
-                self.signal_widgets[key] = {
-                    'value_label': value_lbl,
-                    'bar': bar,
-                    'choices': sig['choices'],
-                    'plot_widget': plot_widget,
-                    'plot_curve': plot_curve,
-                    'data_buffer': data_buffer
-                }
-                row += 1
+                    # Optional live plot
+                    plot_widget, plot_curve, data_buffer = None, None, None
+                    if self.enable_plots:
+                        plot_widget = pg.PlotWidget()
+                        plot_widget.setFixedHeight(100)
+                        plot_widget.showGrid(x=True, y=True, alpha=0.3)
+                        plot_curve = plot_widget.plot(pen=pg.mkPen('#00BFFF', width=2))
+                        data_buffer = collections.deque(maxlen=100)
+                        grid.addWidget(plot_widget, row, 4, 1, 1)
 
-            group.setLayout(grid)
-            self.layout.addWidget(group)
+                    grid.addWidget(name_lbl, row, 0)
+                    self.signal_widgets[key] = {
+                        'value_label': value_lbl,
+                        'bar': bar,
+                        'choices': sig['choices'],
+                        'plot_widget': plot_widget,
+                        'plot_curve': plot_curve,
+                        'data_buffer': data_buffer
+                    }
+                    row += 1
 
-        self.layout.addStretch()
+                group.setLayout(grid)
+                layout.addWidget(group)
 
+            layout.addStretch()
+            tab_scroll.setWidget(tab_container)
+            self.tabs.addTab(tab_scroll, class_name)
+
+    # ---------- Signal Update ----------
     def _update_signal(self, key, val, info):
         if key not in self.signal_widgets:
             return
@@ -233,10 +263,9 @@ class DashboardGUI(QMainWindow):
         else:
             lbl.setText(f"{val:.2f}" if isinstance(val, float) else str(val))
 
-        bar = w['bar']
-        if bar:
+        if w['bar']:
             try:
-                bar.setValue(int(val))
+                w['bar'].setValue(int(val))
             except Exception:
                 pass
 
@@ -246,8 +275,8 @@ class DashboardGUI(QMainWindow):
             except Exception:
                 pass
 
+    # ---------- Plot Refresh ----------
     def _refresh_plots(self):
-        """Update all live plots"""
         if not self.enable_plots:
             return
         for w in self.signal_widgets.values():
@@ -261,6 +290,7 @@ class DashboardGUI(QMainWindow):
                         ymax += 0.5
                     w['plot_widget'].setYRange(ymin, ymax)
 
+    # ---------- Dark Theme ----------
     def _apply_dark_theme(self):
         pg.setConfigOption('background', '#1e1e1e')
         pg.setConfigOption('foreground', '#e0e0e0')
@@ -271,6 +301,8 @@ class DashboardGUI(QMainWindow):
             QLabel { color: #e0e0e0; }
             QProgressBar { border: 1px solid #3d3d3d; background-color: #2d2d2d; }
             QProgressBar::chunk { background-color: #2196F3; }
+            QTabBar::tab { background: #2d2d2d; color: #e0e0e0; padding: 10px; }
+            QTabBar::tab:selected { background: #2196F3; color: white; }
         """)
 
 
@@ -283,7 +315,7 @@ def main():
         sys.exit(1)
 
     app = QApplication(sys.argv)
-    gui = DashboardGUI(enable_plots=True)  # toggle live plots here
+    gui = DashboardGUI(enable_plots=True)
     gui.show()
 
     node = AVONEDashboard(gui.bridge, dbc_path)

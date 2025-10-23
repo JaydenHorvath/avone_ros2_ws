@@ -1,274 +1,380 @@
-# avone_dash/dashboard.py
+#!/usr/bin/env python3
+import sys
+import os
 import threading
-import time
-import curses
+import collections
 import cantools
-from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
-
 import rclpy
 from rclpy.node import Node
 
-# std_msgs supported
-from std_msgs.msg import Bool, Float32, Float64, Int32, UInt8, UInt16, UInt32
+# ROS2 message types
+from std_msgs.msg import (
+    Bool, Int8, UInt8, Int16, UInt16, Int32, UInt32, Float32, Float64
+)
 
-MSG_TYPES = {
-    "Bool": Bool,
-    "Float32": Float32,
-    "Float64": Float64,
-    "Int32": Int32,
-    "UInt8": UInt8,
-    "UInt16": UInt16,
-    "UInt32": UInt32,
+# PyQt5 imports
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QProgressBar,
+    QScrollArea, QGroupBox, QGridLayout, QPushButton, QTabWidget, QAction, QToolBar
+)
+from PyQt5.QtCore import Qt, QObject, pyqtSignal, QTimer
+from PyQt5.QtGui import QFont, QKeySequence
+
+# PyQtGraph for live plotting
+import pyqtgraph as pg
+
+
+# =====================================================
+# 🧭 MANUAL CLASSIFICATION MAP
+#   Put substrings of MESSAGE names here (case-insensitive)
+# =====================================================
+CLASS_MAP = {
+    'Drive':   ['DRIVE_STATE', 'THROTTLE', 'BRAKE', 'RPM', 'GEAR'],
+    'Faults':  ['FAULT', 'ERROR', 'TIMEOUT'],
+    'Sensors': ['SEN', 'REN', 'PRE', 'IMU', 'GPS'],
+    'Motors':  ['MOTOR', 'CURR', 'VOLT', 'INV', 'PHASE'],
+    'System':  ['BEN', 'LVD', 'STATE', 'HEARTBEAT', 'SYS'],
 }
+# Unmatched messages will go to “Misc” (and everything is also visible in “All”)
 
 
-@dataclass
-class Item:
-    name: str
-    topic: str
-    type: str
-    unit: Optional[str] = None
-    choices: Optional[Dict[int, str]] = None
-    min_val: Optional[float] = None
-    max_val: Optional[float] = None
-    value: Any = None
-    last_update: float = 0.0
+# ---------- Thread-safe signal bridge ----------
+class SignalBridge(QObject):
+    update_signal = pyqtSignal(str, object, dict)
 
-    def as_text(self) -> str:
-        """Human-readable value string (with unit and enum decode)."""
-        if self.value is None:
-            return "—"
-        # Enum decode (works even if value arrives as float)
-        if self.choices and self.value is not None:
-            try:
-                return self.choices.get(int(self.value), str(int(self.value)))
-            except Exception:
-                pass
-        # Numeric formatting
-        if isinstance(self.value, float):
-            s = f"{self.value:.2f}"
-        else:
-            s = str(self.value)
-        return s + (f" {self.unit}" if self.unit else "")
 
-    def percentage(self) -> Optional[float]:
-        """Return 0..1 based on min/max (None if not applicable)."""
-        if self.value is None:
-            return None
-        if self.choices is not None:
-            return None  # don't bar enums
-        if self.min_val is None or self.max_val is None:
-            return None
+# ---------- ROS2 Node ----------
+class AVONEDashboard(Node):
+    def __init__(self, bridge, dbc_path):
+        super().__init__('avone_dashboard')
+        self.bridge = bridge
+
         try:
-            v = float(self.value)
-        except Exception:
-            return None
-        lo, hi = float(self.min_val), float(self.max_val)
-        if not (hi > lo):
-            return None
-        # Clamp then normalize
-        v = min(max(v, lo), hi)
-        return (v - lo) / (hi - lo)
+            self.db = cantools.database.load_file(dbc_path)
+            self.get_logger().info(f'Loaded DBC file: {dbc_path}')
+        except Exception as e:
+            self.get_logger().error(f'Failed to load DBC file: {e}')
+            sys.exit(1)
 
+        self.signal_values = {}
+        self.callback_count = {}
 
-@dataclass
-class Group:
-    title: str
-    items: Dict[str, Item] = field(default_factory=dict)
+        self._parse_dbc()
+        self._create_subscriptions()
+        self.create_timer(5.0, self._report_stats)
 
-
-class AvoneDashboard(Node):
-    def __init__(self):
-        super().__init__("avone_can_dashboard")
-        self.declare_parameters(
-            "",
-            [
-                ("timeout_sec", 0.5),
-                ("refresh_rate_hz", 10.0),
-                ("show_bars", True),
-                ("bar_width", 18),
-            ],
-        )
-        self.timeout_sec: float = float(self.get_parameter("timeout_sec").value)
-        self.refresh_rate_hz: float = float(self.get_parameter("refresh_rate_hz").value)
-        self.show_bars: bool = bool(self.get_parameter("show_bars").value)
-        self.bar_width: int = int(self.get_parameter("bar_width").value)
-
-        # 🔧 Hardcode your DBC file path here (or add a 'dbc_file' param if you prefer)
-        dbc_file = "/home/jay/Arduino/libraries/NUCAN/DBC Files/AV1.dbc"
-
-        self.groups: Dict[str, Group] = {}
-        self._load_dbc(dbc_file)
-
-        # Launch curses UI
-        self._stop_event = threading.Event()
-        self.ui_thread = threading.Thread(target=self._curses_main, daemon=True)
-        self.ui_thread.start()
-
-    def _load_dbc(self, path: str):
-        db = cantools.database.load_file(path)
-        all_topics = dict(self.get_topic_names_and_types())
-
-        for msg in db.messages:
-            group = Group(title=msg.name)
+    def _parse_dbc(self):
+        for msg in self.db.messages:
             for sig in msg.signals:
-                topic = f"/av1/{msg.name.lower()}/{sig.name.lower()}"
+                self.signal_values[f"{msg.name}/{sig.name}"] = {
+                    'name': sig.name,
+                    'message': msg.name,
+                    'unit': sig.unit or '',
+                    'min': sig.minimum,
+                    'max': sig.maximum,
+                    'choices': getattr(sig, 'choices', None),
+                    'value': None,
+                }
 
-                # Default type guess
-                mtype = "Float32"
+    def _create_subscriptions(self):
+        type_map = {
+            'bool': Bool, 'int8': Int8, 'uint8': UInt8,
+            'int16': Int16, 'uint16': UInt16,
+            'int32': Int32, 'uint32': UInt32,
+            'float32': Float32, 'float64': Float64
+        }
+        topics = dict(self.get_topic_names_and_types())
 
-                # Override with actual advertised ROS type if available
-                if topic in all_topics:
-                    ros_type = all_topics[topic][0]  # e.g. "std_msgs/msg/Int32"
-                    if ros_type.endswith("Bool"):
-                        mtype = "Bool"
-                    elif ros_type.endswith("Float64"):
-                        mtype = "Float64"
-                    elif ros_type.endswith("Int32"):
-                        mtype = "Int32"
-                    elif ros_type.endswith("UInt8"):
-                        mtype = "UInt8"
-                    elif ros_type.endswith("UInt16"):
-                        mtype = "UInt16"
-                    elif ros_type.endswith("UInt32"):
-                        mtype = "UInt32"
-                    else:
-                        mtype = "Float32"  # fallback
+        for key, info in self.signal_values.items():
+            msg, sig = info['message'], info['name']
+            topic = f'/av1/{msg.lower()}/{sig.lower()}'
+            self.callback_count[key] = 0
 
-                item = Item(
-                    name=sig.name,
-                    topic=topic,
-                    type=mtype,
-                    unit=sig.unit,
-                    choices=sig.choices,
-                    min_val=sig.minimum,
-                    max_val=sig.maximum,
+            msg_type = Float32  # default
+            if topic in topics:
+                full = topics[topic][0]
+                base = full.split('/')[-1].lower()
+                msg_type = type_map.get(base, Float32)
+
+            try:
+                self.create_subscription(
+                    msg_type, topic,
+                    lambda m, k=key: self._callback(m, k), 10
                 )
-                group.items[item.name] = item
-                self._subscribe_item(item)
+                self.get_logger().info(f"Subscribed: {topic} ({msg_type.__name__})")
+            except Exception as e:
+                # PyQt5 console won't have warn(); use warning
+                self.get_logger().warning(f"Failed {topic}: {e}")
 
-            self.groups[msg.name] = group
+    def _callback(self, msg, key):
+        if key not in self.signal_values:
+            return
+        val = getattr(msg, 'data', msg)
+        self.signal_values[key]['value'] = val
+        self.callback_count[key] += 1
+        self.bridge.update_signal.emit(key, val, self.signal_values[key])
 
-        self.get_logger().info(f"Loaded {len(self.groups)} message groups from {path}")
+    def _report_stats(self):
+        active = sum(1 for v in self.callback_count.values() if v > 0)
+        total = len(self.callback_count)
+        self.get_logger().info(f"Active signals: {active}/{total}")
 
-    def _subscribe_item(self, item: Item):
-        msg_type = MSG_TYPES.get(item.type)
-        if msg_type is None:
-            self.get_logger().warn(f"Unsupported type {item.type} for {item.name}")
+
+# ---------- GUI ----------
+class DashboardGUI(QMainWindow):
+    def __init__(self, enable_plots=True):
+        super().__init__()
+        self.setWindowTitle("AV.ONE Dashboard (Tabbed)")
+        self.setGeometry(100, 100, 1700, 1000)
+        self.signal_widgets = {}
+        self.enable_plots = enable_plots
+
+        self.bridge = SignalBridge()
+        self.bridge.update_signal.connect(self._update_signal)
+
+        self.tabs = QTabWidget()
+        self.tabs.setTabPosition(QTabWidget.North)
+        self.tabs.setDocumentMode(False)
+        self.tabs.setTabBarAutoHide(False)  # 🔒 ensure tab bar is visible
+        self.setCentralWidget(self.tabs)
+
+        self._apply_dark_theme()
+        self._install_exit_shortcut()
+
+        # Timer to update plots
+        self.plot_timer = QTimer()
+        self.plot_timer.timeout.connect(self._refresh_plots)
+        self.plot_timer.start(200)
+
+    # ---------- Exit Shortcuts ----------
+    def _install_exit_shortcut(self):
+        toolbar = QToolBar("Controls")
+        toolbar.setMovable(False)
+        self.addToolBar(Qt.TopToolBarArea, toolbar)
+
+        quit_button = QPushButton("Exit (Q/Esc)")
+        quit_button.clicked.connect(self._exit_app)
+        quit_button.setFixedWidth(150)
+        quit_button.setStyleSheet("background-color:#b33a3a; color:white; font-weight:bold;")
+        toolbar.addWidget(quit_button)
+
+        self.addAction(self._make_shortcut("Q", self._exit_app))
+        self.addAction(self._make_shortcut("Escape", self._exit_app))
+
+    def _make_shortcut(self, key, func):
+        act = QAction(self)
+        act.setShortcut(QKeySequence(key))
+        act.triggered.connect(func)
+        return act
+
+    def _exit_app(self):
+        QApplication.quit()
+
+    # ---------- Helpers ----------
+    def _make_scroll_tab(self):
+        tab_scroll = QScrollArea()
+        tab_scroll.setWidgetResizable(True)
+        tab_container = QWidget()
+        layout = QVBoxLayout(tab_container)
+        tab_scroll.setWidget(tab_container)
+        return tab_scroll, tab_container, layout
+
+    def _add_grouped_signals(self, layout, signal_infos):
+        # Group by message name
+        grouped = {}
+        for info in signal_infos:
+            grouped.setdefault(info['message'], []).append(info)
+
+        for msg, sig_list in grouped.items():
+            group = QGroupBox(msg)
+            group.setFont(QFont('Arial', 11, QFont.Bold))
+            grid = QGridLayout()
+            row = 0
+
+            for sig in sorted(sig_list, key=lambda x: x['name']):
+                key = f"{msg}/{sig['name']}"
+                name_lbl = QLabel(sig['name'])
+                name_lbl.setMinimumWidth(250)
+                value_lbl = QLabel('--')
+                value_lbl.setAlignment(Qt.AlignRight)
+                unit_lbl = QLabel(sig['unit'])
+                unit_lbl.setMinimumWidth(60)
+
+                # Progress bar when bounds known
+                bar = None
+                if sig['min'] is not None and sig['max'] is not None:
+                    try:
+                        bar = QProgressBar()
+                        bar.setMinimum(int(sig['min']))
+                        bar.setMaximum(int(sig['max']))
+                        bar.setTextVisible(False)
+                        bar.setMinimumWidth(150)
+                        grid.addWidget(bar, row, 1)
+                        grid.addWidget(value_lbl, row, 2)
+                        grid.addWidget(unit_lbl, row, 3)
+                    except Exception:
+                        # fall back to labels if bounds not int-castable
+                        grid.addWidget(value_lbl, row, 1)
+                        grid.addWidget(unit_lbl, row, 2)
+                else:
+                    grid.addWidget(value_lbl, row, 1)
+                    grid.addWidget(unit_lbl, row, 2)
+
+                # Optional live plot
+                plot_widget, plot_curve, data_buffer = None, None, None
+                if self.enable_plots:
+                    plot_widget = pg.PlotWidget()
+                    plot_widget.setFixedHeight(100)
+                    plot_widget.showGrid(x=True, y=True, alpha=0.3)
+                    plot_curve = plot_widget.plot(pen=pg.mkPen('#00BFFF', width=2))
+                    data_buffer = collections.deque(maxlen=100)
+                    grid.addWidget(plot_widget, row, 4, 1, 1)
+
+                grid.addWidget(name_lbl, row, 0)
+                self.signal_widgets[key] = {
+                    'value_label': value_lbl,
+                    'bar': bar,
+                    'choices': sig['choices'],
+                    'plot_widget': plot_widget,
+                    'plot_curve': plot_curve,
+                    'data_buffer': data_buffer
+                }
+                row += 1
+
+            group.setLayout(grid)
+            layout.addWidget(group)
+
+    # ---------- UI Build ----------
+    def build_ui(self, signal_values):
+        # Build an "All" tab with everything
+        all_tab, all_container, all_layout = self._make_scroll_tab()
+        all_infos = list(signal_values.values())
+        self._add_grouped_signals(all_layout, all_infos)
+        all_layout.addStretch()
+        self.tabs.addTab(all_tab, f"All ({len(all_infos)})")
+
+        # Classify into tabs
+        classified = {k: [] for k in CLASS_MAP.keys()}
+        classified["Misc"] = []
+
+        for info in all_infos:
+            msg_upper = info['message'].upper()
+            placed = False
+            for class_name, keywords in CLASS_MAP.items():
+                if any(kw.upper() in msg_upper for kw in keywords):
+                    classified[class_name].append(info)
+                    placed = True
+                    break
+            if not placed:
+                classified["Misc"].append(info)
+
+        # Build classified tabs
+        for class_name, signals in classified.items():
+            tab, container, layout = self._make_scroll_tab()
+            if signals:
+                self._add_grouped_signals(layout, signals)
+            else:
+                # Empty placeholder so the tab still shows something
+                placeholder = QLabel("No signals matched this category.")
+                placeholder.setAlignment(Qt.AlignCenter)
+                layout.addWidget(placeholder)
+            layout.addStretch()
+            self.tabs.addTab(tab, f"{class_name} ({len(signals)})")
+
+        # Make absolutely sure tabs are visible
+        self.tabs.setTabBarAutoHide(False)
+        self.tabs.setCurrentIndex(0)
+
+        # Optional: print to console for visibility/debugging
+        print(f"[GUI] Built {self.tabs.count()} tabs")
+
+    # ---------- Signal Update ----------
+    def _update_signal(self, key, val, info):
+        if key not in self.signal_widgets:
+            return
+        w = self.signal_widgets[key]
+        lbl = w['value_label']
+        if not lbl:
             return
 
-        def cb(msg):
-            item.value = getattr(msg, "data", None)
-            item.last_update = time.time()
-
-        self.create_subscription(msg_type, item.topic, cb, 10)
-        self.get_logger().info(f"Subscribed to {item.topic} ({item.type})")
-
-    # ---------- UI ----------
-    def _curses_main(self):
-        curses.wrapper(self._draw_loop)
-
-    def _draw_loop(self, stdscr):
-        curses.curs_set(0)
-        curses.start_color()
-        curses.use_default_colors()
-        curses.init_pair(1, curses.COLOR_GREEN, -1)   # good/fresh
-        curses.init_pair(2, curses.COLOR_RED, -1)     # fault/off
-        curses.init_pair(3, curses.COLOR_YELLOW, -1)  # stale
-        curses.init_pair(4, curses.COLOR_CYAN, -1)    # header
-        curses.init_pair(5, curses.COLOR_MAGENTA, -1) # group title
-
-        last_refresh = 0.0
-        period = 1.0 / max(1e-3, self.refresh_rate_hz)
-
-        while not self._stop_event.is_set():
-            now = time.time()
-            if now - last_refresh < period:
-                time.sleep(0.01)
-                continue
-            last_refresh = now
-
-            stdscr.erase()
-            max_y, max_x = stdscr.getmaxyx()
-            title = "AV.ONE – CAN→ROS2 Dashboard (q to quit)"
-            stdscr.addstr(0, 0, title[:max_x], curses.A_BOLD | curses.color_pair(4))
-
-            row, col = 2, 0
-            col_width = max_x // 2 if max_x >= 120 else max_x
-
-            for gtitle, group in self.groups.items():
-                # Move to next column if out of rows
-                if row >= max_y - 2:
-                    col += col_width
-                    row = 2
-                    if col >= max_x:
-                        break
-
-                header = f"[ {gtitle} ]"
-                stdscr.addstr(row, col, header[: max_x - col], curses.A_BOLD | curses.color_pair(5))
-                row += 1
-
-                for item in group.items.values():
-                    if row >= max_y - 1:
-                        break
-
-                    # Value text
-                    label = f"{item.name:>20}: "
-                    val_txt = item.as_text()
-                    base_text = label + val_txt
-
-                    # Freshness color
-                    age = now - item.last_update if item.last_update else 999
-                    stale = age > self.timeout_sec
-                    color = curses.color_pair(3) if stale else curses.color_pair(1)
-
-                    # Optional progress bar
-                    text = base_text
-                    if self.show_bars and not stale:
-                        pct = item.percentage()
-                        if pct is not None:
-                            # Compute bar space left on this line
-                            avail = max_x - col - len(base_text) - 1
-                            bar_w = min(max(10, self.bar_width), max(0, avail - 3))  # [####-----]
-                            if bar_w > 0:
-                                filled = int(round(pct * bar_w))
-                                empty = bar_w - filled
-                                bar = " [" + ("#" * filled) + ("-" * empty) + "]"
-                                text = base_text + bar
-
-                    # Clip to line width
-                    text = text[: max_x - col - 1]
-                    stdscr.addstr(row, col, text, color)
-                    row += 1
-
-                row += 1
-
-            stdscr.refresh()
-            stdscr.nodelay(True)
+        choices = w['choices']
+        if choices:
             try:
-                if stdscr.getch() in (ord("q"), ord("Q")):
-                    self._stop_event.set()
-                    break
+                lbl.setText(str(choices.get(int(val), int(val))))
+            except Exception:
+                lbl.setText(str(val))
+        else:
+            lbl.setText(f"{val:.2f}" if isinstance(val, float) else str(val))
+
+        if w['bar']:
+            try:
+                w['bar'].setValue(int(float(val)))
             except Exception:
                 pass
 
-    def destroy_node(self):
-        self._stop_event.set()
-        return super().destroy_node()
+        if self.enable_plots and w['data_buffer'] is not None:
+            try:
+                w['data_buffer'].append(float(val))
+            except Exception:
+                pass
+
+    # ---------- Plot Refresh ----------
+    def _refresh_plots(self):
+        if not self.enable_plots:
+            return
+        for w in self.signal_widgets.values():
+            if w['plot_curve'] and w['data_buffer']:
+                data = list(w['data_buffer'])
+                w['plot_curve'].setData(data)
+                if data:
+                    ymin, ymax = min(data), max(data)
+                    if ymin == ymax:
+                        ymin -= 0.5
+                        ymax += 0.5
+                    w['plot_widget'].setYRange(ymin, ymax)
+
+    # ---------- Dark Theme ----------
+    def _apply_dark_theme(self):
+        pg.setConfigOption('background', '#1e1e1e')
+        pg.setConfigOption('foreground', '#e0e0e0')
+        self.setStyleSheet("""
+            QMainWindow { background-color: #1e1e1e; }
+            QWidget { background-color: #1e1e1e; color: #e0e0e0; }
+            QGroupBox { border: 1px solid #3d3d3d; border-radius: 5px; padding: 8px; margin-top: 1ex; }
+            QLabel { color: #e0e0e0; }
+            QProgressBar { border: 1px solid #3d3d3d; background-color: #2d2d2d; }
+            QProgressBar::chunk { background-color: #2196F3; }
+            QTabBar::tab { background: #2d2d2d; color: #e0e0e0; padding: 10px; }
+            QTabBar::tab:selected { background: #2196F3; color: white; }
+        """)
 
 
+# ---------- Main ----------
 def main():
     rclpy.init()
-    node = AvoneDashboard()
+    dbc_path = '/home/avone/NUTEAMSGIT/NUCAN/DBC Files/AV1.dbc'
+    if not os.path.exists(dbc_path):
+        print("DBC file not found:", dbc_path)
+        sys.exit(1)
+
+    app = QApplication(sys.argv)
+    gui = DashboardGUI(enable_plots=True)
+
+    node = AVONEDashboard(gui.bridge, dbc_path)
+
+    # Build tabs BEFORE showing window to avoid any theme/layout quirks
+    gui.build_ui(node.signal_values)
+    gui.show()
+
+    ros_thread = threading.Thread(target=lambda: rclpy.spin(node), daemon=True)
+    ros_thread.start()
+
     try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+        sys.exit(app.exec_())
     finally:
         node.destroy_node()
         rclpy.shutdown()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
