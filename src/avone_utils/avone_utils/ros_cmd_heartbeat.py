@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
+from sensor_msgs.msg import JointState
 import can
 import time
 from threading import Thread, Event
@@ -10,17 +11,20 @@ from threading import Thread, Event
 # -----------------------------
 CAN_INTERFACE = "can0"
 
-# Incoming message IDs
+# Incoming message IDs (commands from ROS to actuators)
 STEER_CMD_ID = 0x009
 RMOTOR_CMD_ID = 0x00A
 LMOTOR_CMD_ID = 0x00B
 
-# Outgoing CAN ID for status message
-SENSOR_STATUS_ID = 0x100
+# Outgoing CAN IDs for heartbeats
+CMD_HEARTBEAT_ID = 0x100  # Commands active heartbeat
+ROS_HEARTBEAT_ID = 0x101  # ROS system alive heartbeat
+SYSTEM_HEARTBEAT_ID = 0x102  # NUC/Computer alive heartbeat (always on)
 
 # Timeout (seconds) after last command before setting status=0
 CMD_TIMEOUT = 1.0
-STATUS_RATE_HZ = 5.0  # send at 5 Hz
+HEARTBEAT_RATE_HZ = 2.0  # Toggle every 500ms (2 Hz)
+JOINT_STATES_TIMEOUT = 1.0  # Hardware interface alive timeout
 
 
 class CANStatusNode(Node):
@@ -38,16 +42,48 @@ class CANStatusNode(Node):
             LMOTOR_CMD_ID: 0.0,
         }
 
-        self.status = 0  # 0 = inactive, 1 = active
-        self.last_status = 0
+        # State tracking
+        self.commands_active = False
+        self.last_commands_active = False
+        self.cmd_heartbeat_state = 0
+        
+        self.hardware_interface_alive = False
+        self.last_joint_states_time = time.time()
+        self.ros_heartbeat_state = 0
+        
+        self.system_heartbeat_state = 0  # Always toggles if node is running
+        
         self.stop_event = Event()
+
+        # Subscribe to joint_states to monitor hardware interface health
+        self.joint_states_sub = self.create_subscription(
+            JointState,
+            '/joint_states',
+            self.joint_states_callback,
+            10
+        )
 
         # Threads
         self.listener_thread = Thread(target=self.listen_can, daemon=True)
         self.listener_thread.start()
 
-        self.status_thread = Thread(target=self.send_status, daemon=True)
-        self.status_thread.start()
+        self.heartbeat_thread = Thread(target=self.send_heartbeats, daemon=True)
+        self.heartbeat_thread.start()
+
+        self.get_logger().info("ROS Command Status Node ready")
+        self.get_logger().info(f"SYSTEM_HEARTBEAT: 0x{SYSTEM_HEARTBEAT_ID:03X} (always toggles - proves NUC is on)")
+        self.get_logger().info(f"ROS_HEARTBEAT: 0x{ROS_HEARTBEAT_ID:03X} (toggles when HW interface alive)")
+        self.get_logger().info(f"CMD_HEARTBEAT: 0x{CMD_HEARTBEAT_ID:03X} (toggles when commands active)")
+
+    # -----------------------------
+    # Joint states callback
+    # -----------------------------
+    def joint_states_callback(self, msg):
+        """Called when joint_states received from hardware interface"""
+        self.last_joint_states_time = time.time()
+        if not self.hardware_interface_alive:
+            self.get_logger().info('Hardware interface is alive')
+            self.hardware_interface_alive = True
 
     # -----------------------------
     # CAN listener
@@ -64,37 +100,78 @@ class CANStatusNode(Node):
                 self.get_logger().debug(f"Received cmd message: 0x{msg.arbitration_id:03X}")
 
     # -----------------------------
-    # Status sender + zero on drop
+    # Dual heartbeat sender + zero on drop
     # -----------------------------
-    def send_status(self):
-        rate = 1.0 / STATUS_RATE_HZ
+    def send_heartbeats(self):
+        rate = 1.0 / HEARTBEAT_RATE_HZ
         while rclpy.ok() and not self.stop_event.is_set():
             now = time.time()
+            
+            # Check command activity
             latest_update = max(self.last_update_time.values())
+            self.commands_active = (now - latest_update) < CMD_TIMEOUT
 
-            # Determine status
-            self.status = 1 if (now - latest_update) < CMD_TIMEOUT else 0
+            # Check hardware interface activity
+            time_since_joint_states = now - self.last_joint_states_time
+            hw_interface_active = time_since_joint_states < JOINT_STATES_TIMEOUT
+            
+            if hw_interface_active != self.hardware_interface_alive:
+                if not hw_interface_active:
+                    self.get_logger().error('Hardware interface stopped publishing!')
+                self.hardware_interface_alive = hw_interface_active
 
-            # Send CAN status message
+            # --- System Heartbeat (0x102) ---
+            # ALWAYS toggle - proves NUC/computer is powered and running
+            self.system_heartbeat_state = 1 - self.system_heartbeat_state
             try:
-                status_msg = can.Message(
-                    arbitration_id=SENSOR_STATUS_ID,
-                    data=[self.status],
+                sys_hb_msg = can.Message(
+                    arbitration_id=SYSTEM_HEARTBEAT_ID,
+                    data=[self.system_heartbeat_state],
                     is_extended_id=False
                 )
-                self.bus.send(status_msg)
-                self.get_logger().debug(f"Sent STATUS={self.status}")
+                self.bus.send(sys_hb_msg)
+                self.get_logger().debug(f"SYSTEM_HEARTBEAT={self.system_heartbeat_state}")
             except can.CanError:
-                self.get_logger().warn("CAN send failed (status)")
+                self.get_logger().warn("CAN send failed (SYSTEM heartbeat)")
 
-            # Detect falling edge: went from active → inactive
-            if self.last_status == 1 and self.status == 0:
+            # --- ROS System Heartbeat (0x101) ---
+            # Always toggle if hardware interface is alive
+            if self.hardware_interface_alive:
+                self.ros_heartbeat_state = 1 - self.ros_heartbeat_state
+                try:
+                    ros_hb_msg = can.Message(
+                        arbitration_id=ROS_HEARTBEAT_ID,
+                        data=[self.ros_heartbeat_state],
+                        is_extended_id=False
+                    )
+                    self.bus.send(ros_hb_msg)
+                    self.get_logger().debug(f"ROS_HEARTBEAT={self.ros_heartbeat_state}")
+                except can.CanError:
+                    self.get_logger().warn("CAN send failed (ROS heartbeat)")
+
+            # --- Command Heartbeat (0x100) ---
+            # Only toggle if commands are active
+            if self.commands_active:
+                self.cmd_heartbeat_state = 1 - self.cmd_heartbeat_state
+                try:
+                    cmd_hb_msg = can.Message(
+                        arbitration_id=CMD_HEARTBEAT_ID,
+                        data=[self.cmd_heartbeat_state],
+                        is_extended_id=False
+                    )
+                    self.bus.send(cmd_hb_msg)
+                    self.get_logger().debug(f"CMD_HEARTBEAT={self.cmd_heartbeat_state}")
+                except can.CanError:
+                    self.get_logger().warn("CAN send failed (CMD heartbeat)")
+
+            # --- Detect command dropout and send zeros ---
+            if self.last_commands_active and not self.commands_active:
                 self.get_logger().info("Command timeout detected → sending zero messages")
 
                 zero_msgs = [
                     can.Message(arbitration_id=RMOTOR_CMD_ID, data=[0x00, 0x00], is_extended_id=False),
                     can.Message(arbitration_id=LMOTOR_CMD_ID, data=[0x00, 0x00], is_extended_id=False),
-                    can.Message(arbitration_id=STEER_CMD_ID, data=[0x80], is_extended_id=False),  # 0 deg per DBC
+                    can.Message(arbitration_id=STEER_CMD_ID, data=[0x80], is_extended_id=False),  # 0 deg
                 ]
                 for msg in zero_msgs:
                     try:
@@ -103,9 +180,7 @@ class CANStatusNode(Node):
                     except can.CanError:
                         self.get_logger().warn(f"CAN send failed (zero {msg.arbitration_id:03X})")
 
-            # Update last status
-            self.last_status = self.status
-
+            self.last_commands_active = self.commands_active
             time.sleep(rate)
 
     # -----------------------------
