@@ -15,7 +15,7 @@ ekf_filter_node_odom:
     ]
 
     # IMU input for orientation
-    imu0: /imu
+    imu0: /imu/data
     imu0_config: [
       false, false, false,    # X, Y, Z positions
       false, false, true,     #  roll, pitch, yaw orientations
@@ -31,8 +31,8 @@ ekf_filter_node_odom:
     world_frame:    odom
 
     # make sure to publish the TF
-    publish_tf:     false
-    publish_odometry_frame: false
+    publish_tf:     true
+    publish_odometry_frame: true
     transform_tolerance: 0.2  # tolerate up to 0.5s of “old” transforms
 
 

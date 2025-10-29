@@ -21,13 +21,13 @@ class SensorHeartbeatNode(Node):
         super().__init__('sensor_heartbeat_node')
 
         # ----- parameters -----
-        self.can_interface   = self.declare_parameter('can_interface', 'vcan0').get_parameter_value().string_value
+        self.can_interface   = self.declare_parameter('can_interface', 'can0').get_parameter_value().string_value
         self.status_can_id   = self.declare_parameter('status_can_id', 0x120).get_parameter_value().integer_value
         self.period_ms       = self.declare_parameter('period_ms', 50).get_parameter_value().integer_value
 
         self.lidar_topic     = self.declare_parameter('lidar_topic', '/quanergy/points').get_parameter_value().string_value
         self.lidar_type      = self.declare_parameter('lidar_type', 'PointCloud2').get_parameter_value().string_value  # or LaserScan
-        self.imu_topic       = self.declare_parameter('imu_topic', '/imu').get_parameter_value().string_value
+        self.imu_topic       = self.declare_parameter('imu_topic', '/imu/data').get_parameter_value().string_value
         self.gps_topic       = self.declare_parameter('gps_topic', '/fix').get_parameter_value().string_value
 
         self.lidar_timeout   = self.declare_parameter('lidar_timeout_ms', 1000).get_parameter_value().integer_value

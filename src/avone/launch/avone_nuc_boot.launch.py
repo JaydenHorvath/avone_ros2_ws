@@ -35,6 +35,20 @@ def generate_launch_description():
         output='screen',
     )
 
+    nuc_hearbeats = Node(
+        package='avone_utils',  # adjust if different
+        executable='ros_cmd_heartbeat',
+        name='ros_cmd_heartbeat',
+        output='screen',
+    )
+        # === LED Matrix ===
+    sensor_timout = Node(
+        package='avone_utils',  # adjust if different
+        executable='sensor_timout',
+        name='sensor_timout',
+        output='screen',
+    )
+
 
     # === Launch sequence ===
     return LaunchDescription([
@@ -42,5 +56,11 @@ def generate_launch_description():
         dbc_can_bridge,
         LogInfo(msg='[AV.ONE] Launching LED matrix controller...'),
         drive_state_led,
-        LogInfo(msg='[AV.ONE] Launching Dashboard in Terminator (fullscreen)...'),
+        LogInfo(msg='[AV.ONE] Launching NUC Heartbeats...'),
+        nuc_hearbeats,
+        LogInfo(msg='[AV.ONE] Launching Sensor Timouts...'),
+        sensor_timout,
+
+        
+      
     ])
