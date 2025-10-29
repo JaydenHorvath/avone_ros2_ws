@@ -3,10 +3,10 @@
   <!-- 1) Define the world -->
   <world name="empty">
   
-   <physics name="dart_physics" type="dart">
-      <max_step_size>0.001</max_step_size>
-      <real_time_update_rate>100</real_time_update_rate>
-      <thread_count>20</thread_count>          <!-- match your CPU cores -->
+    <physics name="dart_physics" type="dart">
+      <max_step_size>0.002</max_step_size>
+      <real_time_update_rate>500</real_time_update_rate>
+      <thread_count>12</thread_count>     <!-- sweet spot for 14900HX -->
     </physics>
 
     <plugin
@@ -50,8 +50,8 @@
     <spherical_coordinates>
         <surface_model>EARTH_WGS84</surface_model>
         <world_frame_orientation>ENU</world_frame_orientation>
-        <latitude_deg>-22.986687</latitude_deg>
-        <longitude_deg>-43.202501</longitude_deg>
+        <latitude_deg>-33.805</latitude_deg>
+        <longitude_deg>150.8691389</longitude_deg>
         <elevation>0</elevation>
         <heading_deg>0</heading_deg>
     </spherical_coordinates>

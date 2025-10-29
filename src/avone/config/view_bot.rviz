@@ -1,59 +1,246 @@
 Panels:
   - Class: rviz_common/Displays
+    Help Height: 70
     Name: Displays
-    Help Height: 78
     Property Tree Widget:
       Expanded:
         - /Global Options1
         - /Status1
         - /TF1
         - /RobotModel1
+        - /AerialMap1
       Splitter Ratio: 0.5
- 
-
+    Tree Height: 822
 Visualization Manager:
-  Global Options:
-    Fixed Frame: map
-    Background Color: 192; 191; 188
-    Frame Rate: 30
+  Class: ""
   Displays:
-    - Name: Grid
-      Class: rviz_default_plugins/Grid
-      Enabled: true
+    - Alpha: 0.5
       Cell Size: 1
+      Class: rviz_default_plugins/Grid
+      Color: 36; 31; 49
+      Enabled: true
+      Line Style:
+        Line Width: 0.029999999329447746
+        Value: Lines
+      Name: Grid
+      Normal Cell Count: 0
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
       Plane: XY
       Plane Cell Count: 100
-      Normal Cell Count: 0
-      Color: 36; 31; 49
-      Line Style:
-        Value: Lines
-        Line Width: 0.03
       Reference Frame: map
-
-    - Name: TF
-      Class: rviz_default_plugins/TF
+      Value: true
+    - Class: rviz_default_plugins/TF
       Enabled: true
       Frame Timeout: 15
+      Frames:
+        All Enabled: true
+        base_footprint:
+          Value: true
+        base_link:
+          Value: true
+        camera_link:
+          Value: true
+        camera_link_optical:
+          Value: true
+        chassis:
+          Value: true
+        front_left_wheel:
+          Value: true
+        front_left_wheel_hub:
+          Value: true
+        front_right_wheel:
+          Value: true
+        front_right_wheel_hub:
+          Value: true
+        gps_antenna2_link:
+          Value: true
+        gps_link:
+          Value: true
+        imu_link:
+          Value: true
+        laser_frame:
+          Value: true
+        left_motor:
+          Value: true
+        map:
+          Value: true
+        odom:
+          Value: true
+        rgbdcamera_link:
+          Value: true
+        rgbdcamera_link_optical:
+          Value: true
+        right_motor:
+          Value: true
       Marker Scale: 1
+      Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
-      # <-- no hard-coded Tree: let RViz subscribe to /tf
-
-    - Name: RobotModel
+      Tree:
+        map:
+          odom:
+            base_link:
+              base_footprint:
+                {}
+              chassis:
+                camera_link:
+                  camera_link_optical:
+                    {}
+                front_left_wheel_hub:
+                  front_left_wheel:
+                    {}
+                front_right_wheel_hub:
+                  front_right_wheel:
+                    {}
+                gps_antenna2_link:
+                  {}
+                gps_link:
+                  {}
+                imu_link:
+                  {}
+                laser_frame:
+                  {}
+                left_motor:
+                  {}
+                rgbdcamera_link:
+                  rgbdcamera_link_optical:
+                    {}
+                right_motor:
+                  {}
+      Update Interval: 0
+      Value: true
+    - Alpha: 1
       Class: rviz_default_plugins/RobotModel
-      Enabled: true
+      Collision Enabled: false
+      Description File: ""
       Description Source: Topic
       Description Topic:
-        Value: /robot_description
-        History Policy: Keep Last
+        Depth: 5
         Durability Policy: Volatile
+        History Policy: Keep Last
         Reliability Policy: Reliable
-      Visual Enabled: true
-      Collision Enabled: false
+        Value: /robot_description
+      Enabled: true
+      Links:
+        All Links Enabled: true
+        Expand Joint Details: false
+        Expand Link Details: false
+        Expand Tree: false
+        Link Tree Style: Links in Alphabetic Order
+        base_footprint:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        camera_link_optical:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        chassis:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        front_left_wheel:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        front_left_wheel_hub:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        front_right_wheel:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        front_right_wheel_hub:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        gps_antenna2_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        gps_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        imu_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        laser_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        left_motor:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rgbdcamera_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        rgbdcamera_link_optical:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        right_motor:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+      Mass Properties:
+        Inertia: false
+        Mass: false
+      Name: RobotModel
       TF Prefix: ""
       Update Interval: 0
-
+      Value: true
+      Visual Enabled: true
+    - Alpha: 0.699999988079071
+      Blocks: 3
+      Class: rviz_satellite/AerialMap
+      Draw Behind: false
+      Enabled: true
+      Name: AerialMap
+      Object URI: https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}
+      TF tolerance: 0.10000000149011612
+      Timeout: 3
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /navsat1
+      Value: true
+      Zoom: 20
+  Enabled: true
+  Global Options:
+    Background Color: 192; 191; 188
+    Fixed Frame: map
+    Frame Rate: 30
+  Name: root
   Tools:
     - Class: rviz_default_plugins/Interact
       Hide Inactive Objects: true
@@ -63,40 +250,64 @@ Visualization Manager:
     - Class: rviz_default_plugins/Measure
       Line color: 128; 128; 0
     - Class: rviz_default_plugins/SetInitialPose
-      Topic: /initialpose
+      Covariance x: 0.25
+      Covariance y: 0.25
+      Covariance yaw: 0.06853891909122467
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /initialpose
     - Class: rviz_default_plugins/SetGoal
-      Topic: /goal_pose
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /goal_pose
     - Class: rviz_default_plugins/PublishPoint
       Single click: true
-      Topic: /clicked_point
-
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /clicked_point
+  Transformation:
+    Current:
+      Class: rviz_default_plugins/TF
+  Value: true
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Name: Current View
-      Target Frame: odom
-      Distance: 8.0
-      Yaw: 5.89
-      Pitch: 0.40
-      Focal Point: {X: 0, Y: 0, Z: 0}
-      Near Clip Distance: 0.01
-      Invert Z Axis: false
+      Distance: 33.44684982299805
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.05999999865889549
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
+      Focal Point:
+        X: 0.00924772024154663
+        Y: 0.38718482851982117
+        Z: 0.2876226007938385
       Focal Shape Fixed Size: true
-      Focal Shape Size: 0.05
-      Enable Stereo Rendering: false
-
+      Focal Shape Size: 0.05000000074505806
+      Invert Z Axis: false
+      Name: Current View
+      Near Clip Distance: 0.009999999776482582
+      Pitch: 0.49000027775764465
+      Target Frame: odom
+      Value: Orbit (rviz_default_plugins)
+      Yaw: 3.5249977111816406
+    Saved: ~
 Window Geometry:
-  X: 0
-  Y: 28
-  Width: 1920
-  Height: 997
-  Hide Left Dock: false
-  Hide Right Dock: false
-  Selection:
-    collapsed: false
   Displays:
     collapsed: false
-  Tool Properties:
-    collapsed: false
-  Views:
-    collapsed: false
+  Height: 1043
+  Hide Left Dock: false
+  Hide Right Dock: false
+  QMainWindow State: 000000ff00000000fd000000010000000000000156000003b9fc0200000001fb000000100044006900730070006c006100790073010000003d000003b9000000c900ffffff000005f0000003b900000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Width: 1868
+  X: 52
+  Y: 0

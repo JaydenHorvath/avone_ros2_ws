@@ -31,7 +31,7 @@ ekf_filter_node_odom:
     world_frame:    odom
 
     # make sure to publish the TF
-    publish_tf:     true
-    publish_odometry_frame: true
+    publish_tf:     false
+    publish_odometry_frame: false
     transform_tolerance: 0.5  # tolerate up to 0.5s of “old” transforms
 

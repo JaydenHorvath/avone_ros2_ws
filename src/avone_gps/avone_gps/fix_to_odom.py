@@ -84,8 +84,8 @@ class FixToOdomWithHeading(Node):
         self.z_plane: Optional[float] = None
 
         # Heading source selection
-        self.declare_parameter('heading_source', 'heading')
-        # Options:
+        self.declare_parameter('heading_source', 'position')
+         # Options:
         #   "heading"  = use /heading only
         #   "position" = derive from motion only (preferring /vel if available)
         #   "auto"     = use /heading if valid, else fallback to motion (prefers /vel)
@@ -98,8 +98,8 @@ class FixToOdomWithHeading(Node):
         # Velocity usage
         self.declare_parameter('use_vel', True)
         self.declare_parameter('vel_topic', '/vel')
-        self.declare_parameter('vel_is_ned', False)  # set True if GNSS outputs NED
-        self.declare_parameter('vel_heading_min_speed', 0.2)  # m/s threshold to trust /vel for yaw
+        self.declare_parameter('vel_is_ned', False)
+        self.declare_parameter('vel_heading_min_speed', 0.2)
 
         self.use_vel = bool(self.get_parameter('use_vel').value)
         self.vel_topic = str(self.get_parameter('vel_topic').value)
@@ -113,17 +113,17 @@ class FixToOdomWithHeading(Node):
         self.x0 = self.y0 = self.z0 = None
         self.z_locked_value: Optional[float] = None
 
-        self.latest_q: Optional[Quaternion] = None  # latest chosen orientation
+        self.latest_q: Optional[Quaternion] = None
         self.prev_e = None
         self.prev_n = None
-        self.prev_stamp: Optional[float] = None  # seconds
+        self.prev_stamp: Optional[float] = None
 
         # Latest velocities (ENU)
         self.have_vel = False
         self.vel_e = 0.0
         self.vel_n = 0.0
         self.vel_u = 0.0
-        self.vel_cov = [0.0] * 36  # Twist covariance
+        self.vel_cov = [0.0] * 36
 
         # IO
         if self.heading_source in ('heading', 'auto'):
@@ -146,53 +146,40 @@ class FixToOdomWithHeading(Node):
 
     # -------------------- Callbacks --------------------
     def on_heading(self, msg: QuaternionStamped):
-        """Handle heading quaternion with frame correction."""
         if is_nan_quaternion(msg.quaternion):
             self.get_logger().warn("Received NaN heading quaternion — ignoring /heading")
             return
 
         corrected_q = rotate_quaternion_z(msg.quaternion, self.yaw_offset_deg)
-        # Your original code inverted Z; keep it if you need that sensor correction:
         corrected_q.z *= -1.0
         self.latest_q = corrected_q
 
     def on_vel(self, msg: TwistWithCovarianceStamped):
-        """
-        Accept velocity in either ENU (preferred) or NED (configurable).
-        Store as ENU for odom.twist and heading-from-motion.
-        """
         vx = msg.twist.twist.linear.x
         vy = msg.twist.twist.linear.y
         vz = msg.twist.twist.linear.z
 
         if self.vel_is_ned:
-            # NED -> ENU : [E, N, U] = [vy, vx, -vz]
             e, n, u = vy, vx, -vz
         else:
-            # Assume already ENU aligned with world frame
             e, n, u = vx, vy, vz
 
         self.vel_e, self.vel_n, self.vel_u = e, n, u
         self.have_vel = True
 
-        # Copy covariance if provided (36 elements)
         cov_in = msg.twist.covariance
         if cov_in and len(cov_in) == 36:
             self.vel_cov = list(cov_in)
 
     def on_fix(self, msg: NavSatFix):
-        """Convert GPS fix to odometry and publish."""
-        # Ignore invalid fixes
         if msg.status.status < 0 or math.isnan(msg.latitude) or math.isnan(msg.longitude):
             return
 
-        # Convert LLA to ECEF
         lat_rad = math.radians(msg.latitude)
         lon_rad = math.radians(msg.longitude)
         alt = msg.altitude
         x, y, z = lla_to_ecef(lat_rad, lon_rad, alt)
 
-        # Set origin on first valid fix
         if not self.origin_set:
             self.lat0_rad = lat_rad
             self.lon0_rad = lon_rad
@@ -202,10 +189,8 @@ class FixToOdomWithHeading(Node):
                 f'Origin set at lat={msg.latitude:.8f}, lon={msg.longitude:.8f}, alt={alt:.2f}'
             )
 
-        # ECEF -> ENU
         e, n, u = ecef_to_enu(x, y, z, self.lat0_rad, self.lon0_rad, self.x0, self.y0, self.z0)
 
-        # Z-lock
         if self.z_mode == 'zero':
             z_locked = 0.0
         else:
@@ -214,62 +199,52 @@ class FixToOdomWithHeading(Node):
                 self.get_logger().info(f'Z plane set to {self.z_locked_value:.3f} m')
             z_locked = self.z_locked_value
 
-        # -------------- Heading selection --------------
+        # Heading source
         use_heading_topic = self.heading_source in ('heading', 'auto')
         use_motion_heading = self.heading_source in ('position', 'auto')
 
         heading_valid = self.latest_q is not None and not is_nan_quaternion(self.latest_q)
-
-        # Prefer velocity-based yaw if allowed and speed above threshold
         used_vel_for_heading = False
+
         if use_motion_heading and (not use_heading_topic or not heading_valid):
             if self.have_vel:
                 speed = math.hypot(self.vel_e, self.vel_n)
                 if speed >= self.vel_heading_min_speed:
-                    yaw_rad = math.atan2(self.vel_n, self.vel_e)  # ENU: yaw = atan2(N, E)
+                    yaw_rad = math.atan2(self.vel_n, self.vel_e)
                     self.latest_q = yaw_to_quaternion(yaw_rad)
                     used_vel_for_heading = True
-                    # self.get_logger().debug(f"Yaw from /vel: {math.degrees(yaw_rad):.2f}°")
 
-            # If no reliable /vel heading, fall back to position differencing
             if not used_vel_for_heading:
                 if self.prev_e is not None and self.prev_n is not None:
                     de = e - self.prev_e
                     dn = n - self.prev_n
-                    # Use timestamp delta to guard against tiny steps if you like; direction only here.
                     if abs(de) > 1e-3 or abs(dn) > 1e-3:
-                        yaw_rad = math.atan2(dn, de)  # ENU: yaw = atan2(N, E)
+                        yaw_rad = math.atan2(dn, de)
                         self.latest_q = yaw_to_quaternion(yaw_rad)
-                        # self.get_logger().debug(f"Yaw from position diff: {math.degrees(yaw_rad):.2f}°")
 
-        # -------------- Velocity for odom.twist --------------
-        # Prefer /vel; else compute from position differencing with dt
+        # Velocity estimation
         twist_e = twist_n = twist_u = 0.0
         twist_cov = [0.0] * 36
 
-        # Compute dt (sec) from consecutive /fix stamps
         curr_time = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         dt = None
         if self.prev_stamp is not None:
-            dt = max(1e-6, curr_time - self.prev_stamp)  # avoid division by zero
+            dt = max(1e-6, curr_time - self.prev_stamp)
 
         if self.have_vel:
             twist_e, twist_n, twist_u = self.vel_e, self.vel_n, self.vel_u
-            twist_cov = self.vel_cov[:]  # use GNSS-provided covariance if available
+            twist_cov = self.vel_cov[:]
         elif dt is not None and self.prev_e is not None and self.prev_n is not None:
-            # Differentiate ENU position to approximate velocity
             twist_e = (e - self.prev_e) / dt
             twist_n = (n - self.prev_n) / dt
-            twist_u = 0.0  # u locked; leave vertical vel at 0
-            # Set a simple covariance: bigger than pose, smaller than unknown
-            twist_cov[0] = twist_cov[7] = 0.5  # var on x_dot & y_dot
-            twist_cov[14] = 1e3               # unknown z_dot variance
+            twist_u = 0.0
+            twist_cov[0] = twist_cov[7] = 0.5
+            twist_cov[14] = 1e3
         else:
-            # No velocity info yet: leave zeros with high covariance
             twist_cov[0] = twist_cov[7] = 1e3
             twist_cov[14] = 1e6
 
-        # -------------- Publish Odom --------------
+        # ---------------- Publish Odom ----------------
         odom = Odometry()
         odom.header = Header()
         odom.header.stamp = msg.header.stamp
@@ -285,18 +260,28 @@ class FixToOdomWithHeading(Node):
         else:
             odom.pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
 
-        # Pose covariance from GNSS if available
         cov = [0.0] * 36
         if msg.position_covariance_type in (1, 2, 3) and len(msg.position_covariance) == 9:
             cov_xy = msg.position_covariance[0]
             cov[0] = cov_xy
             cov[7] = cov_xy
-        cov[14] = 0.01  # z locked
+        cov[14] = 0.01
         odom.pose.covariance = cov
 
-        # Fill twist (ENU velocities)
-        odom.twist.twist.linear.x = twist_e
-        odom.twist.twist.linear.y = twist_n
+        # Rotate ENU vel → body frame
+        if self.latest_q is not None and not is_nan_quaternion(self.latest_q):
+            q = self.latest_q
+            siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
+            cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+            yaw = math.atan2(siny_cosp, cosy_cosp)
+        else:
+            yaw = 0.0
+
+        v_fwd =  math.cos(yaw) * twist_e + math.sin(yaw) * twist_n
+        v_lat = -math.sin(yaw) * twist_e + math.cos(yaw) * twist_n
+
+        odom.twist.twist.linear.x = v_fwd
+        odom.twist.twist.linear.y = v_lat
         odom.twist.twist.linear.z = twist_u
         odom.twist.covariance = twist_cov
 

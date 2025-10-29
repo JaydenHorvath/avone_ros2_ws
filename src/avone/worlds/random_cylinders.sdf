@@ -29,12 +29,12 @@
       </link>
     </model>
 
-
     <physics name="dart_physics" type="dart">
-      <max_step_size>0.001</max_step_size>
-      <real_time_update_rate>100</real_time_update_rate>
-      <thread_count>20</thread_count>          <!-- match your CPU cores -->
+      <max_step_size>0.002</max_step_size>
+      <real_time_update_rate>500</real_time_update_rate>
+      <thread_count>12</thread_count>     <!-- sweet spot for 14900HX -->
     </physics>
+
 
     <plugin
       filename="gz-sim-scene-broadcaster-system"
@@ -77,14 +77,15 @@
     <spherical_coordinates>
         <surface_model>EARTH_WGS84</surface_model>
         <world_frame_orientation>ENU</world_frame_orientation>
-        <latitude_deg>-22.986687</latitude_deg>
-        <longitude_deg>-43.202501</longitude_deg>
+        <latitude_deg>-33.805</latitude_deg>
+        <longitude_deg>150.8691389</longitude_deg>
         <elevation>0</elevation>
         <heading_deg>0</heading_deg>
     </spherical_coordinates>
 
 
-    <!-- Surrounding Walls -->
+
+    <!-- Surrounding Walls
     <model name='wall_north'>
       <pose>0 30 1 0 0 0</pose>
       <link name='link'>
@@ -116,7 +117,7 @@
         <visual name='visual'><geometry><box><size>0.5 60 2.0</size></box></geometry></visual>
       </link>
       <static>true</static>
-    </model>
+    </model> -->
 
     <!-- Larger Cylinders -->
     <!-- radius=1.0, length=2.5, total 25 -->

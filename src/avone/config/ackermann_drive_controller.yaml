@@ -1,6 +1,7 @@
 controller_manager:
   ros__parameters:
     update_rate: 50  # Hz
+    use_sim_time: true        # ← add this
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
