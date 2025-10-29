@@ -44,8 +44,8 @@ def generate_launch_description():
         # === LED Matrix ===
     sensor_timout = Node(
         package='avone_utils',  # adjust if different
-        executable='sensor_timout',
-        name='sensor_timout',
+        executable='sensor_timeout',
+        name='sensor_timeout',
         output='screen',
     )
 

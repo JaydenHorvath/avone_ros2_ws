@@ -20,7 +20,7 @@ ekf_filter_node_odom:
       false, false, false,    # X, Y, Z positions
       false, false, true,     #  roll, pitch, yaw orientations
       false, false, false,    #  X, Y, Z linear velocities
-      false, false, true,     #  roll, pitch, yaw angular velocities
+      true, true, true,     #  roll, pitch, yaw angular velocities
       false, false, false     #  X, Y, Z linear accelerations
     ]
     imu0_remove_gravitational_acceleration: true
