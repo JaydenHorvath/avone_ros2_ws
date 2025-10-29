@@ -17,6 +17,7 @@ ros2 run nmea_navsat_driver nmea_serial_driver   --ros-args -p port:=/dev/ttyUSB
 ros2 run rviz2 rviz2 --ros-args -p use_sim_time:=true
 
 ros2 run tf2_ros static_transform_publisher --ros-args -p use_sim_time:=true -- -0.475 -0.175 0 3.14159 0 0 gps_link quanergy
+ros2 run tf2_ros static_transform_publisher --ros-args -p use_sim_time:=true -- 0.0 0.0 0 0.0 0 0 base_link gps_link
 
 ros2 run cone_mapper groundremoval --ros-args -p use_sim_time:=true
 ros2 run cone_mapper clustering_cone --ros-args -p use_sim_time:=true
@@ -49,4 +50,4 @@ ros2 launch avone_localisation sim_navsat_transform.launch.py use_sim_time:=true
 
 
 # RVIZ SATALITE
-URI = https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}
+URI = https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}

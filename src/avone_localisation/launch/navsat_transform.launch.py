@@ -19,7 +19,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             'use_sim_time',
-            default_value='false',
+            default_value='true',
             description='Use simulation (Gazebo) clock'
         ),
         # for testing with rosbag
@@ -37,7 +37,7 @@ def generate_launch_description():
                 
         #     ]
         # ),
-        Node(
+          Node(
             package='robot_localization',
             executable='navsat_transform_node',
             name='navsat_transform_node',
@@ -45,8 +45,9 @@ def generate_launch_description():
             parameters=[config_file, {'use_sim_time': use_sim_time}],
             remappings=[
                 ('gps/fix', '/fix'),
-                ('imu', '/imu_gps'),   
-                ('odometry/filtered', '/odometry/local'),
+                ('imu', '/imu/data_raw'),   
+                ('odometry/filtered', '/ackermann_steering_controller/odometry'),
+                # ('odometry/filtered', '/odometry/local'),
                 ('odometry/gps', '/odometry/gps'),
                 
             ]

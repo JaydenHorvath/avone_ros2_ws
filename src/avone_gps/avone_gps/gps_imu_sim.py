@@ -100,7 +100,7 @@ class GazeboLikeOdom(Node):
     def publish_imu(self, stamp):
         msg = Imu()
         msg.header.stamp = stamp
-        msg.header.frame_id = 'imu_link'
+        msg.header.frame_id = 'base_link'
 
         # Orientation = flat, level
         msg.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)

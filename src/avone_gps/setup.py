@@ -19,11 +19,15 @@ setup(
     entry_points={
         'console_scripts': [
             'fix_to_odom = avone_gps.fix_to_odom:main',
-            'heading_to_imu = avone_gps.heading_to_imu:main',
-            'imu_start = avone_gps.imu_start:main',
+            'odom_gps_fix = avone_gps.odom_gps_fix:main',
+            'gps_serial_replay = avone_gps.gps_serial_replay:main',
             'gps_topics_vis = avone_gps.gps_topics_vis:main',
             'vel_cov_repub= avone_gps.vel_cov_repub:main',
             'gps_imu_sim = avone_gps.gps_imu_sim:main',
+            'imu_to_vel = avone_gps.imu_to_vel:main',
+            'imu_heading = avone_gps.imu_heading:main',
+            'test_imu_tf = avone_gps.test_imu_tf:main',
+            'gps_logger = avone_gps.gps_logger:main',
         ],
     },
 )

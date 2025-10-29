@@ -24,7 +24,7 @@ class ConeSelector(Node):
         # Default sizes/colors for newly added cones
         self.declare_parameter('new_cone_radius', 0.20)   # cylinder radius ~ cone footprint
         self.declare_parameter('new_cone_height', 0.50)
-        self.declare_parameter('new_cone_color_rgba', [1.0, 0.5, 0.0, 0.9])  # orange-ish
+        self.declare_parameter('new_cone_color_rgba', [0.5, 0.5, 0.5, 0.5])  # orange-ish
 
         self.new_cone_radius = float(self.get_parameter('new_cone_radius').value)
         self.new_cone_height = float(self.get_parameter('new_cone_height').value)

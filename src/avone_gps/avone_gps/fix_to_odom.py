@@ -74,7 +74,7 @@ class FixToOdomWithHeading(Node):
 
         # Frames
         self.declare_parameter('world_frame', 'odom')
-        self.declare_parameter('base_frame', 'base_link')
+        self.declare_parameter('base_frame', 'gps')
         self.world_frame = self.get_parameter('world_frame').value
         self.base_frame = self.get_parameter('base_frame').value
 

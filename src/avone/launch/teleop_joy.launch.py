@@ -53,10 +53,10 @@ def generate_launch_description():
             }],
             # remappings=[('/cmd_vel', '/cmd_vel_raw')]
         ),
-        Node(
-            package='avone_utils',
-            executable='cmd_vel_filter',
-            name='cmd_vel_filter',
-            output='screen'
-        )
+        # Node(
+        #     package='avone_utils',
+        #     executable='cmd_vel_filter',
+        #     name='cmd_vel_filter',
+        #     output='screen'
+        # )
     ])

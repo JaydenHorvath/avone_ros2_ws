@@ -106,7 +106,7 @@ class HeadingVelVisualizer(Node):
             return
 
         marker = Marker()
-        marker.header.frame_id = "base_link"
+        marker.header.frame_id = "gps_link"
         marker.header.stamp = self.get_clock().now().to_msg()
         marker.ns = "velocity_arrow"
         marker.id = 0

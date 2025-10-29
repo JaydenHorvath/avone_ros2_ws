@@ -1,39 +1,36 @@
-# This is an empty file, so that git commits the folder correctlyekf_filter_node:
 ekf_filter_node_odom:
   ros__parameters:
     use_sim_time: true
-    frequency:  50.0
+    frequency: 50.0
     two_d_mode: true
-    # Wheel odom input
-    # odom0: /ackermann_steering_controller/odometry
+    
     odom0: /odometry/sim
     odom0_config: [
-      true, true, false,    # X, Y, Z positions
-      false, false, false,    #  roll, pitch, yaw orientations
-      true,  true,  false,    #  X, Y, Z linear velocities
-      false, false, true,     #  roll, pitch, yaw angular velocities
-      false, false, false     #  X, Y, Z linear accelerations
+      true, true, false,  # ← Don't fuse position (use velocity only)
+      false, false, false,
+      true,  true,  false,  # X, Y velocities
+      false, false, false,   # yaw rate
+      false, false, false
     ]
-
-    # IMU input for orientation
+    odom0_differential: false
+    odom0_relative: false
+    
     imu0: /imu/sim
     imu0_config: [
-      false, false, false,    # X, Y, Z positions
-      false, false, true,     #  roll, pitch, yaw orientations
-      false, false, false,    #  X, Y, Z linear velocities
-      false, false, true,     #  roll, pitch, yaw angular velocities
-      false, false, false     #  X, Y, Z linear accelerations
+      false, false, false,
+      false, false, false,  # ← Remove yaw orientation
+      false, false, false,
+      false, false, true,   # yaw rate only
+      true,  true,  false   # linear accelerations
     ]
     imu0_remove_gravitational_acceleration: true
-
-  # frames
-    odom_frame:     odom
+    imu0_differential: false
+    imu0_relative: false
+    
+    odom_frame: odom
     base_link_frame: base_link
-    world_frame:    odom
-
-    # make sure to publish the TF
-    publish_tf:     false
-    publish_odometry_frame: false
-    transform_tolerance: 0.2  # tolerate up to 0.5s of “old” transforms
-
-
+    world_frame: odom
+    publish_tf: true
+    publish_odometry_frame: true
+    transform_timeout: 0.2
+    transform_time_offset: 0.0

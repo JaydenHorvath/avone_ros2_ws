@@ -48,9 +48,9 @@ hardware_interface::CallbackReturn AvoneSystemHardware::on_init(
     read_timeout_ms_ = p.count("read_timeout_ms") ? std::stoi(p.at("read_timeout_ms")) : 20;
 
     l_motor_can_id_ = p.count("l_motor_can_id") ?
-      std::stoul(p.at("l_motor_can_id"), nullptr, 0) : 0x8CF11E05;
+      std::stoul(p.at("l_motor_can_id"), nullptr, 0) : 0x0CF11E05;
     r_motor_can_id_ = p.count("r_motor_can_id") ?
-      std::stoul(p.at("r_motor_can_id"), nullptr, 0) : 0x8CF11E06;
+      std::stoul(p.at("r_motor_can_id"), nullptr, 0) : 0x0CF11E06;
     steer_can_id_   = p.count("steer_can_id") ?
       std::stoul(p.at("steer_can_id"),   nullptr, 0) : 0x006;
 

@@ -54,7 +54,8 @@ def generate_launch_description():
             parameters=[
                 {'use_sim_time': use_sim_time},
                 # tune as needed:
-                {'frequency': 30.0, 'publish_filtered_gps': True}
+                # {'frequency': 30.0, 'publish_filtered_gps': True}
+                '/home/jay/ros2_ws/src/avone/config/navsat_transform.yaml',  # Load the full yaml
             ],
             # remappings=[
             #     ('gps/fix',            '/navsat1'),
@@ -72,7 +73,7 @@ def generate_launch_description():
                 ('odometry/gps', '/odometry/gps'),
 
                 # Heading quaternion from your Hemisphere VS110
-                ('imu/data', '/heading'),
+                ('imu/data', '/imu'),
             ]
 
 

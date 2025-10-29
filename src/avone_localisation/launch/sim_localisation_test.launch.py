@@ -91,6 +91,6 @@ def generate_launch_description():
         vel_cov_repub_node,
         heading_to_imu_node,
         local_ekf_launch,
-        global_ekf_launch,
+        # global_ekf_launch,
         navsat_launch,
     ])

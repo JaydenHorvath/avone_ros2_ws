@@ -27,7 +27,7 @@ ros2 run avone_gps heading_to_imu
 
 ros2 run avone_nav nav2_cancel 
 
-
+rosbag record -a -O name.bag
 # IMU
 
 

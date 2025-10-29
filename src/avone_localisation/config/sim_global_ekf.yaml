@@ -8,58 +8,38 @@ ekf_filter_node_map:
     transform_timeout: 0.2
     print_diagnostics: true
     debug: false
-
    
     odom_frame: odom
     base_link_frame: base_link
-    world_frame: odom
-
-    publish_tf:     true
-    publish_odometry_frame: true
-
-    # odom0: /odometry/local
-    # odom0_config: [false, false, false,
-    #           false, false, false,
-    #           true,  true,  true,
-    #           false, false, true,
-    #           false, false, false]
-    # odom0_queue_size: 10
-    # odom0_differential: false
-    # odom0_relative: false
-
+    world_frame: map              # ← MUST be map for global EKF
+    publish_tf: true
+    
     odom1: /odometry/gps_new
-    odom1_config: [true,  true,  false,
-                false, false, false,
-                true, true, false,
-                false, false, false,
-                false, false, false]
+    odom1_config: [true,  true,  false,    # X, Y position
+                   false, false, false,
+                   false, false, false,     # Don't fuse velocity here
+                   false, false, false,
+                   false, false, false]
     odom1_queue_size: 10
-    odom1_differential: true
+    odom1_differential: false      # ← Must be false for absolute GPS
     odom1_relative: false
-
+    
     imu0: /imu_gps
-    imu0_config: [false, false, false,    # X, Y, Z positions
-                false, false, true,     #  roll, pitch, yaw orientations
-                false, false, false,    #  X, Y, Z linear velocities
-                false, false, true,     #  roll, pitch, yaw angular velocities
-                false, false, false   ]   #  X, Y, Z linear accelerations
-   
+    imu0_config: [false, false, false,
+                  false, false, false,     # ← Remove yaw orientation
+                  false, false, false,
+                  false, false, true,      # Only yaw rate
+                  true,  true,  false]     # Add accelerations
     imu0_differential: false
     imu0_relative: false
     imu0_queue_size: 10
     imu0_remove_gravitational_acceleration: true
-
-
-
-    twist0: /vel_cov  # Use TwistStamped directly - no converter needed!
-    twist0_config: [
-      false, false, false, # positions
-      false, false, false, # orientation
-      true, true, false,   # x, y, z linear velocities (enable x, y)
-      false, false, false,  # roll, pitch, yaw angular velocities (enable yaw)
-      false, false, false
-    ]
+    
+    twist0: /vel_cov
+    twist0_config: [false, false, false,
+                    false, false, false,
+                    true,  true,  false,   # X, Y velocities
+                    false, false, false,
+                    false, false, false]
     twist0_queue_size: 10
-    twist0_differential: false  # Set to true if this is relative motion, false for absolute velocity
-
-
+    twist0_differential: false

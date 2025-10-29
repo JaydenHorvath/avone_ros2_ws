@@ -45,7 +45,7 @@ class GroundRemover(Node):
         self.declare_parameter('output_topic', '/points_no_ground')
 
         # Base filters
-        self.declare_parameter('z_min', -0.3)         # base z threshold at r=0 (m)
+        self.declare_parameter('z_min', -0.4)         # base z threshold at r=0 (m)
         self.declare_parameter('r_min', 0.0)           # inner radius (m)
         self.declare_parameter('r_max', 10.0)          # outer radius (m)
         self.declare_parameter('approx_layout', True)  # x/y/z at offsets 0/4/8
