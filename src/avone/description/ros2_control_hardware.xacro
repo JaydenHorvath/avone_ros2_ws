@@ -8,7 +8,7 @@
       <!-- Your existing params -->
       <param name="max_steer_angle">0.610865</param>
       <param name="min_steer_angle">-0.610865</param>
-      <param name="max_rpm">350</param>
+      <param name="max_rpm">300</param>
       <param name="can_interface">can0</param>
       <param name="can_baudrate">250000</param>
       <param name="read_timeout_ms">20</param>

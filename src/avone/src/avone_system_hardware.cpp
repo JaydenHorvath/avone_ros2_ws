@@ -52,7 +52,7 @@ hardware_interface::CallbackReturn AvoneSystemHardware::on_init(
     r_motor_can_id_ = p.count("r_motor_can_id") ?
       std::stoul(p.at("r_motor_can_id"), nullptr, 0) : 0x0CF11E06;
     steer_can_id_   = p.count("steer_can_id") ?
-      std::stoul(p.at("steer_can_id"),   nullptr, 0) : 0x006;
+      std::stoul(p.at("steer_can_id"),   nullptr, 0) : 0x0D;
 
     cmd_l_motor_can_id_ = p.count("cmd_l_motor_can_id") ?
       std::stoul(p.at("cmd_l_motor_can_id"), nullptr, 0) : 0x0B;
@@ -174,63 +174,115 @@ hardware_interface::CallbackReturn AvoneSystemHardware::on_deactivate(const rclc
 }
 
 hardware_interface::return_type AvoneSystemHardware::read(
-  const rclcpp::Time & /*time*/, const rclcpp::Duration & period)
+  const rclcpp::Time &, const rclcpp::Duration & period)
 {
+  const double dt = period.seconds();
   const rclcpp::Time now = rclcpp::Clock(RCL_SYSTEM_TIME).now();
-  last_read_time_ = now;
 
-  double dt = period.seconds();
+  static float last_rlmotor_velocity = 0.0f;
+  static float last_rrmotor_velocity = 0.0f;
+  static float last_steer_angle_rad  = 0.0f;
+  static rclcpp::Time last_steer_time = now;
 
+  // ---------------------------------------------------------------------
+  // SIM MODE SHORT-CIRCUIT
+  // ---------------------------------------------------------------------
   if (sim_mode_) {
     rlmotor_velocity_ = rlmotor_cmd_;
     rrmotor_velocity_ = rrmotor_cmd_;
     rlmotor_position_ += rlmotor_velocity_ * dt;
     rrmotor_position_ += rrmotor_velocity_ * dt;
-    lsteer_position_ = lsteer_cmd_;
-    rsteer_position_ = rsteer_cmd_;
+    lsteer_position_   = lsteer_cmd_;
+    rsteer_position_   = rsteer_cmd_;
     return hardware_interface::return_type::OK;
   }
 
-  // --- Read available CAN frames ---
-  static float last_rlmotor_velocity = 0.0f;
-  static float last_rrmotor_velocity = 0.0f;
-  static float last_steer_angle_rad  = 0.0f;
+  bool got_steer = false;
 
-  for (int i = 0; i < 10; ++i) {
+  // ---------------------------------------------------------------------
+  // READ CAN FRAMES
+  // ---------------------------------------------------------------------
+  for (int i = 0; i < 20; ++i) {
     uint32_t can_id = 0;
     std::vector<uint8_t> data;
-    bool got_msg = can_iface_->read_frame(can_id, data);
-    if (!got_msg) break;
+    if (!can_iface_->read_frame(can_id, data))
+      break;
+    // if (can_id == steer_can_id_ || can_id == 0x00D) {
+    //   RCLCPP_INFO(rclcpp::get_logger("AvoneSystemHardware"),
+    //               "STEER RX id=0x%03X data[0]=0x%02X (%3d)",
+    //               can_id, data.size() ? data[0] : 0, data.size() ? data[0] : 0);
+    // }
 
+    // General debug print of all frames
+    RCLCPP_DEBUG(rclcpp::get_logger("AvoneSystemHardware"),
+      "CAN RX: id=0x%03X  len=%zu  data=%s",
+      can_id, data.size(),
+      [&](){
+        std::ostringstream oss;
+        for (auto b : data)
+          oss << std::hex << std::uppercase << std::setw(2)
+              << std::setfill('0') << (int)b << " ";
+        return oss.str();
+      }().c_str()
+    );
+
+    // --- LEFT MOTOR SPEED ---
     if (can_id == l_motor_can_id_ && data.size() >= 2) {
       int16_t raw = static_cast<int16_t>((data[1] << 8) | data[0]);
       float rpm = static_cast<float>(raw);
       last_rlmotor_velocity = (rpm * 2.0f * M_PI) / 60.0f;
     }
+
+    // --- RIGHT MOTOR SPEED ---
     else if (can_id == r_motor_can_id_ && data.size() >= 2) {
       int16_t raw = static_cast<int16_t>((data[1] << 8) | data[0]);
       float rpm = static_cast<float>(raw);
       last_rrmotor_velocity = (rpm * 2.0f * M_PI) / 60.0f;
     }
+
+    // --- STEERING ANGLE (ID 0x00D) ---
     else if (can_id == steer_can_id_ && data.size() >= 1) {
-      uint8_t raw_angle = data[0];
-      float angle_deg = raw_angle * 0.7f - 90.0f;
-      angle_deg = -angle_deg; // invert if needed
-      last_steer_angle_rad = angle_deg * (M_PI / 180.0f);
+      uint8_t raw = data[0];                           // 0-255 range
+      float angle_deg = (128 - static_cast<int>(raw)) * 1.0f;  // invert direction
+      float angle_rad = angle_deg * static_cast<float>(M_PI / 180.0f);
+
+      last_steer_angle_rad = angle_rad;
+      last_steer_time = now;
+      got_steer = true;
+
+      RCLCPP_DEBUG(rclcpp::get_logger("AvoneSystemHardware"),
+        "[STEER] raw=0x%02X (%3d) → %.2f° (%.3f rad)",
+        raw, raw, angle_deg, angle_rad);
     }
   }
 
-  // Integrate once per read
+  // ---------------------------------------------------------------------
+  // FALLBACK IF NO NEW STEERING FRAME
+  // ---------------------------------------------------------------------
+  if (!got_steer && (now - last_steer_time).seconds() > 0.25) {
+    // open-loop fallback to commanded steer
+    last_steer_angle_rad = 0.5f * static_cast<float>(lsteer_cmd_ + rsteer_cmd_);
+  }
+
+  // ---------------------------------------------------------------------
+  // INTEGRATE WHEEL POSITIONS
+  // ---------------------------------------------------------------------
   rlmotor_position_ += last_rlmotor_velocity * dt;
   rrmotor_position_ += last_rrmotor_velocity * dt;
 
+  // Update state variables
   rlmotor_velocity_ = last_rlmotor_velocity;
   rrmotor_velocity_ = last_rrmotor_velocity;
   lsteer_position_  = last_steer_angle_rad;
   rsteer_position_  = last_steer_angle_rad;
 
+  RCLCPP_DEBUG(rclcpp::get_logger("AvoneSystemHardware"),
+    "[STATE] LSteer=%.3f rad, RSteer=%.3f rad, RLMotor=%.2f rad/s, RRMotor=%.2f rad/s",
+    lsteer_position_, rsteer_position_, rlmotor_velocity_, rrmotor_velocity_);
+
   return hardware_interface::return_type::OK;
 }
+
 
 hardware_interface::return_type AvoneSystemHardware::write(
   const rclcpp::Time& /*time*/, const rclcpp::Duration& /*period*/)

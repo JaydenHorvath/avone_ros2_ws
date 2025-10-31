@@ -16,13 +16,13 @@
 ##############################
 bt_navigator:
   ros__parameters:
-    use_sim_time: true                     # Use sim time (Gazebo or rosbag)
+    use_sim_time: false                     # Use sim time (Gazebo or rosbag)
     default_nav_to_pose_bt_xml: $(find-pkg-share avone_nav)/behaviour_trees/avone_bt.xml
     global_frame: map                      # Frame of goals
     robot_base_frame: base_link            # Robot’s main reference frame
     # odom_topic: /ackermann_steering_controller/odometry
 
-    odom_topic: /odometry/global           # Velocity source for BT
+    odom_topic: /ackermann_steering_controller/odometry
     bt_loop_duration: 10                   # Tick rate of behavior tree (Hz^-1)
 
     # Single navigator plugin (no NavThroughPoses)
@@ -45,7 +45,7 @@ controller_server:
     failure_tolerance: 0.3                 # Allowable deviation before abort
     progress_checker_plugins: ["progress_checker"]
     goal_checker_plugins: ["general_goal_checker"]
-    current_goal_checker: general_goal_checker    
+    current_goal_checker: "general_goal_checker"   # <-- required!  
     controller_plugins: ["FollowPath"]
 
     # --- Progress Checker ---
@@ -71,11 +71,12 @@ controller_server:
       ########################################
       desired_linear_vel: 2.0        # was 2.0
       max_speed: 2.0                 # hard cap so Nav2 never "thinks" faster than we want
-      min_speed: 0.05                # let it creep instead of stalling and oscillating
+      min_speed: 0.5                # let it creep instead of stalling and oscillating
       acceleration_limit: 0.4        # was 0.5
       deceleration_limit: 0.8        # keep braking strong so you can stop if you overshoot
       allow_reversing: False         # keep forward-only for now (simpler testing)
 
+      use_rotate_to_heading: false           # Disable in-place rotationss
       ########################################
       # approach / goal behavior
       ########################################
@@ -105,7 +106,7 @@ controller_server:
       ########################################
       # heading behavior
       ########################################
-      rotate_to_heading_angular_vel: 0.2   # was 0.1 - slightly faster yaw alignment on startup / sharp changes
+      rotate_to_heading_angular_vel: 0.0   # was 0.1 - slightly faster yaw alignment on startup / sharp changes
 
       ########################################
       # kinematic "output contract" to downstream
@@ -249,7 +250,7 @@ planner_server:
       downsample_costmap: false
       allow_unknown: true
       motion_model_for_search: "DUBIN"     # For Ackermann steering
-      minimum_turning_radius: 4.0          # Wheelbase / tan(max_steer_angle)
+      minimum_turning_radius: 6.0          # Wheelbase / tan(max_steer_angle)
       angle_quantization_bins: 72
       analytic_expansion_ratio: 0.0
       analytic_expansion_max_length: 0.0
@@ -302,22 +303,22 @@ velocity_smoother:
     # ---------------------------
     # velocity clamps [vx, vy, ω]
     # ---------------------------
-    max_velocity: [2.0, 0.0, 0.3]    # match max_speed (1.0 m/s) and max_vel_theta (0.15 rad/s)
-    min_velocity: [0.0, 0.0, -0.3]  # allow gentle reverse if you ever do reversing later;
+    max_velocity: [2.0, 0.0, 0.25]    # match max_speed (1.0 m/s) and max_vel_theta (0.15 rad/s)
+    min_velocity: [0.0, 0.0, -0.25]  # allow gentle reverse if you ever do reversing later;
                                       # can leave negative vx unused for now, it's just a floor
 
     # ---------------------------------
     # accel/decel shaping [vx, vy, ωdot]
     # ---------------------------------
-    max_accel: [0.3, 0.0, 0.2]        # vx accel matches controller accel_limit (0.3 m/s²)
+    max_accel: [0.3, 0.0, 0.1]        # vx accel matches controller accel_limit (0.3 m/s²)
                                       # angular accel 0.1 rad/s² matches max_angular_accel vibe
-    max_decel: [-0.8, 0.0, -0.2]      # braking in x: same 0.8 m/s² you gave controller
+    max_decel: [-0.8, 0.0, -0.1]      # braking in x: same 0.8 m/s² you gave controller
                                       # braking in ω: mirror 0.1 so yaw changes are still damped
 
     # ---------------------------
     # odom feedback / timeout
     # ---------------------------
-    odom_topic: /odometry/global
+    odom_topic: /ackermann_steering_controller/odometry
     odom_duration: 0.1                # 100 ms window for "am I moving like I think I am"
     velocity_timeout: 0.1             # was 0.05 → relax this so a tiny comm hiccup
                                       # doesn’t instantly zero your command and cause a steering snap
@@ -325,7 +326,7 @@ velocity_smoother:
     # ---------------------------
     # deadband
     # ---------------------------
-    deadband_velocity: [0.05, 0.0, 0.0]
+    deadband_velocity: [0.1, 0.0, 0.0]
     # before: 0.02
     # why higher: anything below ~0.05 m/s on these hub motors is usually just cogging noise.
     # This stops the smoother from chasing tiny oscillatory corrections near standstill.
