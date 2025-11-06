@@ -28,11 +28,13 @@ import pyqtgraph as pg
 # 🧭 MANUAL CLASSIFICATION MAP
 # =====================================================
 CLASS_MAP = {
-    'Drive': ['DRIVE_STATE', 'THROTTLE', 'BRAKE', 'RPM', 'GEAR'],
+    'Drive': ['THROTTLE', 'BRK', 'RPM', 'GEAR','ROS', 'CMD'],
     'Faults': ['FAULT', 'ERROR', 'TIMEOUT', 'ERR'],
     'Sensors': [ 'IMU', 'GPS'],
     'Motors': ['MOTOR', 'CURR', 'VOLT'],
-    'System': [ 'STATE', 'HEARTBEAT', 'HB'],
+    'System': ['HEARTBEAT','MODE', 'ARMED',  'STATE', 'HEARTBEAT', 'HB'],
+    'SLAB': [ 'MSGID', 'DCDC', 'CHARGER'],
+
 }
 # Any message not matching a keyword above goes into “Misc”
 
