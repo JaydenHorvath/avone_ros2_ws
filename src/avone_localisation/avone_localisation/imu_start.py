@@ -1,191 +1,279 @@
 #!/usr/bin/env python3
 """
-ROS2 Node for reading VectorNav IMU data from serial port (VNYMR format)
-Orientation convention: X forward, Y right, Z down
+VN-100T IMU ROS2 Driver
+Reads $VNYMR NMEA sentences and publishes sensor_msgs/Imu
+
+IMU Body Frame: X-forward, Y-right, Z-down (FRD)
+ROS2 Standard Frame: X-forward, Y-left, Z-up (FLU)
 """
 
+import math
+import serial
+import numpy as np
+import sys
+import os
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Imu
-from geometry_msgs.msg import TransformStamped
-from tf2_ros import TransformBroadcaster
-import serial
-import math
+
+# Force unbuffered output
+os.environ["PYTHONUNBUFFERED"] = "1"
+sys.stdout.reconfigure(line_buffering=True)
 
 
-class IMUSerialNode(Node):
+def compass_to_cardinal(compass_deg):
+    """Convert compass bearing (0°=North, 90°=East) to cardinal direction."""
+    dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
+    ix = int((compass_deg + 22.5) // 45) % 8
+    return dirs[ix]
+
+
+def euler_to_quaternion(roll, pitch, yaw):
+    """
+    Convert Euler angles (roll, pitch, yaw) to quaternion.
+    Assumes ZYX rotation order (yaw -> pitch -> roll).
+    
+    Args:
+        roll: Rotation around X-axis (radians)
+        pitch: Rotation around Y-axis (radians)
+        yaw: Rotation around Z-axis (radians)
+    
+    Returns:
+        (qx, qy, qz, qw): Quaternion components
+    """
+    cy = math.cos(yaw * 0.5)
+    sy = math.sin(yaw * 0.5)
+    cp = math.cos(pitch * 0.5)
+    sp = math.sin(pitch * 0.5)
+    cr = math.cos(roll * 0.5)
+    sr = math.sin(roll * 0.5)
+    
+    qw = cr * cp * cy + sr * sp * sy
+    qx = sr * cp * cy - cr * sp * sy
+    qy = cr * sp * cy + sr * cp * sy
+    qz = cr * cp * sy - sr * sp * cy
+    
+    return qx, qy, qz, qw
+
+
+class VN100TNode(Node):
     def __init__(self):
-        super().__init__('imu_serial_node')
+        super().__init__('vn100t_imu_node')
         
         # Declare parameters
         self.declare_parameter('serial_port', '/dev/ttyUSB0')
         self.declare_parameter('baud_rate', 115200)
-        self.declare_parameter('frame_id', 'vn100_imu_link')
-        self.declare_parameter('parent_frame', 'imu_link')
+        self.declare_parameter('frame_id', 'imu_link')
         self.declare_parameter('publish_rate', 50.0)
-        self.declare_parameter('publish_tf', False)  # NEW PARAM: enable/disable TF broadcast
+        self.declare_parameter('show_compass', False)
+        
+        # Covariance parameters (adjustable based on your IMU specs and testing)
+        # VN-100T typical specifications:
+        # - Heading accuracy: ~2° RMS (with mag calibration)
+        # - Pitch/Roll accuracy: ~0.5° RMS
+        # - Gyro noise: ~0.0035 rad/s (0.2 deg/s)
+        # - Accel noise: ~0.04 m/s²
+        
+        self.declare_parameter('orientation_covariance_roll', 0.0001)   # (0.5° = 0.0087 rad)² ≈ 0.0001
+        self.declare_parameter('orientation_covariance_pitch', 0.0001)  # (0.5° = 0.0087 rad)² ≈ 0.0001
+        self.declare_parameter('orientation_covariance_yaw', 0.001)     # (2° = 0.035 rad)² ≈ 0.001
+        
+        self.declare_parameter('angular_velocity_covariance', 0.00001)  # (0.0035 rad/s)² ≈ 0.00001
+        self.declare_parameter('linear_acceleration_covariance', 0.0016) # (0.04 m/s²)² = 0.0016
         
         # Get parameters
-        serial_port = self.get_parameter('serial_port').value
-        baud_rate = self.get_parameter('baud_rate').value
+        port = self.get_parameter('serial_port').value
+        baud = self.get_parameter('baud_rate').value
         self.frame_id = self.get_parameter('frame_id').value
-        self.parent_frame = self.get_parameter('parent_frame').value
-        publish_rate = self.get_parameter('publish_rate').value
-        self.publish_tf = self.get_parameter('publish_tf').value
+        self.rate = float(self.get_parameter('publish_rate').value)
+        self.show_compass = bool(self.get_parameter('show_compass').value)
         
-        # Initialize serial connection
+        # Get covariance parameters
+        cov_roll = self.get_parameter('orientation_covariance_roll').value
+        cov_pitch = self.get_parameter('orientation_covariance_pitch').value
+        cov_yaw = self.get_parameter('orientation_covariance_yaw').value
+        cov_gyro = self.get_parameter('angular_velocity_covariance').value
+        cov_accel = self.get_parameter('linear_acceleration_covariance').value
+        
+        # Build covariance matrices (row-major 3x3)
+        # Format: [xx, xy, xz, yx, yy, yz, zx, zy, zz]
+        self.orientation_covariance = [
+            cov_roll, 0.0, 0.0,
+            0.0, cov_pitch, 0.0,
+            0.0, 0.0, cov_yaw
+        ]
+        
+        self.angular_velocity_covariance = [
+            cov_gyro, 0.0, 0.0,
+            0.0, cov_gyro, 0.0,
+            0.0, 0.0, cov_gyro
+        ]
+        
+        self.linear_acceleration_covariance = [
+            cov_accel, 0.0, 0.0,
+            0.0, cov_accel, 0.0,
+            0.0, 0.0, cov_accel
+        ]
+        
+        # Open serial port
         try:
-            self.serial_conn = serial.Serial(
-                port=serial_port,
-                baudrate=baud_rate,
-                timeout=1.0
+            self.ser = serial.Serial(
+                port=port,
+                baudrate=baud,
+                timeout=1.0,
+                bytesize=serial.EIGHTBITS,
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE
             )
-            self.get_logger().info(f'Connected to serial port: {serial_port}')
+            self.get_logger().info(f'✅ VN-100T connected on {port} @ {baud} baud')
         except serial.SerialException as e:
-            self.get_logger().error(f'Failed to open serial port: {e}')
-            self.serial_conn = None
+            self.get_logger().error(f'❌ Failed to open {port}: {e}')
+            self.ser = None
         
         # Create publisher
         self.imu_pub = self.create_publisher(Imu, 'imu/data', 10)
         
-        # TF broadcaster (only if enabled)
-        self.tf_broadcaster = TransformBroadcaster(self) if self.publish_tf else None
+        # Create timer
+        self.timer = self.create_timer(1.0 / self.rate, self.timer_callback)
         
-        # Create timer for reading serial data
-        timer_period = 1.0 / publish_rate
-        self.timer = self.create_timer(timer_period, self.timer_callback)
+        # Coordinate frame transformations
+        # VN-100T outputs data in NED frame (North-East-Down)
+        # IMU body frame: X-forward, Y-right, Z-down (FRD - aligned with NED when pointing North)
+        # ROS2 REP-103 standard: X-forward, Y-left, Z-up (FLU)
         
-        self.get_logger().info('IMU Serial Node initialized')
-        self.get_logger().info(f'Publishing on topic: imu/data')
-        self.get_logger().info(f'Frame ID: {self.frame_id}, Parent: {self.parent_frame}')
-        self.get_logger().info(f'Broadcast TF: {self.publish_tf}')
-        self.get_logger().info('Expecting VectorNav VNYMR format')
-    
-    def parse_vnymr(self, line):
-        """Parse VectorNav VNYMR NMEA sentence."""
-        try:
-            line = line.strip()
-            if not line.startswith('$VNYMR'):
-                return None
-            
-            parts = line.split('*')
-            if len(parts) != 2:
-                return None
-            
-            data_parts = parts[0].split(',')
-            if len(data_parts) != 13:
-                self.get_logger().warn(f'VNYMR: Expected 13 fields, got {len(data_parts)}')
-                return None
-            
-            yaw = float(data_parts[1])
-            pitch = float(data_parts[2])
-            roll = float(data_parts[3])
-            accel_x = -float(data_parts[7])
-            accel_y = -float(data_parts[8])
-            accel_z = -float(data_parts[9])
-            gyro_x = float(data_parts[10])
-            gyro_y = float(data_parts[11])
-            gyro_z = float(data_parts[12])
-            
-            yaw_rad = math.radians(yaw)
-            pitch_rad = math.radians(pitch)
-            roll_rad = math.radians(roll)
-            
-            qx, qy, qz, qw = self.euler_to_quaternion(roll_rad, pitch_rad, yaw_rad)
-            
-            return {
-                'orientation': (qx, qy, qz, qw),
-                'angular_velocity': (gyro_x, gyro_y, gyro_z),
-                'linear_acceleration': (accel_x, accel_y, accel_z),
-                'yaw': yaw,
-                'pitch': pitch,
-                'roll': roll
-            }
-        except (ValueError, IndexError) as e:
-            self.get_logger().warn(f'Failed to parse VNYMR data: {e}')
-            return None
-    
-    def euler_to_quaternion(self, roll, pitch, yaw):
-        """Convert Euler angles to quaternion."""
-        cy, sy = math.cos(yaw * 0.5), math.sin(yaw * 0.5)
-        cp, sp = math.cos(pitch * 0.5), math.sin(pitch * 0.5)
-        cr, sr = math.cos(roll * 0.5), math.sin(roll * 0.5)
+        # Transformation: FRD -> FLU
+        # X_flu = X_frd (forward stays forward)
+        # Y_flu = -Y_frd (right becomes left)
+        # Z_flu = -Z_frd (down becomes up)
+        self.R_frd_to_flu = np.array([
+            [ 1.,  0.,  0.],
+            [ 0., -1.,  0.],
+            [ 0.,  0., -1.]
+        ])
         
-        qw = cr * cp * cy + sr * sp * sy
-        qx = sr * cp * cy - cr * sp * sy
-        qy = cr * sp * cy + sr * cp * sy
-        qz = cr * cp * sy - sr * sp * cy
-        return qx, qy, qz, qw
-    
+        self.get_logger().info('VN-100T IMU driver initialized')
+        self.get_logger().info('Body frame: X=forward, Y=right, Z=down')
+        self.get_logger().info('Publishing in ROS2 standard: X=forward, Y=left, Z=up')
+        self.get_logger().info(f'Orientation covariance: roll={cov_roll:.6f}, pitch={cov_pitch:.6f}, yaw={cov_yaw:.6f}')
+        self.get_logger().info(f'Angular velocity covariance: {cov_gyro:.6f}')
+        self.get_logger().info(f'Linear acceleration covariance: {cov_accel:.6f}')
+
     def timer_callback(self):
-        """Read serial data and publish IMU message"""
-        if not self.serial_conn or not self.serial_conn.is_open:
+        """Main callback to read and publish IMU data."""
+        if not self.ser or not self.ser.is_open:
             return
         
         try:
-            if self.serial_conn.in_waiting > 0:
-                line = self.serial_conn.readline().decode('utf-8', errors='ignore')
-                data = self.parse_vnymr(line)
+            # Read available data
+            if self.ser.in_waiting > 0:
+                line = self.ser.readline().decode('utf-8', errors='ignore').strip()
                 
-                if not data:
+                # Parse $VNYMR sentence
+                if not line.startswith('$VNYMR'):
                     return
-
-                imu_msg = Imu()
-                imu_msg.header.stamp = self.get_clock().now().to_msg()
-                imu_msg.header.frame_id = self.frame_id
-                imu_msg.orientation.x, imu_msg.orientation.y, imu_msg.orientation.z, imu_msg.orientation.w = data['orientation']
-                imu_msg.angular_velocity.x, imu_msg.angular_velocity.y, imu_msg.angular_velocity.z = data['angular_velocity']
-                imu_msg.linear_acceleration.x, imu_msg.linear_acceleration.y, imu_msg.linear_acceleration.z = data['linear_acceleration']
-                imu_msg.orientation_covariance[0] = -1.0
-                imu_msg.angular_velocity_covariance[0] = -1.0
-                imu_msg.linear_acceleration_covariance[0] = -1.0
                 
-                self.imu_pub.publish(imu_msg)
-
-                if self.publish_tf:
-                    self.broadcast_transform(data['orientation'])
+                # Split and validate
+                parts = line.split('*')[0].split(',')
+                if len(parts) < 13:
+                    self.get_logger().warn(f'Incomplete VNYMR sentence: {len(parts)} fields')
+                    return
+                
+                # Parse VN-100T data
+                # Format: $VNYMR,yaw,pitch,roll,magX,magY,magZ,accelX,accelY,accelZ,gyroX,gyroY,gyroZ*checksum
+                yaw_deg = float(parts[1])      # Compass heading: 0°=North, 90°=East, 180°=South, 270°=West
+                pitch_deg = float(parts[2])    # Pitch (nose up/down)
+                roll_deg = float(parts[3])     # Roll (right wing down/up)
+                
+                # Linear acceleration in body frame (m/s²)
+                ax_body = float(parts[7])
+                ay_body = float(parts[8])
+                az_body = float(parts[9])
+                
+                # Angular velocity in body frame (rad/s)
+                gx_body = float(parts[10])
+                gy_body = float(parts[11])
+                gz_body = float(parts[12])
+                
+                # Convert compass heading to ROS2 convention
+                # VN-100T: 0° = North (Y-axis in NED), increasing clockwise
+                # ROS2: Yaw around Z-up, 0° = X-axis (forward), increasing counter-clockwise
+                # When IMU points North: yaw should be +90° (pointing along +Y in ENU/FLU)
+                yaw_ros = math.radians(90.0 - yaw_deg)  # Convert to ROS convention
+                pitch_ros = math.radians(-pitch_deg)     # Flip pitch for FLU frame
+                roll_ros = math.radians(-roll_deg)       # Flip roll for FLU frame
+                
+                # Convert to quaternion
+                qx, qy, qz, qw = euler_to_quaternion(roll_ros, pitch_ros, yaw_ros)
+                
+                # Transform acceleration from FRD to FLU
+                accel_frd = np.array([ax_body, ay_body, az_body])
+                accel_flu = self.R_frd_to_flu @ accel_frd
+                
+                # Transform angular velocity from FRD to FLU
+                gyro_frd = np.array([gx_body, gy_body, gz_body])
+                gyro_flu = self.R_frd_to_flu @ gyro_frd
+                
+                # Create and publish IMU message
+                msg = Imu()
+                msg.header.stamp = self.get_clock().now().to_msg()
+                msg.header.frame_id = self.frame_id
+                
+                # Orientation (quaternion)
+                msg.orientation.x = qx
+                msg.orientation.y = qy
+                msg.orientation.z = qz
+                msg.orientation.w = qw
+                
+                # Angular velocity (rad/s)
+                msg.angular_velocity.x = gyro_flu[0]
+                msg.angular_velocity.y = gyro_flu[1]
+                msg.angular_velocity.z = gyro_flu[2]
+                
+                # Linear acceleration (m/s²)
+                msg.linear_acceleration.x = accel_flu[0]
+                msg.linear_acceleration.y = accel_flu[1]
+                msg.linear_acceleration.z = accel_flu[2]
+                
+                # Set covariances
+                msg.orientation_covariance = self.orientation_covariance
+                msg.angular_velocity_covariance = self.angular_velocity_covariance
+                msg.linear_acceleration_covariance = self.linear_acceleration_covariance
+                
+                self.imu_pub.publish(msg)
+                
+                # Display compass heading
+                if self.show_compass:
+                    compass_bearing = yaw_deg
+                    direction = compass_to_cardinal(compass_bearing)
+                    yaw_ros_deg = math.degrees(yaw_ros)
+                    yaw_ros_deg = (yaw_ros_deg + 360.0) % 360.0
                     
+                    print(f"\033[96m🧭 Compass: {compass_bearing:6.2f}° ({direction:2s}) | "
+                          f"ROS2 Yaw: {yaw_ros_deg:6.2f}° | "
+                          f"Pitch: {pitch_deg:5.1f}° | Roll: {roll_deg:5.1f}°\033[0m", 
+                          flush=True)
+        
+        except ValueError as e:
+            self.get_logger().warn(f'Failed to parse IMU data: {e}')
         except Exception as e:
-            self.get_logger().error(f'Error reading serial data: {e}')
-    
-    def broadcast_transform(self, orientation):
-        """Broadcast TF transform for RViz visualization"""
-        if not self.tf_broadcaster:
-            return
-        
-        t = TransformStamped()
-        t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = self.parent_frame
-        t.child_frame_id = self.frame_id
-        t.transform.translation.x = 0.0
-        t.transform.translation.y = 0.0
-        t.transform.translation.z = 0.0
-        
-        qx, qy, qz, qw = orientation
-        # 180° rotation around X-axis
-        q_rx, q_rw = math.sin(math.pi / 2.0), math.cos(math.pi / 2.0)
-        q_ry = q_rz = 0.0
-        
-        rotated_qx = q_rw * qx + q_rx * qw + q_ry * qz - q_rz * qy
-        rotated_qy = q_rw * qy - q_rx * qz + q_ry * qw + q_rz * qx
-        rotated_qz = q_rw * qz + q_rx * qy - q_ry * qx + q_rz * qw
-        rotated_qw = q_rw * qw - q_rx * qx - q_ry * qy - q_rz * qz
-        
-        t.transform.rotation.x = rotated_qx
-        t.transform.rotation.y = rotated_qy
-        t.transform.rotation.z = rotated_qz
-        t.transform.rotation.w = rotated_qw
+            self.get_logger().error(f'IMU read error: {e}')
 
-        self.tf_broadcaster.sendTransform(t)
+    def destroy_node(self):
+        """Clean up serial port on shutdown."""
+        if self.ser and self.ser.is_open:
+            self.ser.close()
+            self.get_logger().info('Serial port closed')
+        super().destroy_node()
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = IMUSerialNode()
+    node = VN100TNode()
+    
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        pass
+        print('\n👋 Shutting down VN-100T driver...')
     finally:
         node.destroy_node()
         rclpy.shutdown()
