@@ -159,8 +159,8 @@ class CmdVelToAckermannRampHardCutoff(Node):
         super().__init__('cmd_vel_to_ackermann_ramp_hard')
 
         # --- Parameters ---
-        self.linear_threshold = 0.9      # [m/s] must exceed before steering allowed
-        self.angular_ramp_rate = 0.1      # [rad/s²] ramp rate toward target
+        self.linear_threshold = 1.0     # [m/s] must exceed before steering allowed
+        self.angular_ramp_rate = 0.2     # [rad/s²] ramp rate toward target
         self.update_hz = 50.0              # control loop frequency [Hz]
 
         # --- State ---

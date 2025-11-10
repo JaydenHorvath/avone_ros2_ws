@@ -45,9 +45,9 @@ def generate_launch_description():
             parameters=[config_file, {'use_sim_time': use_sim_time}],
             remappings=[
                 ('gps/fix', '/fix'),
-                ('imu', '/imu/data_raw'),   
-                ('odometry/filtered', '/ackermann_steering_controller/odometry'),
-                # ('odometry/filtered', '/odometry/local'),
+                ('imu', '/imu/data'),   
+                # ('odometry/filtered', '/ackermann_steering_controller/odometry'),
+                ('odometry/filtered', '/odometry/local'),
                 ('odometry/gps', '/odometry/gps'),
                 
             ]

@@ -82,7 +82,7 @@ class HeadingVelVisualizer(Node):
         # Publish fake IMU
         imu_msg = Imu()
         imu_msg.header.stamp = msg.header.stamp
-        imu_msg.header.frame_id = "gps_link"
+        imu_msg.header.frame_id = "gps_link1"
         qx, qy, qz, qw = yaw_to_quaternion(yaw)
         imu_msg.orientation.x = qx
         imu_msg.orientation.y = qy

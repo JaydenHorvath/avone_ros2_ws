@@ -7,10 +7,10 @@
   <xacro:include filename="robot_core.xacro"/>
 
   <!-- FOR SIMULATION -->
-  <xacro:include filename="ros2_control.xacro"/>
+  <!-- <xacro:include filename="ros2_control.xacro"/> -->
 
   <!-- FOR REAL HARDWARE -->
-  <!-- <xacro:include filename="ros2_control_hardware.xacro"/> -->
+  <xacro:include filename="ros2_control_hardware.xacro"/>
 
 
   <!-- 5) Sensors, cameras, lidar, etc. -->

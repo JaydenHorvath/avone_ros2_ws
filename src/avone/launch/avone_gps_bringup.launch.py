@@ -9,9 +9,9 @@ def generate_launch_description():
             name='gps_driver',
             output='screen',
             parameters=[
-                {'port': '/dev/ttyUSB0'},
+                {'port': '/dev/ttyUSB1'},
                 {'baud': 115200},
-                {'frame_id': 'gps_link'}
+                {'frame_id': 'gps_link1'}
             ],
         ),
         Node(

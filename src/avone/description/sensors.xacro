@@ -20,13 +20,13 @@
   </gazebo>
 
   <!-- FRONT GPS ANTENNA -->
-  <joint name="gps_joint" type="fixed">
+  <joint name="gps_joint1" type="fixed">
         <parent link="chassis"/>
-        <child link="gps_link"/>
-          <origin xyz="0.0312 0 0.3924" rpy="0 0 0"/>
+        <child link="gps_link1"/>
+          <origin xyz="-0.1188 0 0.3924" rpy="0 0 0"/>
     </joint>
 
-  <link name="gps_link">
+  <link name="gps_link1">
     <visual>
       <geometry>
         <cylinder radius="0.0625" length="0.085"/>
@@ -40,9 +40,9 @@
     </collision>
   </link>
 
-  <gazebo reference="gps_link">
+  <gazebo reference="gps_link1">
     <sensor name="navsat1" type="navsat">
-    <gz_frame_id>gps_link</gz_frame_id>
+    <gz_frame_id>gps_link1</gz_frame_id>
       <always_on>1</always_on>
       <update_rate>50</update_rate>
       <topic>navsat1</topic>
@@ -56,13 +56,13 @@
   </gazebo>
 
 
-<joint name="gps_antenna2_joint" type="fixed">
+<joint name="gps_joint2" type="fixed">
         <parent link="chassis"/>
-        <child link="gps_antenna2_link"/>
+        <child link="gps_link2"/>
           <origin xyz="2.131 0 0.3924" rpy="0 0 0"/>
     </joint> 
 
-  <link name="gps_antenna2_link">
+  <link name="gps_link2">
    <visual>
       <geometry>
         <cylinder radius="0.0625" length="0.085"/>
@@ -76,9 +76,9 @@
     </collision>
   </link>
 
-  <gazebo reference="gps_antenna2_link">
+  <gazebo reference="gps_link2">
     <sensor name="navsat2" type="navsat">
-    <gz_frame_id>gps_antenna2_link</gz_frame_id>
+    <gz_frame_id>gps_link2</gz_frame_id>
       <always_on>1</always_on>
       <update_rate>50</update_rate>
       <topic>navsat2</topic>
