@@ -89,7 +89,7 @@ controller_server:
       ########################################
       use_velocity_scaled_lookahead: true
       lookahead_time: 5.0             # was 2.5 → aim closer, turn earlier
-      lookahead_dist: 6.0           # nominal lookahead at moderate speed
+      lookahead_dist: 4.0           # nominal lookahead at moderate speed
       min_lookahead_dist: 2.5         # was 1.5 → lets you actually hug tighter turns at low speed
       max_lookahead_dist: 6.0       # was 6.0 → avoid "aiming way down track"
       # net effect: earlier steering, less path overshoot, less oscillation
@@ -128,11 +128,11 @@ local_costmap:
   local_costmap:
     ros__parameters:
       footprint: "[
-        [-0.17, -0.944],
-        [ 2.845, -0.944],
-        [ 2.845,  0.944],
-        [-0.17,  0.944]
-      ]"                                   # Vehicle footprint (m)
+        [-0.17, -0.744],
+        [ 2.445, -0.744],
+        [ 2.445,  0.744],
+        [-0.17,  0.744]
+      ]"                            # Vehicle footprint (m)
       update_frequency: 10.0
       publish_frequency: 2.0
       global_frame: odom
@@ -155,8 +155,8 @@ local_costmap:
         z_voxels: 16
         max_obstacle_height: 3.2
         mark_threshold: 1
-        unknown_threshold: 3
-        combination_method: 0
+        unknown_threshold: 2147483647
+        combination_method: 1
         obstacle_max_range: 50.0
         raytrace_max_range: 50.0
         voxel_decay: 1.0           # 100% decay per cycle
@@ -200,6 +200,7 @@ global_costmap:
         [ 2.445,  0.744],
         [-0.17,  0.744]
       ]"
+
       update_frequency: 1.0
       publish_frequency: 1.0
       global_frame: map
@@ -261,13 +262,24 @@ planner_server:
       downsample_costmap: false
       allow_unknown: true
       motion_model_for_search: "DUBIN"     # For Ackermann steering
-      minimum_turning_radius: 6.0          # Wheelbase / tan(max_steer_angle)
+      minimum_turning_radius: 3.0          # Wheelbase / tan(max_steer_angle)
       angle_quantization_bins: 72
-      analytic_expansion_ratio: 50.0
-      analytic_expansion_max_length: 3.0
+      analytic_expansion_ratio: 0.0
+      analytic_expansion_max_length: 0.0
       smooth_path: true
-      goal_heading_mode: ALL_DIRECTION
-      cost_penalty: 8.0
+      goal_heading_mode: DEFAULT
+      # cost_penalty: 10.0
+
+      cost_penalty: 3.0              # start around 2.5–3.0
+      change_penalty: 0.1            # penalty for switching left/right
+      non_straight_penalty: 1.2      # slight preference for straight
+      reverse_penalty: 2.0           # only matters if you use Reeds-Shepp
+      retrospective_penalty: 0.015
+      lookup_table_size: 20.0
+      cache_obstacle_heuristic: false
+      use_quadratic_cost_penalty: false   # see next section
+      downsample_obstacle_heuristic: true
+      allow_primitive_interpolation: false
 
 
 ##############################
