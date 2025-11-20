@@ -133,7 +133,7 @@ local_costmap:
         [ 2.845,  0.944],
         [-0.17,  0.944]
       ]"                                   # Vehicle footprint (m)
-      update_frequency: 5.0
+      update_frequency: 10.0
       publish_frequency: 2.0
       global_frame: odom
       robot_base_frame: base_link
@@ -141,7 +141,7 @@ local_costmap:
       width: 30
       height: 30
       resolution: 0.05
-      robot_radius: 1.0
+      robot_radius: 1.5
 
       plugins: ["voxel_layer", "inflation_layer"]
 
@@ -155,13 +155,20 @@ local_costmap:
         z_voxels: 16
         max_obstacle_height: 3.2
         mark_threshold: 1
-        unknown_threshold: 2147483647
-        combination_method: 1
+        unknown_threshold: 3
+        combination_method: 0
         obstacle_max_range: 50.0
         raytrace_max_range: 50.0
+        voxel_decay: 1.0           # 100% decay per cycle
+        clearing: true
+        inf_is_valid: true
+        decay_model: 1             # Exponential decay
         observation_sources: pointcloud
+        
         pointcloud:
-          topic: /lidar/points
+          # topic: /lidar/points
+          topic: /quanergy/points
+          # topic: /nav2_points
           data_type: PointCloud2
           marking: true
           clearing: true
@@ -169,11 +176,13 @@ local_costmap:
           max_obstacle_height: 3.2
           obstacle_max_range: 50.0
           raytrace_max_range: 50.0
+          observation_persistence: 0.0
+
 
       # --- Inflation Layer ---
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 2.0
+        inflation_radius: 3.0
         cost_scaling_factor: 5.0
 
 
@@ -195,7 +204,7 @@ global_costmap:
       publish_frequency: 1.0
       global_frame: map
       robot_base_frame: base_link
-      robot_radius: 1.0
+      robot_radius: 1.5
       resolution: 0.1
       rolling_window: true                 # Rolling costmap for large-scale GPS nav
       width: 150
@@ -219,7 +228,9 @@ global_costmap:
         raytrace_max_range: 50.0
         observation_sources: pointcloud
         pointcloud:
-          topic: /lidar/points
+          # topic: /lidar/points
+          topic: /quanergy/points
+          # topic: /nav2_points
           data_type: PointCloud2
           marking: true
           clearing: true
@@ -230,7 +241,7 @@ global_costmap:
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 2.0
+        inflation_radius: 3.0
         cost_scaling_factor: 5.0
 
 
@@ -252,10 +263,11 @@ planner_server:
       motion_model_for_search: "DUBIN"     # For Ackermann steering
       minimum_turning_radius: 6.0          # Wheelbase / tan(max_steer_angle)
       angle_quantization_bins: 72
-      analytic_expansion_ratio: 0.0
-      analytic_expansion_max_length: 0.0
+      analytic_expansion_ratio: 50.0
+      analytic_expansion_max_length: 3.0
       smooth_path: true
       goal_heading_mode: ALL_DIRECTION
+      cost_penalty: 8.0
 
 
 ##############################
