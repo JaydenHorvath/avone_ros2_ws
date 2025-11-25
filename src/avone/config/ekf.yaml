@@ -1,37 +1,35 @@
-# This is an empty file, so that git commits the folder correctlyekf_filter_node:
 ekf_filter_node_odom:
   ros__parameters:
     use_sim_time: true
-    frequency:  50.0
+    frequency: 50.0
     two_d_mode: true
-    # Wheel odom input
-    odom0: /ackermann_steering_controller/odometry
-    odom0_config: [
-      false, false, false,    # X, Y, Z positions
-      false, false, false,    #  roll, pitch, yaw orientations
-      true,  true,  false,    #  X, Y, Z linear velocities
-      false, false, true,     #  roll, pitch, yaw angular velocities
-      false, false, false     #  X, Y, Z linear accelerations
-    ]
 
-    # IMU input for orientation
-    imu0: /imu
-    imu0_config: [
-      false, false, false,    # X, Y, Z positions
-      false, false, true,     #  roll, pitch, yaw orientations
-      false, false, false,    #  X, Y, Z linear velocities
-      false, false, true,     #  roll, pitch, yaw angular velocities
-      false, false, false     #  X, Y, Z linear accelerations
-    ]
+    # ---- Wheel-based odometry: linear velocity ONLY ----
+    odom0: /ackermann_steering_controller/odometry
+    odom0_config: [true,  true,  false,  # x, y, z
+                   false, false, true,   # roll, pitch, yaw
+                   false, false, false,  # vx, vy, vz
+                   false, false, false,  # vroll, vpitch, vyaw
+                   false, false, false]  # ax, ay, az
+    odom0_differential: false
+    odom0_relative: false
+
+    # ---- IMU: yaw orientation + yaw rate ----
+    imu0: /imu_fixed
+    imu0_config: [false, false, false,  # x, y, z
+                  true,  true,  true,   # roll, pitch, yaw
+                  false, false, false,  # vx, vy, vz
+                  true,  true,  true,   # vroll, vpitch, vyaw
+                  true,  true,  true]   # ax, ay, az
+    imu0_differential: false
+    imu0_relative: false
     imu0_remove_gravitational_acceleration: true
 
-  # frames
-    odom_frame:     odom
+    map_frame: map
+    odom_frame: odom
     base_link_frame: base_link
-    world_frame:    odom
+    world_frame: odom
 
-    # make sure to publish the TF
-    publish_tf:     false
-    publish_odometry_frame: false
-    transform_tolerance: 0.5  # tolerate up to 0.5s of “old” transforms
-
+    publish_tf: true
+    # publish_odometry_frame: false
+    transform_tolerance: 0.5
