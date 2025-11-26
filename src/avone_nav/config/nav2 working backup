@@ -16,13 +16,13 @@
 ##############################
 bt_navigator:
   ros__parameters:
-    use_sim_time: true                     # Use sim time (Gazebo or rosbag)
+    use_sim_time: false                     # Use sim time (Gazebo or rosbag)
     default_nav_to_pose_bt_xml: $(find-pkg-share avone_nav)/behaviour_trees/avone_bt.xml
     global_frame: map                      # Frame of goals
     robot_base_frame: base_link            # Robot’s main reference frame
-    odom_topic: /ackermann_steering_controller/odometry
+    # odom_topic: /ackermann_steering_controller/odometry
 
-    # odom_topic: /odometry/global           # Velocity source for BT
+    odom_topic: /ackermann_steering_controller/odometry
     bt_loop_duration: 10                   # Tick rate of behavior tree (Hz^-1)
 
     # Single navigator plugin (no NavThroughPoses)
@@ -45,14 +45,14 @@ controller_server:
     failure_tolerance: 0.3                 # Allowable deviation before abort
     progress_checker_plugins: ["progress_checker"]
     goal_checker_plugins: ["general_goal_checker"]
-    current_goal_checker: general_goal_checker    
+    current_goal_checker: "general_goal_checker"   # <-- required!  
     controller_plugins: ["FollowPath"]
 
     # --- Progress Checker ---
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
       required_movement_radius: 0.2        # Must move this far to count as progress
-      movement_time_allowance: 5.0         # Time window for progress (s)
+      movement_time_allowance: 10.0         # Time window for progress (s)
 
     # --- Goal Checker ---
     general_goal_checker:
@@ -66,50 +66,59 @@ controller_server:
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
 
-      use_collision_detection: true        # Enable collision checking in controller
+      ########################################
+      # motion limits / safety envelope
+      ########################################
+      desired_linear_vel: 3.0        # was 2.0
+      max_speed: 3.0                 # hard cap so Nav2 never "thinks" faster than we want
+      min_speed: 0.5                # let it creep instead of stalling and oscillating
+      acceleration_limit: 0.4        # was 0.5
+      deceleration_limit: 0.8        # keep braking strong so you can stop if you overshoot
+      allow_reversing: False         # keep forward-only for now (simpler testing)
 
-      # --- Velocity & Accel Limits ---
-      acceleration_limit: 0.1              # m/s² (gentle take-off)
-      deceleration_limit: 0.8              # m/s² (stronger braking)
-      desired_linear_vel: 2.0              # target cruising speed (m/s)
-      min_speed: 0.1
-      max_speed: 2.0
-      allow_reversing: False
-
-      # --- Goal Approach Control ---
+      use_rotate_to_heading: false           # Disable in-place rotationss
+      ########################################
+      # approach / goal behavior
+      ########################################
       use_approach_linear_velocity_scaling: true
-      approach_velocity_scaling_dist: 5.0  # Start slowing down 5 m before goal
-      min_approach_linear_velocity: 0.5    # Crawl speed at goal
+      approach_velocity_scaling_dist: 7.0    # start slowing down only in last 1 m
+      min_approach_linear_velocity: 0.3      # final crawl speed near goal
 
-      # --- Lookahead Control ---
+      ########################################
+      # lookahead geometry (THIS is the big one)
+      ########################################
       use_velocity_scaled_lookahead: true
-      lookahead_dist: 3.0
-      min_lookahead_dist: 0.5
-      max_lookahead_dist: 5.0
-      lookahead_time: 2.0
+      lookahead_time: 5.0             # was 2.5 → aim closer, turn earlier
+      lookahead_dist: 4.0           # nominal lookahead at moderate speed
+      min_lookahead_dist: 2.5         # was 1.5 → lets you actually hug tighter turns at low speed
+      max_lookahead_dist: 6.0       # was 6.0 → avoid "aiming way down track"
+      # net effect: earlier steering, less path overshoot, less oscillation
 
-      # --- Velocity Regulation ---
-      use_regulated_linear_velocity_scaling: False
-      use_cost_regulated_linear_velocity_scaling: False
-      regulated_linear_scaling_min_radius: 2.5
-      regulated_linear_scaling_min_speed: 0.2
+      ########################################
+      # curvature-based speed limiting
+      ########################################
+      use_regulated_linear_velocity_scaling: true
+      regulated_linear_scaling_min_radius: 6.0   # keep for now; >2.5 m radius = OK speed
+      regulated_linear_scaling_min_speed: 1.0   # don't fully stop in tighter turns
+      use_cost_regulated_linear_velocity_scaling: false
+      inflation_cost_scaling_factor: 3.0         # unchanged (only matters if cost-scaling is on)
 
-      # --- Costmap Influence ---
-      inflation_cost_scaling_factor: 3.0
+      ########################################
+      # heading behavior
+      ########################################
+      rotate_to_heading_angular_vel: 0.0   # was 0.1 - slightly faster yaw alignment on startup / sharp changes
 
-      # --- Heading Control ---
-      rotate_to_heading_angular_vel: 0.1
+      ########################################
+      # kinematic "output contract" to downstream
+      ########################################
+      # max_vel_x: 1.0            # was 2.0
+      # max_vel_theta: 0.3        # keep same; this is fine for slow testing
+      # max_angular_accel: 0.3    # was 0.2, give it a touch more agility at low speed
 
-      # --- Kinematic Limits ---
-      max_vel_x: 0.5                       # Final forward velocity cap
-      max_vel_theta: 0.3                   # Max rotational velocity
-      max_angular_accel: 0.2               # Rotational acceleration (rad/s²)
-
-      # --- Goal Tolerances ---
-      xy_goal_tolerance: 0.5
-      yaw_goal_tolerance: 3.14
-      latch_xy_goal_tolerance: false
-
+      ########################################
+      # safety / collision checking
+      ########################################
+      use_collision_detection: true
 
 ##############################
 # 🗺 Local Costmap
@@ -119,12 +128,12 @@ local_costmap:
   local_costmap:
     ros__parameters:
       footprint: "[
-        [-0.17, -0.944],
-        [ 2.845, -0.944],
-        [ 2.845,  0.944],
-        [-0.17,  0.944]
-      ]"                                   # Vehicle footprint (m)
-      update_frequency: 5.0
+        [-0.17, -0.744],
+        [ 2.445, -0.744],
+        [ 2.445,  0.744],
+        [-0.17,  0.744]
+      ]"                            # Vehicle footprint (m)
+      update_frequency: 10.0
       publish_frequency: 2.0
       global_frame: odom
       robot_base_frame: base_link
@@ -132,7 +141,7 @@ local_costmap:
       width: 30
       height: 30
       resolution: 0.05
-      robot_radius: 1.0
+      robot_radius: 1.5
 
       plugins: ["voxel_layer", "inflation_layer"]
 
@@ -150,9 +159,16 @@ local_costmap:
         combination_method: 1
         obstacle_max_range: 50.0
         raytrace_max_range: 50.0
+        voxel_decay: 1.0           # 100% decay per cycle
+        clearing: true
+        inf_is_valid: true
+        decay_model: 1             # Exponential decay
         observation_sources: pointcloud
+        
         pointcloud:
-          topic: /lidar/points
+          # topic: /lidar/points
+          topic: /quanergy/points
+          # topic: /nav2_points
           data_type: PointCloud2
           marking: true
           clearing: true
@@ -160,11 +176,13 @@ local_costmap:
           max_obstacle_height: 3.2
           obstacle_max_range: 50.0
           raytrace_max_range: 50.0
+          observation_persistence: 0.0
+
 
       # --- Inflation Layer ---
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 2.0
+        inflation_radius: 3.0
         cost_scaling_factor: 5.0
 
 
@@ -182,11 +200,12 @@ global_costmap:
         [ 2.445,  0.744],
         [-0.17,  0.744]
       ]"
+
       update_frequency: 1.0
       publish_frequency: 1.0
       global_frame: map
       robot_base_frame: base_link
-      robot_radius: 1.0
+      robot_radius: 1.5
       resolution: 0.1
       rolling_window: true                 # Rolling costmap for large-scale GPS nav
       width: 150
@@ -210,7 +229,9 @@ global_costmap:
         raytrace_max_range: 50.0
         observation_sources: pointcloud
         pointcloud:
-          topic: /lidar/points
+          # topic: /lidar/points
+          topic: /quanergy/points
+          # topic: /nav2_points
           data_type: PointCloud2
           marking: true
           clearing: true
@@ -221,7 +242,7 @@ global_costmap:
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 2.0
+        inflation_radius: 3.0
         cost_scaling_factor: 5.0
 
 
@@ -237,7 +258,7 @@ planner_server:
 
     GridBased:
       plugin: "nav2_smac_planner/SmacPlannerHybrid"
-      tolerance: 3.0
+      tolerance: 1.0
       downsample_costmap: false
       allow_unknown: true
       motion_model_for_search: "DUBIN"     # For Ackermann steering
@@ -246,6 +267,19 @@ planner_server:
       analytic_expansion_ratio: 0.0
       analytic_expansion_max_length: 0.0
       smooth_path: true
+      goal_heading_mode: DEFAULT
+      # cost_penalty: 10.0
+
+      cost_penalty: 3.0              # start around 2.5–3.0
+      change_penalty: 0.1            # penalty for switching left/right
+      non_straight_penalty: 1.2      # slight preference for straight
+      reverse_penalty: 2.0           # only matters if you use Reeds-Shepp
+      retrospective_penalty: 0.015
+      lookup_table_size: 20.0
+      cache_obstacle_heuristic: false
+      use_quadratic_cost_penalty: false   # see next section
+      downsample_obstacle_heuristic: true
+      allow_primitive_interpolation: false
 
 
 ##############################
@@ -283,14 +317,40 @@ waypoint_follower:
 ##############################
 velocity_smoother:
   ros__parameters:
-    smoothing_frequency: 20.0              # Hz
+    smoothing_frequency: 20.0        # 20 Hz output is fine
     scale_velocities: False
-    feedback: "OPEN_LOOP"                  # Use time-based smoothing (no odom feedback)
-    max_velocity: [2.0, 0.0, 0.5]          # [vx, vy, ω]
-    min_velocity: [-2.0, 0.0, -0.5]
-    max_accel: [0.5, 0.0, 0.15]             # Acceleration limits (m/s², rad/s²)
-    max_decel: [-0.8, 0.0, -0.15]           # Deceleration limits
+
+    # Use odometry to close the loop if your /odometry/global twist is sane.
+    # If /odometry/global twist is noisy or laggy, keep OPEN_LOOP for now.
+    feedback: "OPEN_LOOP"
+
+    # ---------------------------
+    # velocity clamps [vx, vy, ω]
+    # ---------------------------
+    max_velocity: [3.0, 0.0, 0.3]    # match max_speed (1.0 m/s) and max_vel_theta (0.15 rad/s)
+    min_velocity: [0.0, 0.0, -0.3]  # allow gentle reverse if you ever do reversing later;
+                                      # can leave negative vx unused for now, it's just a floor
+
+    # ---------------------------------
+    # accel/decel shaping [vx, vy, ωdot]
+    # ---------------------------------
+    max_accel: [0.3, 0.0, 0.1]        # vx accel matches controller accel_limit (0.3 m/s²)
+                                      # angular accel 0.1 rad/s² matches max_angular_accel vibe
+    max_decel: [-0.8, 0.0, -0.1]      # braking in x: same 0.8 m/s² you gave controller
+                                      # braking in ω: mirror 0.1 so yaw changes are still damped
+
+    # ---------------------------
+    # odom feedback / timeout
+    # ---------------------------
     odom_topic: /ackermann_steering_controller/odometry
-    odom_duration: 0.1
-    deadband_velocity: [0.02, 0.0, 0.0]
-    velocity_timeout: 0.05
+    odom_duration: 0.1                # 100 ms window for "am I moving like I think I am"
+    velocity_timeout: 0.1             # was 0.05 → relax this so a tiny comm hiccup
+                                      # doesn’t instantly zero your command and cause a steering snap
+
+    # ---------------------------
+    # deadband
+    # ---------------------------
+    deadband_velocity: [0.1, 0.0, 0.0]
+    # before: 0.02
+    # why higher: anything below ~0.05 m/s on these hub motors is usually just cogging noise.
+    # This stops the smoother from chasing tiny oscillatory corrections near standstill.

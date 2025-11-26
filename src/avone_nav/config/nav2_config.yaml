@@ -64,61 +64,191 @@ controller_server:
 
     # --- Main Path Follower ---
     FollowPath:
-      plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+      plugin: "nav2_mppi_controller::MPPIController"
 
-      ########################################
-      # motion limits / safety envelope
-      ########################################
-      desired_linear_vel: 3.0        # was 2.0
-      max_speed: 3.0                 # hard cap so Nav2 never "thinks" faster than we want
-      min_speed: 0.5                # let it creep instead of stalling and oscillating
-      acceleration_limit: 0.4        # was 0.5
-      deceleration_limit: 0.8        # keep braking strong so you can stop if you overshoot
-      allow_reversing: False         # keep forward-only for now (simpler testing)
+      # -----------------------------
+      # MPPI rollout horizon settings
+      # -----------------------------
+      time_steps: 40             # Number of steps in each predicted trajectory
+                                # 40 steps at model_dt 0.05 → 2.0 s prediction horizon.
+                                # Longer = more foresight but more CPU.
 
-      use_rotate_to_heading: false           # Disable in-place rotationss
-      ########################################
-      # approach / goal behavior
-      ########################################
-      use_approach_linear_velocity_scaling: true
-      approach_velocity_scaling_dist: 7.0    # start slowing down only in last 1 m
-      min_approach_linear_velocity: 0.3      # final crawl speed near goal
+      model_dt: 0.05             # Simulation timestep for each predicted trajectory.
+                                # Must be <= 1 / controller_frequency (20 Hz → 0.05).
+                                # Smaller = smoother but more samples needed.
 
-      ########################################
-      # lookahead geometry (THIS is the big one)
-      ########################################
-      use_velocity_scaled_lookahead: true
-      lookahead_time: 5.0             # was 2.5 → aim closer, turn earlier
-      lookahead_dist: 4.0           # nominal lookahead at moderate speed
-      min_lookahead_dist: 2.5         # was 1.5 → lets you actually hug tighter turns at low speed
-      max_lookahead_dist: 6.0       # was 6.0 → avoid "aiming way down track"
-      # net effect: earlier steering, less path overshoot, less oscillation
+      batch_size: 2000           # Number of sampled trajectories per control cycle.
+                                # Higher = better optimisation, smoother steering.
+                                # Lower = faster but less stable. NUC fits 2000 easily.
 
-      ########################################
-      # curvature-based speed limiting
-      ########################################
-      use_regulated_linear_velocity_scaling: true
-      regulated_linear_scaling_min_radius: 6.0   # keep for now; >2.5 m radius = OK speed
-      regulated_linear_scaling_min_speed: 1.0   # don't fully stop in tighter turns
-      use_cost_regulated_linear_velocity_scaling: false
-      inflation_cost_scaling_factor: 3.0         # unchanged (only matters if cost-scaling is on)
+      # -----------------------------
+      # Control noise sigma (exploration)
+      # -----------------------------
+      vx_std: 0.8                # Standard deviation of sampled forward velocities.
+                                # Higher = explores more aggressive accel/braking.
 
-      ########################################
-      # heading behavior
-      ########################################
-      rotate_to_heading_angular_vel: 0.0   # was 0.1 - slightly faster yaw alignment on startup / sharp changes
+      vy_std: 0.0                # Sideways velocity noise (unused for Ackermann).
+                                # Always keep zero.
 
-      ########################################
-      # kinematic "output contract" to downstream
-      ########################################
-      # max_vel_x: 1.0            # was 2.0
-      # max_vel_theta: 0.3        # keep same; this is fine for slow testing
-      # max_angular_accel: 0.3    # was 0.2, give it a touch more agility at low speed
+      wz_std: 0.6                # Std dev for yaw rate samples. Higher = explores sharper turns.
 
-      ########################################
-      # safety / collision checking
-      ########################################
-      use_collision_detection: true
+      # -----------------------------
+      # Velocity limits (robot capability)
+      # -----------------------------
+      vx_max: 3.0                # Max commanded forward velocity (m/s).
+      vx_min: 0.0                # No reversing for now.
+
+      vy_max: 0.0                # Ackermann robot; keep zero.
+
+      wz_max: 0.3                # Max yaw rate (rad/s). If steering oscillates, lower to 0.4.
+
+      # -----------------------------
+      # Acceleration limits
+      # Physical acceleration bounds for your drivetrain
+      # -----------------------------
+      ax_max: 0.5                # Max forward acceleration. Controls punch-off from 0.
+      ax_min: -0.5               # Max braking deceleration. Make more negative if needed.
+
+      ay_max: 0.0                # No lateral accel modelling for Ackermann.
+      ay_min: 0.0
+
+      az_max: 0.8                # Max yaw acceleration. Limits steering jerk.
+
+      # -----------------------------
+      # MPPI Hyperparameters
+      # -----------------------------
+      iteration_count: 1         # How many MPPI optimisation passes per cycle.
+                                # 1 is fine at 20 Hz. 2 possible if CPU allows.
+
+      temperature: 0.3           # Softmax temperature. Lower = greedier behaviour.
+                                # If behaviour feels random → reduce.
+
+      gamma: 0.015               # Discount factor on future cost.
+                                # Lower = prioritise near-term control.
+
+      motion_model: "Ackermann"  # The kinematic model. Must be this for cars.
+
+      visualize: true           # Set true to publish sample trajectories to RViz.
+                                # Use only for debugging, heavy otherwise.
+
+      reset_period: 1.0          # Re-sample noise every X seconds. Helps long-term stability.
+
+      regenerate_noises: false   # Keep sampled noise between cycles for smoother behaviour.
+
+      open_loop: false           # Use odometry state each cycle.
+                                # Should be false for all real robots.
+
+      # -----------------------------
+      # Path following behaviour
+      # -----------------------------
+      prune_distance: 15.0       # How far ahead (m) to keep path points.
+                                # Set slightly longer than prediction horizon.
+
+      transform_tolerance: 0.1   # TF tolerance. Keep 0.05–0.1.
+
+      # -----------------------------
+      # Ackermann-specific constraints
+      # -----------------------------
+      AckermannConstraints:
+        min_turning_r: 3.0       # Minimum physical turning radius of AV.ONE.
+                                # Must match SMAC’s minimum_turning_radius.
+                                # If car cuts inside → raise this.
+                                # If car cannot follow tight cones → lower.
+
+      # -----------------------------
+      # Collision checking
+      # -----------------------------
+      TrajectoryValidator:
+        plugin: "mppi::DefaultOptimalTrajectoryValidator"
+        collision_lookahead_time: 5.0    # Predict collisions up to 3 s ahead.
+                                        # Larger = safer, but slower response.
+
+        consider_footprint: true         # Uses actual footprint polygon in costmap.
+
+      # -----------------------------
+      # Critic list (the cost function)
+      # These shape driving style.
+      # -----------------------------
+      critics: [
+        "ConstraintCritic",
+        "CostCritic",
+        "GoalCritic",
+        "GoalAngleCritic",
+        "PathAlignCritic",
+        "PathFollowCritic",
+        "PathAngleCritic",
+        "PreferForwardCritic",
+        "VelocityDeadbandCritic"
+      ]
+
+      # -----------------------------
+      # Individual critic settings
+      # -----------------------------
+      ConstraintCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 8.0         # Higher = more penalty for violating accel/yaw limits.
+
+      GoalCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0         # Strong pull toward goal. Lower if oscillation at end.
+        threshold_to_consider: 2.0
+
+      GoalAngleCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 3.0         # Encourages ending with correct orientation.
+        threshold_to_consider: 1.0
+
+      PreferForwardCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0         # Prevents backward movements.
+        threshold_to_consider: 0.5
+
+      CostCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0        # How much to avoid costmap obstacles.
+        critical_cost: 200.0
+        consider_footprint: true
+        collision_cost: 100000000.0  # Hard collision penalty.
+        near_goal_distance: 2.0
+        trajectory_point_step: 2
+
+      PathAlignCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 12.0        # Encourages aligning car direction with path tangent.
+        max_path_occupancy_ratio: 0.05
+        trajectory_point_step: 4
+        threshold_to_consider: 0.5
+        offset_from_furthest: 25
+        use_path_orientations: true
+
+      PathFollowCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 10.0         # Penalises distance from the path centerline.
+        offset_from_furthest: 8
+        threshold_to_consider: 2.0
+
+      PathAngleCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 3.0         # Penalises angle between robot heading and path direction.
+        offset_from_furthest: 6
+        threshold_to_consider: 0.5
+        max_angle_to_furthest: 1.0
+        mode: 2                  # Respect feasible Dubins headings.
+
+      VelocityDeadbandCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 35.0        # Larger = more aggressive push past deadband velocity.
+        deadband_velocities: [0.6, 0.0, 0.0]
+                                # Minimum speed the motors need to overcome static friction.
 
 ##############################
 # 🗺 Local Costmap
@@ -166,8 +296,8 @@ local_costmap:
         observation_sources: pointcloud
         
         pointcloud:
-          # topic: /lidar/points
-          topic: /quanergy/points
+          topic: /lidar/points
+          # topic: /quanergy/points
           # topic: /nav2_points
           data_type: PointCloud2
           marking: true
@@ -183,7 +313,7 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         inflation_radius: 3.0
-        cost_scaling_factor: 5.0
+        cost_scaling_factor: 8.0
 
 
 ##############################
@@ -229,8 +359,8 @@ global_costmap:
         raytrace_max_range: 50.0
         observation_sources: pointcloud
         pointcloud:
-          # topic: /lidar/points
-          topic: /quanergy/points
+          topic: /lidar/points
+          # topic: /quanergy/points
           # topic: /nav2_points
           data_type: PointCloud2
           marking: true
@@ -243,7 +373,7 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         inflation_radius: 3.0
-        cost_scaling_factor: 5.0
+        cost_scaling_factor: 8.0
 
 
 ##############################
