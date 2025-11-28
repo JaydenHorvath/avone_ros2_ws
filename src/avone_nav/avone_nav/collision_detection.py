@@ -16,7 +16,7 @@ class FrontLidarSocketCan(Node):
         super().__init__('Lidar_Collision_Detection')
 
         # Topics
-        self.declare_parameter('cloud_topic', '/lidar/points')
+        self.declare_parameter('cloud_topic', '/quanergy/points')
         self.declare_parameter('filtered_cloud_topic', '/collision_points')
 
         # Lidar slice parameters
@@ -32,8 +32,8 @@ class FrontLidarSocketCan(Node):
         self.declare_parameter('max_z', 2.0)                   # ignore high stuff if you want
 
         # SocketCAN parameters
-        self.declare_parameter('can_interface', 'can0')
-        self.declare_parameter('can_id', 0x501)
+        self.declare_parameter('can_interface', 'vcan0')
+        self.declare_parameter('can_id', 0x04)
         self.declare_parameter('extended_id', False)
         self.declare_parameter('send_on_every_scan', False)    # if False, send only on change
 

@@ -38,10 +38,11 @@ bt_navigator:
 ##############################
 controller_server:
   ros__parameters:
-    controller_frequency: 20.0             # Hz control loop
-    min_x_velocity_threshold: 0.001
-    min_y_velocity_threshold: 0.001
-    min_theta_velocity_threshold: 0.001
+    controller_frequency: 20.0     # Hz control loop  
+    min_vel_x: 1.0      
+    # min_x_velocity_threshold: 0.001
+    # min_y_velocity_threshold: 0.001
+    # min_theta_velocity_threshold: 0.001
     failure_tolerance: 0.3                 # Allowable deviation before abort
     progress_checker_plugins: ["progress_checker"]
     goal_checker_plugins: ["general_goal_checker"]
@@ -59,66 +60,164 @@ controller_server:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.8               # Distance tolerance (m)
-      yaw_goal_tolerance: 3.14             # Orientation tolerance (rad)
+      yaw_goal_tolerance: 1.0             # Orientation tolerance (rad)
       latch_xy_goal_tolerance: True        # Latch goal success once inside XY tol
 
     # --- Main Path Follower ---
     FollowPath:
-      plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+          plugin: "nav2_mppi_controller::MPPIController"
+          
+          # REDUCE COMPUTATIONAL LOAD
+          time_steps: 30             # Reduce from 40-50
+          model_dt: 0.05             
+          batch_size: 1000           # CRITICAL: Reduce from 2000
+          
+          iteration_count: 1         # Keep at 1
+          
+          vx_std: 0.8                
+          vy_std: 0.0                
+          wz_std: 0.1                
+          
+          vx_max: 3.0                
+          vx_min: 0.0                
+          vy_max: 0.0                
+          wz_max: 0.15                
+          
+          ax_max: 0.4                
+          ax_min: -0.4               
+          ay_max: 0.0                
+          ay_min: 0.0                
+          az_max: 0.03               
+          
+          temperature: 0.2           
+          gamma: 0.015               
+          
+          motion_model: "Ackermann"  
+          visualize: false           # CRITICAL: Turn OFF - huge CPU hit
+          
+          reset_period: 1.0          
+          regenerate_noises: false   
+          open_loop: false           
+          
+          prune_distance: 20.0       
+          transform_tolerance: 0.1   
+          
+          AckermannConstraints:
+            min_turning_r: 3.0       
+          
+          TrajectoryValidator:
+            plugin: "mppi::DefaultOptimalTrajectoryValidator"
+            collision_lookahead_time: 3.0    # Reduce from 5.0
+            consider_footprint: true         
+          
+          critics: [
+            "ConstraintCritic",
+            "CostCritic",
+            "GoalCritic",
+            "GoalAngleCritic",
+            "PathFollowCritic",
+            "PathAngleCritic",
+            "PathAlignCritic",
+            "PreferForwardCritic",
+            "VelocityDeadbandCritic"
+          ]
+          # Remove PathAlignCritic temporarily - it's expensive
+          
+          ConstraintCritic:
+            enabled: true
+            cost_power: 1
+            cost_weight: 8.0
 
-      ########################################
-      # motion limits / safety envelope
-      ########################################
-      desired_linear_vel: 3.0        # was 2.0
-      max_speed: 3.0                 # hard cap so Nav2 never "thinks" faster than we want
-      min_speed: 0.5                # let it creep instead of stalling and oscillating
-      acceleration_limit: 0.4        # was 0.5
-      deceleration_limit: 0.8        # keep braking strong so you can stop if you overshoot
-      allow_reversing: False         # keep forward-only for now (simpler testing)
+          GoalCritic:
+            enabled: true
+            cost_power: 1
+            cost_weight: 5.0
 
-      use_rotate_to_heading: false           # Disable in-place rotationss
-      ########################################
-      # approach / goal behavior
-      ########################################
-      use_approach_linear_velocity_scaling: true
-      approach_velocity_scaling_dist: 7.0    # start slowing down only in last 1 m
-      min_approach_linear_velocity: 0.3      # final crawl speed near goal
+          GoalAngleCritic:
+            enabled: true
+            cost_power: 1
+            cost_weight: 3.0
 
-      ########################################
-      # lookahead geometry (THIS is the big one)
-      ########################################
-      use_velocity_scaled_lookahead: true
-      lookahead_time: 5.0             # was 2.5 → aim closer, turn earlier
-      lookahead_dist: 4.0           # nominal lookahead at moderate speed
-      min_lookahead_dist: 2.5         # was 1.5 → lets you actually hug tighter turns at low speed
-      max_lookahead_dist: 6.0       # was 6.0 → avoid "aiming way down track"
-      # net effect: earlier steering, less path overshoot, less oscillation
+          PreferForwardCritic:
+            enabled: true
+            cost_power: 1
+            cost_weight: 10.0
 
-      ########################################
-      # curvature-based speed limiting
-      ########################################
-      use_regulated_linear_velocity_scaling: true
-      regulated_linear_scaling_min_radius: 6.0   # keep for now; >2.5 m radius = OK speed
-      regulated_linear_scaling_min_speed: 1.0   # don't fully stop in tighter turns
-      use_cost_regulated_linear_velocity_scaling: false
-      inflation_cost_scaling_factor: 3.0         # unchanged (only matters if cost-scaling is on)
+          CostCritic:
+            enabled: true
+            cost_power: 1
+            cost_weight: 3.81
+            critical_cost: 300.0
+            consider_footprint: true
+            collision_cost: 1000000.0
+            near_goal_distance: 3.0
+            trajectory_point_step: 3  # Increase from 2 (check fewer points)
 
-      ########################################
-      # heading behavior
-      ########################################
-      rotate_to_heading_angular_vel: 0.0   # was 0.1 - slightly faster yaw alignment on startup / sharp changes
+          PathFollowCritic:
+            enabled: true
+            cost_power: 1
+            cost_weight: 25.0
+            offset_from_furthest: 8
+            threshold_to_consider: 1.4
 
-      ########################################
-      # kinematic "output contract" to downstream
-      ########################################
-      # max_vel_x: 1.0            # was 2.0
-      # max_vel_theta: 0.3        # keep same; this is fine for slow testing
-      # max_angular_accel: 0.3    # was 0.2, give it a touch more agility at low speed
+          PathAngleCritic:
+            enabled: true
+            cost_power: 1
+            cost_weight: 15.0
+            offset_from_furthest: 6
+            threshold_to_consider: 0.5
+            max_angle_to_furthest: 1.2
+            mode: 0
 
-      ########################################
-      # safety / collision checking
-      ########################################
-      use_collision_detection: true
+          PathAlignCritic:
+            enabled: true
+            cost_power: 1
+            cost_weight: 8.0                    # Moderate weight - not too aggressive
+            trajectory_point_step: 5            # Check every 5th point (less CPU)
+            offset_from_furthest: 15            # Look 15 points ahead on path
+            threshold_to_consider: 0.4          # Only engage when >0.4m from path
+            max_angle_to_furthest: 1.57         # 90 degrees in radians (π/2)
+            use_path_orientations: false        # CRITICAL: False for straight line stability
+
+          VelocityDeadbandCritic:
+            enabled: true
+            cost_power: 1
+            cost_weight: 20.0
+            deadband_velocities: [1.5, 0.0, 0.0]
+
+
+
+velocity_smoother:
+  ros__parameters:
+    use_sim_time: false
+    smoothing_frequency: 40.0
+    scale_velocities: false
+    feedback: "OPEN_LOOP"
+    
+    # --- Velocity Limits ---
+    max_velocity: [1.5, 0.0, 0.2]
+    min_velocity: [0.0, 0.0, -0.2]
+    
+    # --- Deadband Velocities ---
+    # deadband_velocity: [0.0, 0.5, 0.0]   # Disabled for now - was killing your output
+    
+    # --- Acceleration Limits ---
+    max_accel: [0.5, 0.0, 0.1]
+    max_decel: [-1.0, 0.0, -0.1]
+    
+    # --- Timeout ---
+    velocity_timeout: 1.0
+    
+    # --- Odometry Configuration ---
+    odom_topic: /ackermann_steering_controller/odometry
+    odom_duration: 0.1
+    
+    # --- Performance ---
+    use_realtime_priority: false
+    
+    # --- Message Type ---
+    enable_stamped_cmd_vel: false
+
 
 ##############################
 # 🗺 Local Costmap
@@ -166,8 +265,8 @@ local_costmap:
         observation_sources: pointcloud
         
         pointcloud:
-          # topic: /lidar/points
-          topic: /quanergy/points
+          topic: /lidar/points
+          # topic: /quanergy/points
           # topic: /nav2_points
           data_type: PointCloud2
           marking: true
@@ -183,7 +282,7 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         inflation_radius: 3.0
-        cost_scaling_factor: 5.0
+        cost_scaling_factor: 8.0
 
 
 ##############################
@@ -229,8 +328,8 @@ global_costmap:
         raytrace_max_range: 50.0
         observation_sources: pointcloud
         pointcloud:
-          # topic: /lidar/points
-          topic: /quanergy/points
+          topic: /lidar/points
+          # topic: /quanergy/points
           # topic: /nav2_points
           data_type: PointCloud2
           marking: true
@@ -243,7 +342,7 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         inflation_radius: 3.0
-        cost_scaling_factor: 5.0
+        cost_scaling_factor: 8.0
 
 
 ##############################
@@ -253,7 +352,7 @@ global_costmap:
 ##############################
 planner_server:
   ros__parameters:
-    use_sim_time: true
+    use_sim_time: false
     planner_plugins: ["GridBased"]
 
     GridBased:
@@ -272,7 +371,7 @@ planner_server:
 
       cost_penalty: 3.0              # start around 2.5–3.0
       change_penalty: 0.1            # penalty for switching left/right
-      non_straight_penalty: 1.2      # slight preference for straight
+      non_straight_penalty: 3.0     # slight preference for straight
       reverse_penalty: 2.0           # only matters if you use Reeds-Shepp
       retrospective_penalty: 0.015
       lookup_table_size: 20.0
@@ -286,71 +385,71 @@ planner_server:
 # 🪄 Smoother Server
 #    - Post-processes planner path for curvature & smoothness
 ##############################
-smoother_server:
-  ros__parameters:
-    smoother_plugins: ["simple_smoother"]
-    simple_smoother:
-      plugin: "nav2_smoother::SimpleSmoother"
-      tolerance: 1.0e-10
-      max_its: 1000
-      do_refinement: True
+# smoother_server:
+#   ros__parameters:
+#     smoother_plugins: ["simple_smoother"]
+#     simple_smoother:
+#       plugin: "nav2_smoother::SimpleSmoother"
+#       tolerance: 1.0e-10
+#       max_its: 1000
+#       do_refinement: True
 
 
 ##############################
 # 📍 Waypoint Follower
 #    - Optional waypoint behavior for multi-goal sequences
 ##############################
-waypoint_follower:
-  ros__parameters:
-    loop_rate: 20
-    stop_on_failure: false
-    waypoint_task_executor_plugin: "wait_at_waypoint"
-    wait_at_waypoint:
-      plugin: "nav2_waypoint_follower::WaitAtWaypoint"
-      enabled: True
-      waypoint_pause_duration: 200
+# waypoint_follower:
+#   ros__parameters:
+#     loop_rate: 20
+#     stop_on_failure: false
+#     waypoint_task_executor_plugin: "wait_at_waypoint"
+#     wait_at_waypoint:
+#       plugin: "nav2_waypoint_follower::WaitAtWaypoint"
+#       enabled: True
+#       waypoint_pause_duration: 200
 
 
 ##############################
 # 🧤 Velocity Smoother
 #    - Smooths acceleration and braking between cmd_vel updates
-##############################
-velocity_smoother:
-  ros__parameters:
-    smoothing_frequency: 20.0        # 20 Hz output is fine
-    scale_velocities: False
+# ##############################
+# velocity_smoother:
+#   ros__parameters:
+#     smoothing_frequency: 20.0        # 20 Hz output is fine
+#     scale_velocities: False
 
-    # Use odometry to close the loop if your /odometry/global twist is sane.
-    # If /odometry/global twist is noisy or laggy, keep OPEN_LOOP for now.
-    feedback: "OPEN_LOOP"
+#     # Use odometry to close the loop if your /odometry/global twist is sane.
+#     # If /odometry/global twist is noisy or laggy, keep OPEN_LOOP for now.
+#     feedback: "OPEN_LOOP"
 
-    # ---------------------------
-    # velocity clamps [vx, vy, ω]
-    # ---------------------------
-    max_velocity: [3.0, 0.0, 0.3]    # match max_speed (1.0 m/s) and max_vel_theta (0.15 rad/s)
-    min_velocity: [0.0, 0.0, -0.3]  # allow gentle reverse if you ever do reversing later;
-                                      # can leave negative vx unused for now, it's just a floor
+#     # ---------------------------
+#     # velocity clamps [vx, vy, ω]
+#     # ---------------------------
+#     max_velocity: [3.0, 0.0, 0.3]    # match max_speed (1.0 m/s) and max_vel_theta (0.15 rad/s)
+#     min_velocity: [0.0, 0.0, -0.3]  # allow gentle reverse if you ever do reversing later;
+#                                       # can leave negative vx unused for now, it's just a floor
 
-    # ---------------------------------
-    # accel/decel shaping [vx, vy, ωdot]
-    # ---------------------------------
-    max_accel: [0.3, 0.0, 0.1]        # vx accel matches controller accel_limit (0.3 m/s²)
-                                      # angular accel 0.1 rad/s² matches max_angular_accel vibe
-    max_decel: [-0.8, 0.0, -0.1]      # braking in x: same 0.8 m/s² you gave controller
-                                      # braking in ω: mirror 0.1 so yaw changes are still damped
+#     # ---------------------------------
+#     # accel/decel shaping [vx, vy, ωdot]
+#     # ---------------------------------
+#     max_accel: [0.3, 0.0, 0.1]        # vx accel matches controller accel_limit (0.3 m/s²)
+#                                       # angular accel 0.1 rad/s² matches max_angular_accel vibe
+#     max_decel: [-0.8, 0.0, -0.1]      # braking in x: same 0.8 m/s² you gave controller
+#                                       # braking in ω: mirror 0.1 so yaw changes are still damped
 
-    # ---------------------------
-    # odom feedback / timeout
-    # ---------------------------
-    odom_topic: /ackermann_steering_controller/odometry
-    odom_duration: 0.1                # 100 ms window for "am I moving like I think I am"
-    velocity_timeout: 0.1             # was 0.05 → relax this so a tiny comm hiccup
-                                      # doesn’t instantly zero your command and cause a steering snap
+#     # ---------------------------
+#     # odom feedback / timeout
+#     # ---------------------------
+#     odom_topic: /ackermann_steering_controller/odometry
+#     odom_duration: 0.1                # 100 ms window for "am I moving like I think I am"
+#     velocity_timeout: 0.1             # was 0.05 → relax this so a tiny comm hiccup
+#                                       # doesn’t instantly zero your command and cause a steering snap
 
-    # ---------------------------
-    # deadband
-    # ---------------------------
-    deadband_velocity: [0.1, 0.0, 0.0]
-    # before: 0.02
-    # why higher: anything below ~0.05 m/s on these hub motors is usually just cogging noise.
-    # This stops the smoother from chasing tiny oscillatory corrections near standstill.
+#     # ---------------------------
+#     # deadband
+#     # ---------------------------
+#     deadband_velocity: [0.1, 0.0, 0.0]
+#     # before: 0.02
+#     # why higher: anything below ~0.05 m/s on these hub motors is usually just cogging noise.
+# #     # This stops the smoother from chasing tiny oscillatory corrections near standstill.

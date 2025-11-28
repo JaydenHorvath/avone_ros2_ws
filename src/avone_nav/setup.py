@@ -30,6 +30,7 @@ setup(
         'console_scripts': [
             'collision_detection = avone_nav.collision_detection:main',
             'nav2_cancel = avone_nav.nav2_cancel:main',
+            'nav2_lidar = avone_nav.nav2_lidar:main',
         ],
     },
 )

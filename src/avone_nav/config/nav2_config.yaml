@@ -9,7 +9,19 @@
 # - Static layers removed (no global map)
 # - Global costmap uses rolling window (for large GPS-driven navigation)
 ################################################################################
-
+lifecycle_manager_navigation:
+  ros__parameters:
+    use_sim_time: False
+    autostart: True
+    node_names: 
+      - 'controller_server'
+      - 'smoother_server'
+      - 'planner_server'
+      - 'behavior_server'
+      - 'bt_navigator'
+      - 'waypoint_follower'
+      - 'velocity_smoother'
+      - 'collision_monitor'  # Add this line
 
 ##############################
 # 🧠 Behavior Tree Navigator
@@ -38,10 +50,11 @@ bt_navigator:
 ##############################
 controller_server:
   ros__parameters:
-    controller_frequency: 20.0             # Hz control loop
-    min_x_velocity_threshold: 0.001
-    min_y_velocity_threshold: 0.001
-    min_theta_velocity_threshold: 0.001
+    controller_frequency: 20.0     # Hz control loop  
+    min_vel_x: 1.0      
+    # min_x_velocity_threshold: 0.001
+    # min_y_velocity_threshold: 0.001
+    # min_theta_velocity_threshold: 0.001
     failure_tolerance: 0.3                 # Allowable deviation before abort
     progress_checker_plugins: ["progress_checker"]
     goal_checker_plugins: ["general_goal_checker"]
@@ -59,198 +72,165 @@ controller_server:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.8               # Distance tolerance (m)
-      yaw_goal_tolerance: 3.14             # Orientation tolerance (rad)
+      yaw_goal_tolerance: 1.0             # Orientation tolerance (rad)
       latch_xy_goal_tolerance: True        # Latch goal success once inside XY tol
 
     # --- Main Path Follower ---
     FollowPath:
-      plugin: "nav2_mppi_controller::MPPIController"
+          plugin: "nav2_mppi_controller::MPPIController"
+          
+          # REDUCE COMPUTATIONAL LOAD
+          time_steps: 35             # Reduce from 40-50
+          model_dt: 0.05             
+          batch_size: 1000           # CRITICAL: Reduce from 2000
+          
+          iteration_count: 1         # Keep at 1
+          
+          vx_std: 0.8                
+          vy_std: 0.0                
+          wz_std: 0.1                
+          
+          vx_max: 3.0                
+          vx_min: 0.0                
+          vy_max: 0.0                
+          wz_max: 0.2                
+          
+          ax_max: 0.4                
+          ax_min: -0.4               
+          ay_max: 0.0                
+          ay_min: 0.0                
+          az_max: 0.03               
+          
+          temperature: 0.2           
+          gamma: 0.015               
+          
+          motion_model: "Ackermann"  
+          visualize: false           # CRITICAL: Turn OFF - huge CPU hit
+          
+          reset_period: 1.0          
+          regenerate_noises: false   
+          open_loop: false           
+          
+          prune_distance: 20.0       
+          transform_tolerance: 0.1   
+          
+          AckermannConstraints:
+            min_turning_r: 4.5       
+          
+          TrajectoryValidator:
+            plugin: "mppi::DefaultOptimalTrajectoryValidator"
+            collision_lookahead_time: 3.0    # Reduce from 5.0
+            consider_footprint: true         
+          
+          critics: [
+            "ConstraintCritic",
+            "CostCritic",
+            "GoalCritic",
+            "GoalAngleCritic",
+            "PathFollowCritic",
+            "PathAngleCritic",
+            "PathAlignCritic",
+            "PreferForwardCritic",
+            "VelocityDeadbandCritic"
+          ]
+          # Remove PathAlignCritic temporarily - it's expensive
+          
+          ConstraintCritic:
+            enabled: true
+            cost_power: 1
+            cost_weight: 10.0
 
-      # -----------------------------
-      # MPPI rollout horizon settings
-      # -----------------------------
-      time_steps: 40             # Number of steps in each predicted trajectory
-                                # 40 steps at model_dt 0.05 → 2.0 s prediction horizon.
-                                # Longer = more foresight but more CPU.
+          GoalCritic:
+            enabled: true
+            cost_power: 1
+            cost_weight: 5.0
 
-      model_dt: 0.05             # Simulation timestep for each predicted trajectory.
-                                # Must be <= 1 / controller_frequency (20 Hz → 0.05).
-                                # Smaller = smoother but more samples needed.
+          GoalAngleCritic:
+            enabled: true
+            cost_power: 1
+            cost_weight: 5.0
 
-      batch_size: 2000           # Number of sampled trajectories per control cycle.
-                                # Higher = better optimisation, smoother steering.
-                                # Lower = faster but less stable. NUC fits 2000 easily.
+          PreferForwardCritic:
+            enabled: true
+            cost_power: 1
+            cost_weight: 20.0
 
-      # -----------------------------
-      # Control noise sigma (exploration)
-      # -----------------------------
-      vx_std: 0.8                # Standard deviation of sampled forward velocities.
-                                # Higher = explores more aggressive accel/braking.
+          CostCritic:
+            enabled: true
+            cost_power: 1
+            cost_weight: 3.81
+            critical_cost: 300.0
+            consider_footprint: true
+            collision_cost: 1000000.0
+            near_goal_distance: 5.0
+            trajectory_point_step: 3  # Increase from 2 (check fewer points)
 
-      vy_std: 0.0                # Sideways velocity noise (unused for Ackermann).
-                                # Always keep zero.
+          PathFollowCritic:
+            enabled: true
+            cost_power: 1
+            cost_weight: 15.0
+            offset_from_furthest: 8
+            threshold_to_consider: 1.4
 
-      wz_std: 0.6                # Std dev for yaw rate samples. Higher = explores sharper turns.
+          PathAngleCritic:
+            enabled: true
+            cost_power: 1
+            cost_weight: 15.0
+            offset_from_furthest: 10
+            threshold_to_consider: 0.3
+            max_angle_to_furthest: 0.6
+            mode: 0
 
-      # -----------------------------
-      # Velocity limits (robot capability)
-      # -----------------------------
-      vx_max: 3.0                # Max commanded forward velocity (m/s).
-      vx_min: 0.0                # No reversing for now.
+          PathAlignCritic:
+            enabled: true
+            cost_power: 1
+            cost_weight: 15.0                    # Moderate weight - not too aggressive
+            trajectory_point_step: 5            # Check every 5th point (less CPU)
+            offset_from_furthest: 20            # Look 15 points ahead on path
+            threshold_to_consider: 0.2         # Only engage when >0.4m from path
+            max_angle_to_furthest: 0.8        # 90 degrees in radians (π/2)
+            use_path_orientations: false        # CRITICAL: False for straight line stability
 
-      vy_max: 0.0                # Ackermann robot; keep zero.
+          VelocityDeadbandCritic:
+            enabled: true
+            cost_power: 1
+            cost_weight: 30.0
+            deadband_velocities: [1.5, 0.0, 0.0]
 
-      wz_max: 0.3                # Max yaw rate (rad/s). If steering oscillates, lower to 0.4.
 
-      # -----------------------------
-      # Acceleration limits
-      # Physical acceleration bounds for your drivetrain
-      # -----------------------------
-      ax_max: 0.5                # Max forward acceleration. Controls punch-off from 0.
-      ax_min: -0.5               # Max braking deceleration. Make more negative if needed.
 
-      ay_max: 0.0                # No lateral accel modelling for Ackermann.
-      ay_min: 0.0
+velocity_smoother:
+  ros__parameters:
+    use_sim_time: false
+    smoothing_frequency: 40.0
+    scale_velocities: false
+    feedback: "OPEN_LOOP"
+    
+    # --- Velocity Limits ---
+    max_velocity: [3.0, 0.0, 0.2]
+    min_velocity: [0.0, 0.0, -0.2]
+    
+    # --- Deadband Velocities ---
+    # deadband_velocity: [0.0, 0.5, 0.0]   # Disabled for now - was killing your output
+    
+    # --- Acceleration Limits ---
+    max_accel: [0.5, 0.0, 0.2]
+    max_decel: [-1.0, 0.0, -0.2]
+    
+    # --- Timeout ---
+    velocity_timeout: 1.0
+    
+    # --- Odometry Configuration ---
+    odom_topic: /ackermann_steering_controller/odometry
+    odom_duration: 0.1
+    
+    # --- Performance ---
+    use_realtime_priority: false
+    
+    # --- Message Type ---
+    enable_stamped_cmd_vel: false
 
-      az_max: 0.8                # Max yaw acceleration. Limits steering jerk.
-
-      # -----------------------------
-      # MPPI Hyperparameters
-      # -----------------------------
-      iteration_count: 1         # How many MPPI optimisation passes per cycle.
-                                # 1 is fine at 20 Hz. 2 possible if CPU allows.
-
-      temperature: 0.3           # Softmax temperature. Lower = greedier behaviour.
-                                # If behaviour feels random → reduce.
-
-      gamma: 0.015               # Discount factor on future cost.
-                                # Lower = prioritise near-term control.
-
-      motion_model: "Ackermann"  # The kinematic model. Must be this for cars.
-
-      visualize: true           # Set true to publish sample trajectories to RViz.
-                                # Use only for debugging, heavy otherwise.
-
-      reset_period: 1.0          # Re-sample noise every X seconds. Helps long-term stability.
-
-      regenerate_noises: false   # Keep sampled noise between cycles for smoother behaviour.
-
-      open_loop: false           # Use odometry state each cycle.
-                                # Should be false for all real robots.
-
-      # -----------------------------
-      # Path following behaviour
-      # -----------------------------
-      prune_distance: 15.0       # How far ahead (m) to keep path points.
-                                # Set slightly longer than prediction horizon.
-
-      transform_tolerance: 0.1   # TF tolerance. Keep 0.05–0.1.
-
-      # -----------------------------
-      # Ackermann-specific constraints
-      # -----------------------------
-      AckermannConstraints:
-        min_turning_r: 3.0       # Minimum physical turning radius of AV.ONE.
-                                # Must match SMAC’s minimum_turning_radius.
-                                # If car cuts inside → raise this.
-                                # If car cannot follow tight cones → lower.
-
-      # -----------------------------
-      # Collision checking
-      # -----------------------------
-      TrajectoryValidator:
-        plugin: "mppi::DefaultOptimalTrajectoryValidator"
-        collision_lookahead_time: 5.0    # Predict collisions up to 3 s ahead.
-                                        # Larger = safer, but slower response.
-
-        consider_footprint: true         # Uses actual footprint polygon in costmap.
-
-      # -----------------------------
-      # Critic list (the cost function)
-      # These shape driving style.
-      # -----------------------------
-      critics: [
-        "ConstraintCritic",
-        "CostCritic",
-        "GoalCritic",
-        "GoalAngleCritic",
-        "PathAlignCritic",
-        "PathFollowCritic",
-        "PathAngleCritic",
-        "PreferForwardCritic",
-        "VelocityDeadbandCritic"
-      ]
-
-      # -----------------------------
-      # Individual critic settings
-      # -----------------------------
-      ConstraintCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 8.0         # Higher = more penalty for violating accel/yaw limits.
-
-      GoalCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 5.0         # Strong pull toward goal. Lower if oscillation at end.
-        threshold_to_consider: 2.0
-
-      GoalAngleCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 3.0         # Encourages ending with correct orientation.
-        threshold_to_consider: 1.0
-
-      PreferForwardCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 5.0         # Prevents backward movements.
-        threshold_to_consider: 0.5
-
-      CostCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 5.0        # How much to avoid costmap obstacles.
-        critical_cost: 200.0
-        consider_footprint: true
-        collision_cost: 100000000.0  # Hard collision penalty.
-        near_goal_distance: 2.0
-        trajectory_point_step: 2
-
-      PathAlignCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 12.0        # Encourages aligning car direction with path tangent.
-        max_path_occupancy_ratio: 0.05
-        trajectory_point_step: 4
-        threshold_to_consider: 0.5
-        offset_from_furthest: 25
-        use_path_orientations: true
-
-      PathFollowCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 10.0         # Penalises distance from the path centerline.
-        offset_from_furthest: 8
-        threshold_to_consider: 2.0
-
-      PathAngleCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 3.0         # Penalises angle between robot heading and path direction.
-        offset_from_furthest: 6
-        threshold_to_consider: 0.5
-        max_angle_to_furthest: 1.0
-        mode: 2                  # Respect feasible Dubins headings.
-
-      VelocityDeadbandCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 35.0        # Larger = more aggressive push past deadband velocity.
-        deadband_velocities: [0.6, 0.0, 0.0]
-                                # Minimum speed the motors need to overcome static friction.
-
-##############################
+# ##############################
 # 🗺 Local Costmap
 #    - Short-range obstacle avoidance region
 ##############################
@@ -383,7 +363,7 @@ global_costmap:
 ##############################
 planner_server:
   ros__parameters:
-    use_sim_time: true
+    use_sim_time: false
     planner_plugins: ["GridBased"]
 
     GridBased:
@@ -392,7 +372,7 @@ planner_server:
       downsample_costmap: false
       allow_unknown: true
       motion_model_for_search: "DUBIN"     # For Ackermann steering
-      minimum_turning_radius: 3.0          # Wheelbase / tan(max_steer_angle)
+      minimum_turning_radius: 4.5          # Wheelbase / tan(max_steer_angle)
       angle_quantization_bins: 72
       analytic_expansion_ratio: 0.0
       analytic_expansion_max_length: 0.0
@@ -402,7 +382,7 @@ planner_server:
 
       cost_penalty: 3.0              # start around 2.5–3.0
       change_penalty: 0.1            # penalty for switching left/right
-      non_straight_penalty: 1.2      # slight preference for straight
+      non_straight_penalty: 3.0     # slight preference for straight
       reverse_penalty: 2.0           # only matters if you use Reeds-Shepp
       retrospective_penalty: 0.015
       lookup_table_size: 20.0
@@ -416,71 +396,71 @@ planner_server:
 # 🪄 Smoother Server
 #    - Post-processes planner path for curvature & smoothness
 ##############################
-smoother_server:
-  ros__parameters:
-    smoother_plugins: ["simple_smoother"]
-    simple_smoother:
-      plugin: "nav2_smoother::SimpleSmoother"
-      tolerance: 1.0e-10
-      max_its: 1000
-      do_refinement: True
+# smoother_server:
+#   ros__parameters:
+#     smoother_plugins: ["simple_smoother"]
+#     simple_smoother:
+#       plugin: "nav2_smoother::SimpleSmoother"
+#       tolerance: 1.0e-10
+#       max_its: 1000
+#       do_refinement: True
 
 
 ##############################
 # 📍 Waypoint Follower
 #    - Optional waypoint behavior for multi-goal sequences
 ##############################
-waypoint_follower:
-  ros__parameters:
-    loop_rate: 20
-    stop_on_failure: false
-    waypoint_task_executor_plugin: "wait_at_waypoint"
-    wait_at_waypoint:
-      plugin: "nav2_waypoint_follower::WaitAtWaypoint"
-      enabled: True
-      waypoint_pause_duration: 200
+# waypoint_follower:
+#   ros__parameters:
+#     loop_rate: 20
+#     stop_on_failure: false
+#     waypoint_task_executor_plugin: "wait_at_waypoint"
+#     wait_at_waypoint:
+#       plugin: "nav2_waypoint_follower::WaitAtWaypoint"
+#       enabled: True
+#       waypoint_pause_duration: 200
 
 
 ##############################
 # 🧤 Velocity Smoother
 #    - Smooths acceleration and braking between cmd_vel updates
-##############################
-velocity_smoother:
-  ros__parameters:
-    smoothing_frequency: 20.0        # 20 Hz output is fine
-    scale_velocities: False
+# ##############################
+# velocity_smoother:
+#   ros__parameters:
+#     smoothing_frequency: 20.0        # 20 Hz output is fine
+#     scale_velocities: False
 
-    # Use odometry to close the loop if your /odometry/global twist is sane.
-    # If /odometry/global twist is noisy or laggy, keep OPEN_LOOP for now.
-    feedback: "OPEN_LOOP"
+#     # Use odometry to close the loop if your /odometry/global twist is sane.
+#     # If /odometry/global twist is noisy or laggy, keep OPEN_LOOP for now.
+#     feedback: "OPEN_LOOP"
 
-    # ---------------------------
-    # velocity clamps [vx, vy, ω]
-    # ---------------------------
-    max_velocity: [3.0, 0.0, 0.3]    # match max_speed (1.0 m/s) and max_vel_theta (0.15 rad/s)
-    min_velocity: [0.0, 0.0, -0.3]  # allow gentle reverse if you ever do reversing later;
-                                      # can leave negative vx unused for now, it's just a floor
+#     # ---------------------------
+#     # velocity clamps [vx, vy, ω]
+#     # ---------------------------
+#     max_velocity: [3.0, 0.0, 0.3]    # match max_speed (1.0 m/s) and max_vel_theta (0.15 rad/s)
+#     min_velocity: [0.0, 0.0, -0.3]  # allow gentle reverse if you ever do reversing later;
+#                                       # can leave negative vx unused for now, it's just a floor
 
-    # ---------------------------------
-    # accel/decel shaping [vx, vy, ωdot]
-    # ---------------------------------
-    max_accel: [0.3, 0.0, 0.1]        # vx accel matches controller accel_limit (0.3 m/s²)
-                                      # angular accel 0.1 rad/s² matches max_angular_accel vibe
-    max_decel: [-0.8, 0.0, -0.1]      # braking in x: same 0.8 m/s² you gave controller
-                                      # braking in ω: mirror 0.1 so yaw changes are still damped
+#     # ---------------------------------
+#     # accel/decel shaping [vx, vy, ωdot]
+#     # ---------------------------------
+#     max_accel: [0.3, 0.0, 0.1]        # vx accel matches controller accel_limit (0.3 m/s²)
+#                                       # angular accel 0.1 rad/s² matches max_angular_accel vibe
+#     max_decel: [-0.8, 0.0, -0.1]      # braking in x: same 0.8 m/s² you gave controller
+#                                       # braking in ω: mirror 0.1 so yaw changes are still damped
 
-    # ---------------------------
-    # odom feedback / timeout
-    # ---------------------------
-    odom_topic: /ackermann_steering_controller/odometry
-    odom_duration: 0.1                # 100 ms window for "am I moving like I think I am"
-    velocity_timeout: 0.1             # was 0.05 → relax this so a tiny comm hiccup
-                                      # doesn’t instantly zero your command and cause a steering snap
+#     # ---------------------------
+#     # odom feedback / timeout
+#     # ---------------------------
+#     odom_topic: /ackermann_steering_controller/odometry
+#     odom_duration: 0.1                # 100 ms window for "am I moving like I think I am"
+#     velocity_timeout: 0.1             # was 0.05 → relax this so a tiny comm hiccup
+#                                       # doesn’t instantly zero your command and cause a steering snap
 
-    # ---------------------------
-    # deadband
-    # ---------------------------
-    deadband_velocity: [0.1, 0.0, 0.0]
-    # before: 0.02
-    # why higher: anything below ~0.05 m/s on these hub motors is usually just cogging noise.
-    # This stops the smoother from chasing tiny oscillatory corrections near standstill.
+#     # ---------------------------
+#     # deadband
+#     # ---------------------------
+#     deadband_velocity: [0.1, 0.0, 0.0]
+#     # before: 0.02
+#     # why higher: anything below ~0.05 m/s on these hub motors is usually just cogging noise.
+# #     # This stops the smoother from chasing tiny oscillatory corrections near standstill.

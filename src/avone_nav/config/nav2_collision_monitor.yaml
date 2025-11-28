@@ -1,0 +1,41 @@
+collision_monitor:
+  ros__parameters:
+    use_sim_time: false
+    enabled: true
+    base_frame_id: "base_link"
+    odom_frame_id: "odom"
+    cmd_vel_in_topic: "cmd_vel"
+    cmd_vel_out_topic: "cmd_vel_out"
+    transform_tolerance: 0.2
+    source_timeout: 1.0
+    stop_pub_timeout: 2.0
+    enable_stamped_cmd_vel: false
+    
+    polygons: ["EmergencyStop", "SlowZone"]
+    
+    EmergencyStop:
+      type: "polygon"
+      action_type: "stop"
+      points: [2.5, -0.744, 3.0, -0.744, 3.0, 0.744, 2.5, 0.744]
+      min_points: 4
+      visualize: true
+      polygon_pub_topic: "emergency_stop_zone"
+    
+    SlowZone:
+      type: "polygon"
+      action_type: "slowdown"
+      points: [2.5, -0.744, 3.0, -0.744, 3.0, 0.744, 2.5, 0.744]
+      min_points: 4
+      slowdown_ratio: 0.4
+      visualize: true
+      polygon_pub_topic: "slow_zone"
+    
+    observation_sources: ["lidar"]
+    
+    lidar:
+      type: "pointcloud"
+      topic: "/quanergy/points"
+      source_timeout: 0.5
+      min_height: 0.1
+      max_height: 3.0
+      enabled: true

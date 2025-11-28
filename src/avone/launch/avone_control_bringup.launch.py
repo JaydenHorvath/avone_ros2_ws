@@ -89,12 +89,12 @@ def generate_launch_description():
     #     output='screen'
     # )
 
-    joy_node = Node(
-        package='joy',
-        executable='joy_node',
-        name='joy_node',
-        output='screen'
-    )
+    # joy_node = Node(
+    #     package='joy',
+    #     executable='joy_node',
+    #     name='joy_node',
+    #     output='screen'
+    # )
 
     cmd_filter_node = Node(
         package='avone_utils',
@@ -153,7 +153,7 @@ def generate_launch_description():
         delay_ctrl_after_jsb,
         tf_odometry_relay,
         # twiststamped_node,
-        joy_node,
+        # joy_node,
         teleop_twist_joy_node,
         static_map_tf,
         cmd_filter_node,
