@@ -7,13 +7,13 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
-    use_sim_time = LaunchConfiguration('use_sim_time', default='false')
+    use_sim_time = LaunchConfiguration('use_sim_time', default='true')
     map_ekf_yaml = PathJoinSubstitution([FindPackageShare('avone_localisation'), 'config', 'global_ekf.yaml'])
 
     return LaunchDescription([
         DeclareLaunchArgument(
             'use_sim_time',
-            default_value='false',
+            default_value='true',
             description='Use simulation (Gazebo) clock'
         ),
 
@@ -24,7 +24,7 @@ def generate_launch_description():
             output='screen',
             parameters=[{'use_sim_time': use_sim_time}, map_ekf_yaml],
             remappings=[
-                ('odometry/filtered', '/odometry/global'),
+                ('odometry/filtered', '/odometry/global1'),
             ]
         ),
     ])

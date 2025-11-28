@@ -7,7 +7,7 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
-    use_sim_time = LaunchConfiguration('use_sim_time', default='false')
+    use_sim_time = LaunchConfiguration('use_sim_time', default='true')
 
     # Path to your YAML config (assuming it's inside `config/` of your package)
     config_file = PathJoinSubstitution([
@@ -47,8 +47,8 @@ def generate_launch_description():
                 ('gps/fix', '/fix'),
                 ('imu', '/imu/data'),   
                 # ('odometry/filtered', '/ackermann_steering_controller/odometry'),
-                ('odometry/filtered', '/odometry/local'),
-                ('odometry/gps', '/odometry/gps'),
+                ('odometry/filtered', '/odometry/local1'),
+                ('odometry/gps', '/odometry/gps1'),
                 
             ]
         ),

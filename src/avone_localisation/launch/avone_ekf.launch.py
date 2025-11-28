@@ -8,7 +8,7 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time', default='true')
-    ekf_yaml = PathJoinSubstitution([FindPackageShare('avone_localisation'), 'config', 'local_ekf.yaml'])
+    ekf_yaml = PathJoinSubstitution([FindPackageShare('avone_localisation'), 'config', 'avone_ekf.yaml'])
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -24,7 +24,7 @@ def generate_launch_description():
             output='screen',
             parameters=[{'use_sim_time': use_sim_time}, ekf_yaml],
             remappings=[
-                ('odometry/filtered', '/odometry/local1'),
+                ('odometry/filtered', '/odometry/avone'),
             ]
         ),
     ])

@@ -1,0 +1,40 @@
+# EKF odometry fusion config
+ekf_filter_node_odom:
+  ros__parameters:
+    use_sim_time: true
+    frequency: 50.0
+    two_d_mode: true
+
+    # Wheel odom input
+    odom0: /ackermann_steering_controller/odometry
+    odom0_config: [
+      false, false, false,   # X, Y, Z positions
+      false, false, false,   # roll, pitch, yaw orientations
+      false,  false,  false,   # X, Y, Z linear velocities
+      false, false, false,    # roll, pitch, yaw angular velocities
+      false, false, false    # X, Y, Z linear accelerations
+    ]
+
+    # --------------------------
+    # GPS odometry input (pose + heading)
+    # --------------------------
+    odom1: /odometry/gps
+    odom1_config: [
+      true,  true,  false,   # X, Y positions
+      false, false, true,    # yaw orientation
+      true, true, true,   # X, Y, Z linear velocities
+      false, false, true,   # roll, pitch, yaw angular velocities
+      false, false, false    # X, Y, Z linear accelerations
+    ]
+
+
+    
+
+    # Frames
+    odom_frame: odom
+    base_link_frame: base
+    world_frame: odom
+
+    publish_tf: true
+    publish_odometry_frame: true
+    transform_tolerance: 0.2

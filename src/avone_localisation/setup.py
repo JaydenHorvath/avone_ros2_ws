@@ -29,6 +29,7 @@ setup(
             'fix_to_odom = avone_localisation.fix_to_odom:main',
             'heading_to_imu = avone_localisation.heading_to_imu:main',
             'imu_start = avone_localisation.imu_start:main',
+            'imu_cov_ekf = avone_localisation.imu_cov_ekf:main',
         ],
     },
 )
