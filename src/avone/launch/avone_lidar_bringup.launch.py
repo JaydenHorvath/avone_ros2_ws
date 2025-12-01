@@ -25,7 +25,7 @@ def generate_launch_description():
         name='quanergy_static_tf',
         arguments=[
             '0', '0', '0',        # x y z
-            '3.14159', '0', '0',  # roll pitch yaw
+            '0', '0', '0',  # roll pitch yaw
             'laser_frame', 'quanergy'
         ],
         output='screen'

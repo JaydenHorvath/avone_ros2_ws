@@ -10,7 +10,7 @@ class SimpleSteeringCutoff(Node):
         super().__init__('simple_steering_cutoff')
 
         # Minimum velocity before allowing steering
-        self.min_velocity = 0.0  # m/s
+        self.min_velocity = 0.2  # m/s
 
         # State
         self.current_velocity = 0.0

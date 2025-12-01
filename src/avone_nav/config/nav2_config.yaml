@@ -32,9 +32,9 @@ bt_navigator:
     default_nav_to_pose_bt_xml: $(find-pkg-share avone_nav)/behaviour_trees/avone_bt.xml
     global_frame: map                      # Frame of goals
     robot_base_frame: base_link            # Robot’s main reference frame
-    # odom_topic: /ackermann_steering_controller/odometry
+    odom_topic: /odometry/global1
 
-    odom_topic: /ackermann_steering_controller/odometry
+    # odom_topic: /ackermann_steering_controller/odometry
     bt_loop_duration: 10                   # Tick rate of behavior tree (Hz^-1)
 
     # Single navigator plugin (no NavThroughPoses)
@@ -115,7 +115,7 @@ controller_server:
           transform_tolerance: 0.1   
           
           AckermannConstraints:
-            min_turning_r: 4.5       
+            min_turning_r: 3.0       
           
           TrajectoryValidator:
             plugin: "mppi::DefaultOptimalTrajectoryValidator"
@@ -131,7 +131,8 @@ controller_server:
             "PathAngleCritic",
             "PathAlignCritic",
             "PreferForwardCritic",
-            "VelocityDeadbandCritic"
+            "VelocityDeadbandCritic",
+            "TwirlingCritic"
           ]
           # Remove PathAlignCritic temporarily - it's expensive
           
@@ -143,12 +144,12 @@ controller_server:
           GoalCritic:
             enabled: true
             cost_power: 1
-            cost_weight: 5.0
+            cost_weight: 7.0
 
           GoalAngleCritic:
             enabled: true
             cost_power: 1
-            cost_weight: 5.0
+            cost_weight: 10.0
 
           PreferForwardCritic:
             enabled: true
@@ -162,20 +163,20 @@ controller_server:
             critical_cost: 300.0
             consider_footprint: true
             collision_cost: 1000000.0
-            near_goal_distance: 5.0
-            trajectory_point_step: 3  # Increase from 2 (check fewer points)
+            near_goal_distance: 8.0
+            trajectory_point_step: 4  # Increase from 2 (check fewer points)
 
           PathFollowCritic:
             enabled: true
             cost_power: 1
-            cost_weight: 15.0
+            cost_weight: 10.0
             offset_from_furthest: 8
             threshold_to_consider: 1.4
 
           PathAngleCritic:
             enabled: true
             cost_power: 1
-            cost_weight: 15.0
+            cost_weight: 30.0
             offset_from_furthest: 10
             threshold_to_consider: 0.3
             max_angle_to_furthest: 0.6
@@ -184,7 +185,7 @@ controller_server:
           PathAlignCritic:
             enabled: true
             cost_power: 1
-            cost_weight: 15.0                    # Moderate weight - not too aggressive
+            cost_weight: 5.0                    # Moderate weight - not too aggressive
             trajectory_point_step: 5            # Check every 5th point (less CPU)
             offset_from_furthest: 20            # Look 15 points ahead on path
             threshold_to_consider: 0.2         # Only engage when >0.4m from path
@@ -195,7 +196,12 @@ controller_server:
             enabled: true
             cost_power: 1
             cost_weight: 30.0
-            deadband_velocities: [1.5, 0.0, 0.0]
+            deadband_velocities: [0.5, 0.0, 0.0]
+          
+          TwirlingCritic:
+            enabled: true
+            twirling_cost_power: 1
+            twirling_cost_weight: 20.0
 
 
 
@@ -215,13 +221,13 @@ velocity_smoother:
     
     # --- Acceleration Limits ---
     max_accel: [0.5, 0.0, 0.2]
-    max_decel: [-1.0, 0.0, -0.2]
+    max_decel: [-1.5, 0.0, -0.2]
     
     # --- Timeout ---
     velocity_timeout: 1.0
     
     # --- Odometry Configuration ---
-    odom_topic: /ackermann_steering_controller/odometry
+    odom_topic: /odometry/global1
     odom_duration: 0.1
     
     # --- Performance ---

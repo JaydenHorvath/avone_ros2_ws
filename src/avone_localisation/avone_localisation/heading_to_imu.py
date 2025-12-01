@@ -29,24 +29,22 @@ class HeadingVelVisualizer(Node):
         # ---------------- Parameters ----------------
         self.declare_parameter('invert_heading', False)
         self.declare_parameter('heading_offset_deg', -90.0)
-
+        self.declare_parameter('heading_std_deg', 2.0)
 
         self.invert_heading = self.get_parameter('invert_heading').value
         self.heading_offset_deg = self.get_parameter('heading_offset_deg').value
-        use_sim_time = self.get_parameter('use_sim_time').value
+        self.heading_std_deg = self.get_parameter('heading_std_deg').value
 
-        # Get or set use_sim_time if passed via CLI or launch
+        heading_std_rad = math.radians(self.heading_std_deg)
+        self.heading_var = heading_std_rad * heading_std_rad
+
+        # use_sim_time if passed externally
         if self.has_parameter('use_sim_time'):
             use_sim_time = self.get_parameter('use_sim_time').value
-        else:
-            use_sim_time = False
-
-        if use_sim_time:
-            self.get_logger().info("Using simulation time (use_sim_time=True)")
-            self.set_parameters([rclpy.parameter.Parameter(
-                'use_sim_time', rclpy.Parameter.Type.BOOL, True
-            )])
-
+            if use_sim_time:
+                self.set_parameters([rclpy.parameter.Parameter(
+                    'use_sim_time', rclpy.Parameter.Type.BOOL, True
+                )])
 
         # ---------------- Subscribers ----------------
         self.sub_heading = self.create_subscription(
@@ -66,30 +64,50 @@ class HeadingVelVisualizer(Node):
         """Convert /heading quaternion into yaw, apply offset, publish fake IMU."""
         yaw = yaw_from_quaternion(msg.quaternion)
 
-        # Flip 180° if requested
+        # Flip 180 if requested
         if self.invert_heading:
             yaw = yaw - math.pi
 
-        # Apply configurable degree offset
+        # Apply configurable offset
         yaw += math.radians(self.heading_offset_deg)
 
-        yaw = -yaw
+        yaw = -yaw  # user implemented inversion
 
         # Normalize [-pi, pi]
         yaw = math.atan2(math.sin(yaw), math.cos(yaw))
         self.latest_yaw = yaw
 
-        # Publish fake IMU
+        # Build IMU message
         imu_msg = Imu()
         imu_msg.header.stamp = msg.header.stamp
         imu_msg.header.frame_id = "gps_link1"
+
         qx, qy, qz, qw = yaw_to_quaternion(yaw)
         imu_msg.orientation.x = qx
         imu_msg.orientation.y = qy
         imu_msg.orientation.z = qz
         imu_msg.orientation.w = qw
-        self.imu_pub.publish(imu_msg)
 
+        # ---------------- Covariances (IMPORTANT) ----------------
+        # Orientation covariance
+        imu_msg.orientation_covariance[0] = 999.0   # roll (ignored)
+        imu_msg.orientation_covariance[4] = 999.0   # pitch (ignored)
+        imu_msg.orientation_covariance[8] = self.heading_var  # yaw variance
+
+        # Angular velocity is NOT provided
+        imu_msg.angular_velocity.x = 0.0
+        imu_msg.angular_velocity.y = 0.0
+        imu_msg.angular_velocity.z = 0.0
+        imu_msg.angular_velocity_covariance[0] = -1.0
+
+        # Linear acceleration NOT provided
+        imu_msg.linear_acceleration.x = 0.0
+        imu_msg.linear_acceleration.y = 0.0
+        imu_msg.linear_acceleration.z = 0.0
+        imu_msg.linear_acceleration_covariance[0] = -1.0
+        # --------------------------------------------------------
+
+        self.imu_pub.publish(imu_msg)
         self.update_marker()
 
     def vel_twist_cb(self, msg: TwistStamped):
@@ -106,7 +124,7 @@ class HeadingVelVisualizer(Node):
             return
 
         marker = Marker()
-        marker.header.frame_id = "gps_link"
+        marker.header.frame_id = "gps_link1"
         marker.header.stamp = self.get_clock().now().to_msg()
         marker.ns = "velocity_arrow"
         marker.id = 0
@@ -118,7 +136,7 @@ class HeadingVelVisualizer(Node):
         marker.pose.position.y = 0.0
         marker.pose.position.z = 0.0
 
-        # Orientation: from velocity vector
+        # Orientation from velocity vector
         yaw = math.atan2(vel.y, vel.x)
         qz = math.sin(yaw * 0.5)
         qw = math.cos(yaw * 0.5)

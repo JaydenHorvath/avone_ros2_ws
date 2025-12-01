@@ -1,7 +1,7 @@
 import os
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import IncludeLaunchDescription
+from launch.actions import IncludeLaunchDescription, ExecuteProcess
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from ament_index_python.packages import get_package_share_directory
 
@@ -29,7 +29,11 @@ def generate_launch_description():
                 'params_file': nav2_config
             }.items()
         ),
-        
+
+        # Run your cancel executable
+        ExecuteProcess(
+            cmd=['ros2', 'run', 'avone_nav', 'nav2_cancel'],
+            name='nav2_cancel_process',
+            output='screen'
+        ),
     ])
-
-
