@@ -14,6 +14,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         # Config files
         ('share/' + package_name + '/config', glob('config/*.yaml')),
+        ('share/' + package_name + '/weights', glob('yolo_ros/weights/*.pt')),
     ],
     install_requires=[
         # Core dependencies

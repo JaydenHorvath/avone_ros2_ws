@@ -11,6 +11,12 @@ from vision_msgs.msg import (
 from geometry_msgs.msg import PoseWithCovariance
 from cv_bridge import CvBridge
 from ultralytics import YOLO
+from ament_index_python.packages import get_package_share_directory
+import os
+
+pkg_share = get_package_share_directory('yolo_ros')
+model_path = os.path.join(pkg_share, 'weights', 'best.pt')
+
 
 class YoloRosNode(Node):
     def __init__(self):
@@ -42,7 +48,7 @@ class YoloRosNode(Node):
         self.det_pub   = self.create_publisher(Detection2DArray, '/yolo/detections', 10)
 
         # load your YOLO model
-        self.model = YOLO('/home/jay/Documents/yolo11-tutorial/runs/detect/train17/weights/best.pt')
+        self.model = YOLO(model_path)
         self.get_logger().info("YOLO node up and running!")
 
     def caminfo_callback(self, info_msg: CameraInfo):
