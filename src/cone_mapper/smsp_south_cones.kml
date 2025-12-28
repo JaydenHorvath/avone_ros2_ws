@@ -1,0 +1,425 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>AVONE Cones (Filtered)</name>
+    <Placemark>
+      <name>Cone 0</name>
+      <Point><coordinates>150.87000178781597,-33.80718696494119,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 1</name>
+      <Point><coordinates>150.87001306489282,-33.8071492089225,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 2</name>
+      <Point><coordinates>150.87003785262345,-33.80709476048556,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 3</name>
+      <Point><coordinates>150.87005645531363,-33.80703605225703,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 4</name>
+      <Point><coordinates>150.87008003976686,-33.80698157417583,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 5</name>
+      <Point><coordinates>150.87010221445036,-33.806923741800695,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 6</name>
+      <Point><coordinates>150.87011886465268,-33.806863964581865,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 7</name>
+      <Point><coordinates>150.8701741235185,-33.8068821185524,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 8</name>
+      <Point><coordinates>150.87013880251592,-33.80682804830447,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 9</name>
+      <Point><coordinates>150.87019213592166,-33.806843901700084,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 10</name>
+      <Point><coordinates>150.8701580560354,-33.80677507309785,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 11</name>
+      <Point><coordinates>150.87021696797785,-33.806792243417654,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 12</name>
+      <Point><coordinates>150.8702363079863,-33.806749376906694,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 13</name>
+      <Point><coordinates>150.87018156913524,-33.80673333396742,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 14</name>
+      <Point><coordinates>150.8702471688351,-33.80672055818589,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 15</name>
+      <Point><coordinates>150.87019386029493,-33.80670417299006,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 16</name>
+      <Point><coordinates>150.8701933067657,-33.80668746979207,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 17</name>
+      <Point><coordinates>150.87019149049794,-33.80667359717259,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 18</name>
+      <Point><coordinates>150.87024760236093,-33.80668828096706,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 19</name>
+      <Point><coordinates>150.87018901258975,-33.80665669814277,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 20</name>
+      <Point><coordinates>150.87024163462397,-33.80665938319487,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 21</name>
+      <Point><coordinates>150.87018484057944,-33.80664130558078,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 22</name>
+      <Point><coordinates>150.8701914883357,-33.806603077050426,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 23</name>
+      <Point><coordinates>150.8702159160561,-33.806584278092465,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 24</name>
+      <Point><coordinates>150.8701861498058,-33.806632174247696,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 25</name>
+      <Point><coordinates>150.8702372301746,-33.80663245452078,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 26</name>
+      <Point><coordinates>150.87028800458882,-33.806595901340756,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 27</name>
+      <Point><coordinates>150.8702565550475,-33.80664956555204,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 28</name>
+      <Point><coordinates>150.87027322579095,-33.806669629332134,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 29</name>
+      <Point><coordinates>150.8703196898125,-33.80661632983519,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 30</name>
+      <Point><coordinates>150.87033756923893,-33.80663738624913,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 31</name>
+      <Point><coordinates>150.8702490618618,-33.8065801970648,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 32</name>
+      <Point><coordinates>150.87029987411492,-33.80668529947227,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 33</name>
+      <Point><coordinates>150.8704146892658,-33.80667206465373,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 34</name>
+      <Point><coordinates>150.87048543938215,-33.80667356393508,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 35</name>
+      <Point><coordinates>150.8705878509377,-33.806673347442086,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 36</name>
+      <Point><coordinates>150.87066828997771,-33.8066578021672,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 37</name>
+      <Point><coordinates>150.87079347407158,-33.80660724341765,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 38</name>
+      <Point><coordinates>150.87086471825597,-33.806564017582225,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 39</name>
+      <Point><coordinates>150.8709459778598,-33.80647461765409,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 40</name>
+      <Point><coordinates>150.87098890232144,-33.80636013687795,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 41</name>
+      <Point><coordinates>150.87101152134187,-33.8062970377044,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 42</name>
+      <Point><coordinates>150.8710725684801,-33.80615105854521,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 43</name>
+      <Point><coordinates>150.87109225336314,-33.80609181761815,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 44</name>
+      <Point><coordinates>150.87108596129266,-33.80598160112516,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 45</name>
+      <Point><coordinates>150.87113297127567,-33.80590200806012,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 46</name>
+      <Point><coordinates>150.87116903392092,-33.80582700806013,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 47</name>
+      <Point><coordinates>150.87113709787928,-33.80574790277806,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 48</name>
+      <Point><coordinates>150.87120850531159,-33.80575385858115,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 49</name>
+      <Point><coordinates>150.871226181489,-33.80580659843023,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 50</name>
+      <Point><coordinates>150.8716162422905,-33.808469048124806,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 51</name>
+      <Point><coordinates>150.87161386816905,-33.80846780845538,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 52</name>
+      <Point><coordinates>150.87153985850074,-33.8084541361593,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 53</name>
+      <Point><coordinates>150.87146764131575,-33.80844189756785,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 54</name>
+      <Point><coordinates>150.8713727932181,-33.808421899364475,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 55</name>
+      <Point><coordinates>150.8712548190586,-33.80839693439861,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 56</name>
+      <Point><coordinates>150.8711349205202,-33.808381863432025,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 57</name>
+      <Point><coordinates>150.87105824591137,-33.80834303932135,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 58</name>
+      <Point><coordinates>150.8709711028973,-33.808358341153905,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 59</name>
+      <Point><coordinates>150.87090310745376,-33.808325089267456,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 60</name>
+      <Point><coordinates>150.87081485089456,-33.80830909034543,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 61</name>
+      <Point><coordinates>150.8707695458248,-33.80829867173242,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 62</name>
+      <Point><coordinates>150.87071245231232,-33.808288086033535,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 63</name>
+      <Point><coordinates>150.87064047513414,-33.80827106034184,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 64</name>
+      <Point><coordinates>150.87056225777883,-33.80825681941478,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 65</name>
+      <Point><coordinates>150.8704986635413,-33.808242097891245,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 66</name>
+      <Point><coordinates>150.87043658394134,-33.8082300686063,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 67</name>
+      <Point><coordinates>150.87037190318648,-33.808217555131634,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 68</name>
+      <Point><coordinates>150.87030907978163,-33.80820289469325,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 69</name>
+      <Point><coordinates>150.87024075135565,-33.808184845825124,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 70</name>
+      <Point><coordinates>150.87018003287542,-33.80816623820745,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 71</name>
+      <Point><coordinates>150.8701236323556,-33.80812241858833,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 72</name>
+      <Point><coordinates>150.8700591613364,-33.80810756321643,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 73</name>
+      <Point><coordinates>150.8700617257335,-33.80810684097425,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 74</name>
+      <Point><coordinates>150.87003012483652,-33.80805840673062,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 75</name>
+      <Point><coordinates>150.86995553893564,-33.80802566867816,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 76</name>
+      <Point><coordinates>150.86991399937818,-33.80795062825416,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 77</name>
+      <Point><coordinates>150.8698746263687,-33.8078928255233,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 78</name>
+      <Point><coordinates>150.86989849623544,-33.80781314083052,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 79</name>
+      <Point><coordinates>150.86989497937884,-33.80781317586465,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 80</name>
+      <Point><coordinates>150.86983875832357,-33.807833791207806,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 81</name>
+      <Point><coordinates>150.8698293277856,-33.80782789110001,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 82</name>
+      <Point><coordinates>150.86976996826286,-33.80781737816433,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 83</name>
+      <Point><coordinates>150.86975833658136,-33.80774254974176,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 84</name>
+      <Point><coordinates>150.86976186316795,-33.80774189846616,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 85</name>
+      <Point><coordinates>150.86972026306822,-33.8077493616354,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 86</name>
+      <Point><coordinates>150.86972145337228,-33.807716418767995,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 87</name>
+      <Point><coordinates>150.86977698900267,-33.80772406878596,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 88</name>
+      <Point><coordinates>150.86976115071528,-33.80774410651503,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 89</name>
+      <Point><coordinates>150.86974349724122,-33.80768103249419,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 90</name>
+      <Point><coordinates>150.86980931424455,-33.80770105854521,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 91</name>
+      <Point><coordinates>150.86979178834167,-33.80762976677374,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 92</name>
+      <Point><coordinates>150.86984726451095,-33.80752793960881,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 93</name>
+      <Point><coordinates>150.86985996649312,-33.80748917029512,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 94</name>
+      <Point><coordinates>150.86989063330952,-33.807411244495626,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 95</name>
+      <Point><coordinates>150.8699115571467,-33.80736025096347,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 96</name>
+      <Point><coordinates>150.86993351236447,-33.807308421103606,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 97</name>
+      <Point><coordinates>150.86986904372375,-33.80778257219954,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 98</name>
+      <Point><coordinates>150.8698357580222,-33.807754714671695,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 99</name>
+      <Point><coordinates>150.8697956489918,-33.80774740960522,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 100</name>
+      <Point><coordinates>150.8697293119737,-33.80779906609103,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 101</name>
+      <Point><coordinates>150.87169855165385,-33.808440527643306,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 102</name>
+      <Point><coordinates>150.87174373131464,-33.808460559982514,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 103</name>
+      <Point><coordinates>150.87174248803612,-33.80849228833321,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Cone 104</name>
+      <Point><coordinates>150.87169422720677,-33.808524115498145,0</coordinates></Point>
+    </Placemark>
+  </Document></kml>

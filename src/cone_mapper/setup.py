@@ -45,6 +45,7 @@ setup(
               'trackmapper = cone_mapper.trackmapper:main',
               'cone_export = cone_mapper.cone_export:main',
               'coneselector = cone_mapper.coneselector:main',
+              'trolley_cone_marker = cone_mapper.trolley_cone_marker:main',
         ],
     },
 )

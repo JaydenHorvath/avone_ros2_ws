@@ -2,189 +2,150 @@
 import rclpy
 from rclpy.node import Node
 
-from visualization_msgs.msg import (
-    MarkerArray, Marker,
-    InteractiveMarker, InteractiveMarkerControl
-)
-from interactive_markers.interactive_marker_server import InteractiveMarkerServer
+from geometry_msgs.msg import PointStamped
+from visualization_msgs.msg import Marker, MarkerArray
+from std_msgs.msg import String, Bool
+from std_srvs.srv import Trigger
 
-from geometry_msgs.msg import PointStamped, Pose, Quaternion
-from std_msgs.msg import Bool
+import csv
+import os
 
 
-class ConeSelector(Node):
+class ClickConeMapper(Node):
     def __init__(self):
-        super().__init__('cone_selector')
+        super().__init__("click_cone_mapper")
 
-        # ---------------- Params ----------------
-        # Topic where RViz "Publish Point" tool publishes
-        self.declare_parameter('clicked_point_topic', '/clicked_point')
-        self.clicked_point_topic = self.get_parameter('clicked_point_topic').value
+        self.frame_id = "odom"
+        self.current_color = "blue"
 
-        # Default sizes/colors for newly added cones
-        self.declare_parameter('new_cone_radius', 0.20)   # cylinder radius ~ cone footprint
-        self.declare_parameter('new_cone_height', 0.50)
-        self.declare_parameter('new_cone_color_rgba', [0.5, 0.5, 0.5, 0.5])  # orange-ish
+        # Store cones as list of dicts: {x, y, color}
+        self.cones = []
 
-        self.new_cone_radius = float(self.get_parameter('new_cone_radius').value)
-        self.new_cone_height = float(self.get_parameter('new_cone_height').value)
-        rgba = self.get_parameter('new_cone_color_rgba').value
-        self.new_cone_rgba = (
-            float(rgba[0]), float(rgba[1]), float(rgba[2]), float(rgba[3])
-        )
-
-        # ---------------- Interactive marker server ----------------
-        self.server = InteractiveMarkerServer(self, "cone_selector")
-
-        # ---------------- Subscriptions ----------------
-        # Subscribe to auto-detected cones to mirror them as interactive markers
-        self.sub = self.create_subscription(
-            MarkerArray,
-            '/cones/tracks/markers',
-            self.cone_callback,
-            10
-        )
-
-        # Subscribe to RViz "Publish Point" tool output
-        self.click_sub = self.create_subscription(
+        # RViz click subscriber
+        self.sub_click = self.create_subscription(
             PointStamped,
-            self.clicked_point_topic,
-            self.clicked_point_cb,
+            "/clicked_point",
+            self.clicked_point_callback,
             10
         )
 
-        # Optional toggle to simulate "Shift" (enable/disable add mode)
-        self.shift_sub = self.create_subscription(
-            Bool,
-            '/cone_selector/add_mode',
-            self.shift_mode_callback,
+        # Color toggle subscriber ("blue" or "orange")
+        self.sub_color = self.create_subscription(
+            String,
+            "/cone_color_toggle",
+            self.color_toggle_callback,
             10
         )
-        self.shift_mode = False
 
-        # ---------------- Publisher ----------------
-        self.pub = self.create_publisher(MarkerArray, '/cones/tracks/markers_filtered', 10)
-
-        # ---------------- State ----------------
-        self.cones = {}               # id -> Marker
-        self.next_cone_id = 10000     # manual cones start here (avoid collision with detected IDs)
-
-        self.get_logger().info(
-            "Cone selector ready — Left-click cones to remove.\n"
-            f"To ADD: select RViz 'Publish Point' tool and click (while /cone_selector/add_mode is True).\n"
-            f"Listening to clicked points on: {self.clicked_point_topic}"
+        # Marker publisher
+        self.pub_markers = self.create_publisher(
+            MarkerArray,
+            "/cone_markers",
+            10
         )
 
-    # ---------- Callbacks ----------
-    def shift_mode_callback(self, msg: Bool):
-        self.shift_mode = msg.data
-        self.get_logger().info(f"Add mode {'ENABLED' if msg.data else 'DISABLED'}")
-
-    def cone_callback(self, msg: MarkerArray):
-        """Mirror incoming detected cones as interactive markers (if not already present)."""
-        for marker in msg.markers:
-            if marker.id not in self.cones:
-                self._make_interactive_marker(marker)
-        self._publish_filtered()
-
-    def clicked_point_cb(self, msg: PointStamped):
-        """Handle RViz Publish Point clicks to add cones (only if add_mode is True)."""
-        if not self.shift_mode:
-            # Acting like "Shift not held": ignore add when toggle is off
-            self.get_logger().debug("Clicked point received but add mode is disabled.")
-            return
-
-        p = msg.point
-        frame = msg.header.frame_id if msg.header.frame_id else "map"
-
-        new_id = self.next_cone_id
-        self.next_cone_id += 1
-
-        self.get_logger().info(
-            f"Adding cone from Publish Point at ({p.x:.2f}, {p.y:.2f}, {p.z:.2f}) in frame '{frame}' "
-            f"with ID {new_id}"
+        # Service to save CSV manually
+        self.srv_save = self.create_service(
+            Trigger,
+            "/save_cone_map",
+            self.save_service_callback
         )
 
-        marker = self._build_cone_marker(new_id, frame, p.x, p.y, p.z)
-        self._make_interactive_marker(marker)
-        self._publish_filtered()
+        self.get_logger().info("CLICK CONE MAPPER READY")
+        self.get_logger().info("Use RViz Publish Point tool to place cones")
+        self.get_logger().info("Publish 'blue' or 'orange' to /cone_color_toggle")
 
-    # ---------- Helpers ----------
-    def _build_cone_marker(self, marker_id: int, frame_id: str, x: float, y: float, z: float) -> Marker:
-        """Create a cylinder marker representing a cone at the given position."""
-        r, g, b, a = self.new_cone_rgba
+    def color_toggle_callback(self, msg: String):
+        if msg.data in ["blue", "orange"]:
+            self.current_color = msg.data
+            self.get_logger().info(f"Switched cone color to: {self.current_color}")
+        else:
+            self.get_logger().warn("Invalid color. Use 'blue' or 'orange'.")
 
-        m = Marker()
-        m.header.frame_id = frame_id
-        m.id = marker_id
-        m.type = Marker.CYLINDER
-        m.action = Marker.ADD
+    def clicked_point_callback(self, msg: PointStamped):
+        x = msg.point.x
+        y = msg.point.y
 
-        m.pose = Pose()
-        m.pose.position.x = float(x)
-        m.pose.position.y = float(y)
-        # Place cylinder so it rests on ground if your clicked z is ground height.
-        # If your clicks return ground Z already, leave as is; otherwise adjust (e.g., +height/2).
-        m.pose.position.z = float(z + self.new_cone_height * 0.5)
-        m.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
+        cone = {
+            "x": x,
+            "y": y,
+            "color": self.current_color
+        }
+        self.cones.append(cone)
 
-        # Cylinder scales: x,y are diameters
-        m.scale.x = float(self.new_cone_radius * 2.0)
-        m.scale.y = float(self.new_cone_radius * 2.0)
-        m.scale.z = float(self.new_cone_height)
+        self.get_logger().info(
+            f"Added cone at ({x:.2f}, {y:.2f}) color={self.current_color}"
+        )
 
-        m.color.r = r
-        m.color.g = g
-        m.color.b = b
-        m.color.a = a
+        self.publish_markers()
 
-        return m
+    def publish_markers(self):
+        arr = MarkerArray()
+        for i, c in enumerate(self.cones):
+            m = Marker()
+            m.header.frame_id = self.frame_id
+            m.header.stamp = self.get_clock().now().to_msg()
+            m.id = i
+            m.type = Marker.CYLINDER
+            m.action = Marker.ADD
 
-    def _make_interactive_marker(self, marker: Marker):
-        """Wrap a regular Marker into an InteractiveMarker so clicks remove it."""
-        int_marker = InteractiveMarker()
-        int_marker.header = marker.header
-        int_marker.name = str(marker.id)
-        int_marker.description = f"Cone {marker.id}"
-        int_marker.pose = marker.pose
+            m.scale.x = 0.25
+            m.scale.y = 0.25
+            m.scale.z = 0.5
 
-        control = InteractiveMarkerControl()
-        control.interaction_mode = InteractiveMarkerControl.BUTTON
-        control.always_visible = True
-        control.markers.append(marker)
-        int_marker.controls.append(control)
+            m.pose.position.x = c["x"]
+            m.pose.position.y = c["y"]
+            m.pose.position.z = 0.0
 
-        self.server.insert(int_marker)
-        self.server.setCallback(int_marker.name, self._process_feedback)
+            # Colors (RGBA)
+            if c["color"] == "blue":
+                m.color.r = 0.0
+                m.color.g = 0.3
+                m.color.b = 1.0
+                m.color.a = 1.0
+            else:
+                m.color.r = 1.0
+                m.color.g = 0.5
+                m.color.b = 0.0
+                m.color.a = 1.0
 
-        self.cones[marker.id] = marker
-        self.server.applyChanges()
+            arr.markers.append(m)
 
-    def _process_feedback(self, feedback):
-        """Click on existing interactive marker -> remove it (regardless of add mode)."""
-        marker_name = feedback.marker_name.strip()
-        if marker_name.isdigit():
-            mid = int(marker_name)
-            if mid in self.cones:
-                self.get_logger().info(f"Removed cone ID {mid}")
-                del self.cones[mid]
-                self.server.erase(str(mid))
-                self.server.applyChanges()
-                self._publish_filtered()
+        self.pub_markers.publish(arr)
 
-    def _publish_filtered(self):
-        msg = MarkerArray()
-        msg.markers = list(self.cones.values())
-        self.pub.publish(msg)
+    def save_to_csv(self, filepath=None):
+        if filepath is None:
+            filepath = os.path.expanduser("~/cones.csv")
+
+        with open(filepath, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["x", "y", "color"])
+            for c in self.cones:
+                writer.writerow([c["x"], c["y"], c["color"]])
+
+        self.get_logger().info(f"Saved CSV: {filepath}")
+        return filepath
+
+    def save_service_callback(self, request, response):
+        path = self.save_to_csv()
+        response.success = True
+        response.message = f"Saved to {path}"
+        return response
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = ConeSelector()
-    rclpy.spin(node)
+    node = ClickConeMapper()
+
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        node.get_logger().info("Saving cones before shutdown...")
+        node.save_to_csv()
+
     node.destroy_node()
     rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
