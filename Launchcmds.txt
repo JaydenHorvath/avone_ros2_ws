@@ -54,9 +54,9 @@ MORE LIDAR setup
 sudo systemctl stop isc-dhcp-server
 
 # Configure interface
-sudo ip link set dev enx6c6e070b25d8 up
-sudo ip addr flush dev enx6c6e070b25d8
-sudo ip addr add 192.168.1.1/24 dev enx6c6e070b25d8
+sudo ip link set dev eno1 up
+sudo ip addr flush dev eno1
+sudo ip addr add 192.168.1.1/24 dev eno1
 
 # Wait a moment
 sleep 2
@@ -78,11 +78,11 @@ ros2 launch quanergy_client_ros client.launch.py host:=192.168.1.100
 
 
 
-ros2 launch quanergy_client_ros client.launch.py host:=192.168.2.57
+ros2 launch quanergy_client_ros client.launch.py host:=192.168.1.57
 
 
 static tf for lidar 
-ros2 run tf2_ros static_transform_publisher   0 0 0 3.14159 0 0   base_lin quanergy
+ros2 run tf2_ros static_transform_publisher   0 0 0 3.14159 0 0   laser_frame quanergy
 
 
 ros2 run tf2_ros static_transform_publisher     2.3555 0 0.420     0 0 0     chassis quanergy
@@ -108,7 +108,7 @@ sudo ip link set can0 up
 
 sudo modprobe vcan
 sudo ip link add dev vcan0 type vcan
-sudo ip link set up vcan0co
+sudo ip link set up vcan0
 
 #
 sudo ip link delete vcan0

@@ -1,4 +1,4 @@
-# This is an empty file, so that git commits the folder correctlyekf_filter_node:
+
 ekf_filter_node_odom:
   ros__parameters:
     use_sim_time: true
@@ -18,15 +18,13 @@ ekf_filter_node_odom:
     imu0: /imu/data
     imu0_config: [
       false, false, false,    # X, Y, Z positions
-      false, false, true,     #  roll, pitch, yaw orientations
+      false, false, false,     #  roll, pitch, yaw orientations
       false, false, false,    #  X, Y, Z linear velocities
       false, false, true,     #  roll, pitch, yaw angular velocities
       false, false, false     #  X, Y, Z linear accelerations
     ]
     imu0_remove_gravitational_acceleration: true
 
-
-    
 
 
 
@@ -36,8 +34,8 @@ ekf_filter_node_odom:
     world_frame:    odom
 
     # make sure to publish the TF
-    publish_tf:     false
-    publish_odometry_frame: false
+    publish_tf:     true
+    publish_odometry_frame: true
     transform_tolerance: 0.2  # tolerate up to 0.5s of “old” transforms
     reset_on_time_jump: true
     smooth_lagged_data: true

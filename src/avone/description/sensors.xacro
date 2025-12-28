@@ -23,7 +23,7 @@
   <joint name="gps_joint1" type="fixed">
         <parent link="chassis"/>
         <child link="gps_link1"/>
-          <origin xyz="-0.1188 0 0.3924" rpy="0 0 0"/>
+          <origin xyz="-0.107 0 0.4434" rpy="0 0 0"/>
     </joint>
 
   <link name="gps_link1">
@@ -59,7 +59,7 @@
 <joint name="gps_joint2" type="fixed">
         <parent link="chassis"/>
         <child link="gps_link2"/>
-          <origin xyz="2.131 0 0.3924" rpy="0 0 0"/>
+          <origin xyz="1.693 0 0.4434" rpy="0 0 0"/>
     </joint> 
 
   <link name="gps_link2">

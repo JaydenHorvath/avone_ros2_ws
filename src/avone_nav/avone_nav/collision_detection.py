@@ -19,7 +19,7 @@ class FrontLidarSocketCan(Node):
 
         # Car frame detection arc
         self.declare_parameter('center_deg', 0.0)        # 0 degrees = vehicle forward
-        self.declare_parameter('half_arc_deg', 20.0)     # +/- 20 degrees
+        self.declare_parameter('half_arc_deg', 15.0)     # +/- 20 degrees
 
         # Lidar mounting rotation relative to vehicle frame
         # Example: lidar rotated 90 degrees left -> lidar_yaw_deg = +90

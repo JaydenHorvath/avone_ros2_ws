@@ -74,7 +74,7 @@ class FixToOdomWithHeading(Node):
 
         # Frames
         self.declare_parameter('world_frame', 'odom')
-        self.declare_parameter('base_frame', 'gps')
+        self.declare_parameter('base_frame', 'gps_A')
         self.world_frame = self.get_parameter('world_frame').value
         self.base_frame = self.get_parameter('base_frame').value
 
@@ -84,7 +84,7 @@ class FixToOdomWithHeading(Node):
         self.z_plane: Optional[float] = None
 
         # Heading source selection
-        self.declare_parameter('heading_source', 'position')
+        self.declare_parameter('heading_source', 'heading')
          # Options:
         #   "heading"  = use /heading only
         #   "position" = derive from motion only (preferring /vel if available)
@@ -135,7 +135,7 @@ class FixToOdomWithHeading(Node):
             )
 
         self.fix_sub = self.create_subscription(NavSatFix, '/fix', self.on_fix, 10)
-        self.odom_pub = self.create_publisher(Odometry, '/odometry/gps', 10)
+        self.odom_pub = self.create_publisher(Odometry, '/odometry/gpsA', 10)
         self.tf_broadcaster = TransformBroadcaster(self)
 
         self.get_logger().info(

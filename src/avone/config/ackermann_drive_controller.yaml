@@ -18,7 +18,7 @@ ackermann_steering_controller:
     wheelbase: 1.74
     front_wheel_track: 1.245
     rear_wheel_track: 1.245
-    front_wheels_radius: 0.440
+    front_wheels_radius: 0.440 # THIS IS DOUBLE THE REAL WHEEL SIZE DUE TO DOUBLE WHEEL RPM FROM KELLY  CONTROLLER
     rear_wheels_radius: 0.440
     front_steering: true
     reference_timeout: 2.0
@@ -40,4 +40,14 @@ ackermann_steering_controller:
     position_feedback: true
     publish_rate: 50.0   # Hz, or whatever rate you want
 
-
+    linear.x.max_velocity: 5.0
+    linear.x.min_velocity: -5.0
+    linear.x.max_acceleration: 2.0
+    linear.x.min_acceleration: -2.0
+    
+        # --- Steering limits ---
+    front_steering_joint_names: ['LSteer', 'RSteer']
+    steering.max_position: 0.5236  # 30° in radians
+    steering.min_position: -0.5236
+    steering.max_velocity: 2.0     # rad/s steering rate limit
+    steering.max_acceleration: 3.0  # rad/s² steering acceleration limit

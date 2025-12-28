@@ -54,3 +54,11 @@ sudo ip addr add 192.168.2.10/24 dev enx6c6e070b25d8
 
 # bring the interface up
 sudo ip link set enx6c6e070b25d8 up
+
+
+
+demo day 
+ros2 run tf2_ros static_transform_publisher --ros-args -p use_sim_time:=false -- 0 0 0 3.14159 0 0 laser_frame quanergy
+ros2 launch quanergy_client_ros client.launch.py host:=192.168.2.57
+ros2 launch avone avone_control_bringup.launch.py 
+ros2 launch avone_nav nav2.launch.py 
