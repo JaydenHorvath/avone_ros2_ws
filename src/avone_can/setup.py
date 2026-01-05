@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'can_simulation'
+package_name = 'avone_can'
 
 setup(
     name=package_name,
@@ -20,10 +20,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'steer_id = can_simulation.steer_id:main',
-            'wheel_vel_test = can_simulation.wheel_vel_test:main',
-            'test_cantoros = can_simulation.test_cantoros:main',
-            'steer_pid_tune = can_simulation.steer_pid_tune:main',
+            'sim_steer_ang = avone_can.sim_steer_ang:main',
+            'sim_wheel_vel = avone_can.sim_wheel_vel:main',
+            'can_2_ros = avone_can.can_2_ros:main',
 
         ],  
     },

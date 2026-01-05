@@ -20,7 +20,7 @@ from rich.text import Text
 from rich import box
 
 # Configuration
-DBC_PATH = '/home/jay/Arduino/libraries/NUCAN/DBC Files/AV1.dbc'
+DBC_PATH = '/home/avone/NUTEAMSGIT/NUCAN/DBC Files/AV1.dbc'
 
 # Load DBC
 db = cantools.database.load_file(DBC_PATH)

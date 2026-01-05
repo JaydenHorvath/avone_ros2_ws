@@ -1,0 +1,191 @@
+
+
+====================================================================
+AVONE LAUNCH COMMANDS 
+====================================================================
+
+
+====================================================================
+MAIN CONTROL BRINGUP
+====================================================================
+
+Command:
+  ros2 launch avone avone_control_bringup.launch.py
+
+What this launches with individual commands:
+    - Generates robot_description from xacro (URDF)
+    - Publishes TF and joint states via robot_state_publisher
+    - Starts ros2_control and loads the Ackermann steering controller
+    - Spawns joint_state_broadcaster, then steering controller (sequenced)
+    - Relays controller odometry TF into /tf
+    - Starts cmd_vel filtering
+    - Launches teleop control for manual testing
+    - Optionally launches RViz after controllers are active
+
+
+
+
+
+
+=====================
+GPS BRINGUP
+=====================
+
+Command:
+ ros2 launch avone avone_gps_bringup.launch.py
+
+What this launches:
+    - Starts the NMEA GPS serial driver
+    - Publishes GPS fixes from a USB serial device
+    - Sets the GPS frame for localisation integration
+    - Converts GPS heading output into an IMU-compatible message
+    - Provides heading data for robot_localization and navigation
+
+Individual Commdands:
+
+• GPS serial driver (NMEA)
+  - Reads GPS data from USB serial
+  - Publishes NavSatFix messages
+  - Sets GPS frame for localisation
+
+  Command:
+    ros2 run nmea_navsat_driver nmea_serial_driver \
+      --ros-args \
+      -p port:=/dev/ttyUSB1 \
+      -p baud:=115200 \
+      -p frame_id:=gps_link1
+
+
+• GPS heading → IMU conversion
+  - Converts GPS heading output into IMU-compatible data
+  - Used as yaw input for robot_localization
+
+  Command:
+    ros2 run avone_localisation heading_to_imu
+
+=====================
+IMU BRINGUP
+=====================
+
+Command:
+  ros2 launch avone avone_imu_bringup.launch.py
+
+What this launches:
+  - Starts the VectorNav IMU interface node
+  - Initializes IMU communication and data publishing
+  - Publishes IMU orientation, angular velocity, and acceleration data
+  - Provides IMU data for localisation and state estimation
+  - (Optional) Static transform support for IMU frame alignment
+
+Individual Commands:
+
+• VectorNav IMU bringup
+  - Starts IMU communication
+  - Publishes sensor_msgs/Imu data
+  - Used as the primary IMU source for localisation
+
+  Command:
+    ros2 run avone_localisation imu_start \
+      --ros-args \
+      -p use_sim_time:=false
+
+=====================
+LIDAR BRINGUP
+=====================
+
+Command:
+  ros2 launch avone avone_lidar_bringup.launch.py
+
+What this launches:
+  - Starts the Quanergy LiDAR client
+  - Connects to the LiDAR over Ethernet
+  - Publishes LiDAR scan and point cloud data
+  - Publishes a static transform for the LiDAR frame
+  - Starts collision detection using LiDAR data
+
+Individual Commands:
+
+• Quanergy LiDAR client
+  - Connects to the Quanergy LiDAR over Ethernet
+  - Receives raw LiDAR data
+  - Publishes point cloud and scan topics
+
+  Command:
+    ros2 launch quanergy_client_ros client.launch.py \
+      host:=192.168.1.57
+
+
+• Static transform: laser_frame → quanergy
+  - Defines fixed transform between vehicle frame and LiDAR frame
+  - Used for correct TF alignment of LiDAR data
+
+  Command:
+    ros2 run tf2_ros static_transform_publisher \
+      0 0 0 \
+      0 0 0 \
+      laser_frame quanergy
+
+
+• Collision detection
+  - Monitors LiDAR data for front on obsticals
+  - Publishes collision CAN messaged, causing fault state
+  - Used as a safety layer during autonomous operation
+
+  Command:
+    ros2 run avone_nav collision_detection
+
+=====================
+LOCALISATION BRINGUP
+=====================
+
+Command:
+  ros2 launch avone avone_localisation_bringup.launch.py
+
+What this launches:
+  - Starts the local (odom-frame) EKF for vehicle state estimation
+  - Starts the global (map-frame) EKF for fused global localisation
+  - Launches navsat_transform to fuse GPS data into the localisation stack
+  - Provides odometry and pose outputs for navigation and control
+  - Establishes the full robot_localization pipeline (local + global)
+
+Individual Commands:
+
+• Local EKF (odom frame)
+  - Fuses IMU, wheel odometry, and local sensors
+  - Publishes locally consistent odometry
+  - Used for control and short-horizon navigation
+
+  Command:
+    ros2 launch avone_localisation local_ekf.launch.py
+
+
+• Global EKF (map frame)
+  - Fuses local odometry with global corrections
+  - Provides globally referenced pose estimates
+  - Used for navigation, mapping, and logging
+
+  Command:
+    ros2 launch avone_localisation global_ekf.launch.py
+
+
+• NavSat transform
+  - Converts GPS (NavSatFix) into a local Cartesian frame
+  - Aligns GPS data with IMU heading and odometry
+  - Feeds transformed GPS data into the global EKF
+
+  Command:
+    ros2 launch avone_localisation navsat_transform.launch.py
+
+
+--------------------------------------------------------------------
+
+Optional: Single-EKF Localisation (All Sensors Fused)
+
+• AV.ONE single EKF
+  - Fuses IMU, wheel odometry, and GPS in a single filter
+  - Publishes a unified filtered odometry output
+  - Used for early bringup, testing, or simplified deployments
+  - Not intended for final competition configuration
+
+  Command:
+    ros2 launch avone_localisation avone_ekf.launch.py

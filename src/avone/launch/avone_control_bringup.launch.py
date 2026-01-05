@@ -121,13 +121,13 @@ def generate_launch_description():
         }],
     )
 
-    static_map_tf = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='static_odom_to_map',
-        output='screen',
-        arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom']
-    )
+    # static_map_tf = Node(
+    #     package='tf2_ros',
+    #     executable='static_transform_publisher',
+    #     name='static_odom_to_map',
+    #     output='screen',
+    #     arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom']
+    # )
 
     # ---- Start order controls ----
     delay_rviz_after_jsb = RegisterEventHandler(
@@ -155,7 +155,7 @@ def generate_launch_description():
         # twiststamped_node,
         # joy_node,
         teleop_twist_joy_node,
-        static_map_tf,
+        # static_map_tf,
         cmd_filter_node,
     ]
 
