@@ -1,3 +1,4 @@
+
 ekf_filter_node_odom:
   ros__parameters:
     use_sim_time: true
@@ -14,7 +15,7 @@ ekf_filter_node_odom:
     ]
 
     # IMU input for orientation
-    imu0: /imu/data
+    imu0: /imu/data 
     imu0_config: [
       false, false, false,    # X, Y, Z positions
       false, false, false,     #  roll, pitch, yaw orientations
@@ -38,6 +39,7 @@ ekf_filter_node_odom:
 
 
         # IMU input for orientation
+
     imu1: /imu_gps
     imu1_config: [
       false, false, false,    # X, Y, Z positions

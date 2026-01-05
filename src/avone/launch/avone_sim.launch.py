@@ -23,6 +23,9 @@ from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
 from launch_ros.parameter_descriptions import ParameterValue
 
+from launch.actions import SetEnvironmentVariable
+from launch.substitutions import EnvironmentVariable
+
 
 def generate_launch_description():
     # Use /clock if running in Gazebo
@@ -31,6 +34,21 @@ def generate_launch_description():
     # Paths to your YAMLs in avone/config
     ekf_yaml = PathJoinSubstitution([FindPackageShare('avone'), 'config', 'ekf.yaml'])
     map_ekf_yaml = PathJoinSubstitution([FindPackageShare('avone'), 'config', 'map_ekf.yaml'])
+    avone_ekf_yaml = PathJoinSubstitution([FindPackageShare('avone_localisation'), 'config', 'avone_ekf.yaml'])
+
+
+    MODELS_PATH = "/home/avone/avone_ws/src/avone/worlds/models"
+
+    set_ign_models = SetEnvironmentVariable(
+        name="IGN_GAZEBO_RESOURCE_PATH",
+        value=MODELS_PATH
+    )
+
+    set_gz_models = SetEnvironmentVariable(
+        name="GZ_SIM_RESOURCE_PATH",
+        value=MODELS_PATH
+    )
+
 
     # # Environment variables for GPU offload
     # env_offload = SetEnvironmentVariable(
@@ -73,17 +91,36 @@ def generate_launch_description():
     # -------------------------------------------------------------------------
     # robot_localization Nodes
     # -------------------------------------------------------------------------
-    ekf_local_node = Node(
+
+
+    imu_to_imu_gps = Node(
+    package='topic_tools',
+    executable='relay',
+    name='relay_imu_to_imu_gps',
+    arguments=['/imu', '/imu_gps'],
+    output='screen',
+    )
+
+    imu_to_imu_data = Node(
+        package='topic_tools',
+        executable='relay',
+        name='relay_imu_to_imu_data',
+        arguments=['/imu', '/imu/data'],
+        output='screen',
+    )
+
+
+    ekf_avone_node = Node(
         package='robot_localization',
         executable='ekf_node',
         name='ekf_filter_node_odom',
         output='screen',
         parameters=[
             {'use_sim_time': use_sim_time},
-            ekf_yaml
+            avone_ekf_yaml
         ],
         remappings=[
-            ('odometry/filtered', '/odometry/local'),
+            ('odometry/filtered', '/odometry/avone'),
         ]
     )
 
@@ -94,30 +131,19 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'use_sim_time': use_sim_time},
-            {'frequency': 30.0, 'publish_filtered_gps': False},
-             {'broadcast_utm_transform': True},
+            {'frequency': 30.0, 'publish_filtered_gps': True},
+             {'broadcast_utm_transform': False},
             
         ],
          remappings=[
-            ('gps/fix', '/navsat1'),
-            ('odometry/filtered', '/odometry/local'),
-            ('odometry/gps', '/odometry/gps'),
+            ('gps/fix', '/fix'),
+            ('odometry/filtered', '/odometry/avone'),
+            ('odometry/gps', '/odometry/gps1'),
+            ('imu', '/imu'),
          ]
     )
 
-    ekf_map_node = Node(
-        package='robot_localization',
-        executable='ekf_node',
-        name='ekf_filter_node_map',
-        output='screen',
-        parameters=[
-            {'use_sim_time': use_sim_time},
-            map_ekf_yaml
-        ],
-        remappings=[
-            ('odometry/filtered', '/odometry/global'),
-        ]
-    )
+  
 
     static_map_tf =      Node(
             package='tf2_ros',
@@ -163,9 +189,7 @@ def generate_launch_description():
             'camera/image_raw@sensor_msgs/msg/Image[ignition.msgs.Image',
             '/navsat1@sensor_msgs/msg/NavSatFix[ignition.msgs.NavSat',
             '/navsat2@sensor_msgs/msg/NavSatFix[ignition.msgs.NavSat',
-            # '/depth/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
-            # '/depth/image_raw@sensor_msgs/msg/Image[ignition.msgs.Image',
-            # '/depth/image_raw/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
+           
         ],
         remappings=[
             ('rgbdcamera/image', '/camera/rgbd/image_raw'),
@@ -174,8 +198,30 @@ def generate_launch_description():
             ('rgbdcamera/depth_image', '/camera/rgbd/depth_image'),
             ('/lidar', '/scan'),
             ('/lidar/points', '/lidar/points'),
+            ('/navsat1', '/fix'),
+    
+            
         ]
     )
+
+    # Node(
+    #     package='topic_tools',
+    #     executable='relay',
+    #     name='imu_data',
+    #     arguments=[
+    #         '/imu', '/imu/data'],
+    #     output='screen'
+    # ),
+
+    # Node(
+    #     package='topic_tools',
+    #     executable='relay',
+    #     name='imu_gps',
+    #     arguments=[
+    #         '/imu', '/imu_gps'],
+    #     output='screen'
+    # ),
+
 
 
 
@@ -188,7 +234,7 @@ def generate_launch_description():
             ])
         ),
         launch_arguments={
-            'gz_args': '-r -v1 /home/avone/avone_ws/src/avone/worlds/random_cylinders.sdf'
+            'gz_args': '-r -v1 /home/avone/avone_ws/src/avone/worlds/smalltrack.world'
         }.items()
     )
 
@@ -199,22 +245,23 @@ def generate_launch_description():
         arguments=[
             '-entity', 'my_robot',
             '-topic', 'robot_description',
+
             # small track
             # '-x', '-14.8',
             # '-y', '11',
             # '-z', '0.1',
             # '--Y', '0'
 
-            '-x', '0',
-            '-y', '0',
-            '-z', '0',
-            '--Y', '0'
+            # '-x', '0',
+            # '-y', '0',
+            # '-z', '0',
+            # '--Y', '0'
 
             # # small track
-            # '-x', '-10.0',
-            # '-y', '11',
-            # '-z', '0.1',
-            # '--Y', '0'
+            '-x', '-10.0',
+            '-y', '11',
+            '-z', '0.1',
+            '--Y', '0'
             # accel
             # '-x', '25.2118',
             # '-y', '-0.2167',
@@ -296,21 +343,21 @@ def generate_launch_description():
         output='screen'
     )
 
-    # teleop_twist_joy_node = Node(
-    #     package='teleop_twist_joy',
-    #     executable='teleop_node',
-    #     name='teleop_twist_joy_node',
-    #     output='screen',
-    #     parameters=[{
-    #         'stamp': True,
-    #         'axis_linear.x': 1,
-    #         'scale_linear.x': 2.0,
-    #         'axis_angular.yaw': 3,
-    #         'scale_angular.yaw': 0.5,
-    #         'enable_button': 4,
-    #         'repeat_rate': 50.0
-    #     }],
-    # )
+    teleop_twist_joy_node = Node(
+        package='teleop_twist_joy',
+        executable='teleop_node',
+        name='teleop_twist_joy_node',
+        output='screen',
+        parameters=[{
+            'stamp': True,
+            'axis_linear.x': 1,
+            'scale_linear.x': 2.0,
+            'axis_angular.yaw': 3,
+            'scale_angular.yaw': 0.5,
+            'enable_button': 4,
+            'repeat_rate': 50.0
+        }],
+    )
 
     # -------------------------------------------------------------------------
     # Build the combined LaunchDescription
@@ -325,6 +372,8 @@ def generate_launch_description():
             description='Use simulation (Gazebo) clock'
         ),
 
+        set_ign_models,
+        set_gz_models,
         # ----------------------------------------------------
         # 2) GPU environment variables
         # ----------------------------------------------------
@@ -381,9 +430,10 @@ def generate_launch_description():
         # 10) robot_localization Nodes
         # ---------------------------------------------------- 
          static_map_tf,
-        # ekf_local_node,
-        # ekf_map_node,
-        # navsat_transform_node,
+        ekf_avone_node,
+        navsat_transform_node,
+        imu_to_imu_gps,
+        imu_to_imu_data,
         
           
     #    tf_odometry_relay,
@@ -398,5 +448,5 @@ def generate_launch_description():
         joy_node,
         cmd_filter_node,
         # twiststamped_node,
-        # teleop_twist_joy_node,
+        teleop_twist_joy_node,
     ])

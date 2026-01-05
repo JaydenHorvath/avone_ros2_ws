@@ -17,8 +17,8 @@ def generate_launch_description():
 
     # === DBC CAN bridge ===
     dbc_can_bridge = Node(
-        package='can_simulation',
-        executable='test_cantoros',
+        package='avone_can',
+        executable='can_2_ros',
         name='dbc_can_bridge',
         output='screen',
         parameters=[{
