@@ -20,7 +20,8 @@ from launch.substitutions import (
 )
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
-
+from ament_index_python.packages import get_package_share_directory
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
@@ -31,27 +32,30 @@ def generate_launch_description():
     ekf_yaml = PathJoinSubstitution([FindPackageShare('avone'), 'config', 'ekf.yaml'])
     map_ekf_yaml = PathJoinSubstitution([FindPackageShare('avone'), 'config', 'map_ekf.yaml'])
 
-    # Environment variables for GPU offload
-    env_offload = SetEnvironmentVariable(
-        name='__NV_PRIME_RENDER_OFFLOAD',
-        value='1'
-    )
-    env_vendor = SetEnvironmentVariable(
-        name='__GLX_VENDOR_LIBRARY_NAME',
-        value='nvidia'
-    )
+    # # Environment variables for GPU offload
+    # env_offload = SetEnvironmentVariable(
+    #     name='__NV_PRIME_RENDER_OFFLOAD',
+    #     value='1'
+    # )
+    # env_vendor = SetEnvironmentVariable(
+    #     name='__GLX_VENDOR_LIBRARY_NAME',
+    #     value='nvidia'
+    # )
 
     # Robot description via xacro
-    robot_description_content = Command([
-        PathJoinSubstitution([FindExecutable(name='xacro')]),
-        ' ',
-        PathJoinSubstitution([
-            FindPackageShare('avone'),
-            'description', 'robot.urdf.xacro'
-        ])
-    ])
     robot_description = {
-        'robot_description': robot_description_content,
+        'robot_description': ParameterValue(
+            Command([
+                PathJoinSubstitution([FindExecutable(name='xacro')]),
+                ' ',
+                PathJoinSubstitution([
+                    FindPackageShare('avone'),
+                    'description',
+                    'robot.urdf.xacro'
+                ])
+            ]),
+            value_type=str
+        ),
         'use_sim_time': use_sim_time
     }
 
@@ -184,7 +188,7 @@ def generate_launch_description():
             ])
         ),
         launch_arguments={
-            'gz_args': '-r -v1 /home/jay/ros2_ws/src/avone/worlds/random_cylinders.sdf'
+            'gz_args': '-r -v1 /home/avone/avone_ws/src/avone/worlds/random_cylinders.sdf'
         }.items()
     )
 
@@ -324,8 +328,8 @@ def generate_launch_description():
         # ----------------------------------------------------
         # 2) GPU environment variables
         # ----------------------------------------------------
-        env_offload,
-        env_vendor,
+        # env_offload,
+        # env_vendor,
 
         # ----------------------------------------------------
         # 3) Robot State Publisher

@@ -1,7 +1,7 @@
 controller_manager:
   ros__parameters:
     update_rate: 50  # Hz
-    use_sim_time: false        # ← add this
+    use_sim_time: false        
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
@@ -18,7 +18,7 @@ ackermann_steering_controller:
     wheelbase: 1.74
     front_wheel_track: 1.245
     rear_wheel_track: 1.245
-    front_wheels_radius: 0.440 # THIS IS DOUBLE THE REAL WHEEL SIZE DUE TO DOUBLE WHEEL RPM FROM KELLY  CONTROLLER
+    front_wheels_radius: 0.440 # THIS IS DOUBLE THE REAL WHEEL SIZE DUE TO DOUBLE WHEEL RPM FROM KELLY  CONTROLLER 
     rear_wheels_radius: 0.440
     front_steering: true
     reference_timeout: 2.0
