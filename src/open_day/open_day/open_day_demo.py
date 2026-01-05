@@ -228,9 +228,9 @@ class ConeSteeringController(Node):
             raw_value_clamped = max(0, min(255, raw_value_int))
             
             # Create CAN message
-            # ID 4 (0x04), 1 byte of data
+            # ID 9 (0x09), 1 byte of data
             message = can.Message(
-                arbitration_id=0x04,  # ROS_STEER_ANG_TARGET
+                arbitration_id=0x09,  # ROS_STEER_ANG_TARGET
                 data=[raw_value_clamped],
                 is_extended_id=False
             )
@@ -239,7 +239,7 @@ class ConeSteeringController(Node):
             self.can_bus.send(message)
             
             # DEBUG: Log what was actually sent
-            self.get_logger().info(f'Sent CAN: ID=0x04, data=[{raw_value_clamped:02X}] ({raw_value_clamped})')
+            self.get_logger().info(f'Sent CAN: ID=0x09, data=[{raw_value_clamped:02X}] ({raw_value_clamped})')
             
         except Exception as e:
             self.get_logger().error(f'Failed to send CAN message: {e}')
