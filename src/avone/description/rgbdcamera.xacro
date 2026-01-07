@@ -1,49 +1,91 @@
 <?xml version="1.0"?>
+<!--
+rgbdcamera.xacro
+
+Purpose
+  Defines a fixed mounted RGBD camera on the chassis and adds a Gazebo RGBD
+  sensor that publishes both color and depth streams.
+
+Frames
+  chassis -> rgbdcamera_link -> rgbdcamera_link_optical
+
+Notes on optical frame
+  rgbdcamera_link_optical uses the REP-103/REP-105 optical convention:
+    X right, Y down, Z forward
+  The rpy of (-pi/2, 0, -pi/2) rotates a standard link frame into optical.
+
+Gazebo sensor
+  Uses a Gazebo 'rgbd' sensor (color + depth) with a single topic root.
+  Tune: update_rate, resolution, fov, clip near/far.
+
+Common gotchas
+  If you want the published messages stamped with the optical frame,
+  set gz_frame_id to rgbdcamera_link_optical (not rgbdcamera_link).
+-->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <!-- 1) raw camera on the chassis -->
+  <!-- 1) Fixed mount from chassis to the camera body link -->
   <joint name="rgbdcamera_joint" type="fixed">
     <parent link="chassis"/>
     <child  link="rgbdcamera_link"/>
+    <!-- Mount pose (meters, radians) -->
     <origin xyz="0.6909 0 0.772413" rpy="0 0 0"/>
   </joint>
+
+  <!-- Camera body link (add visual/collision if you want to see it) -->
   <link name="rgbdcamera_link"/>
 
-  <!-- 2) optical frame, with X→right, Y→down, Z→forward -->
+  <!-- 2) Optical frame: X right, Y down, Z forward -->
   <joint name="rgbdcamera_optical_joint" type="fixed">
     <parent link="rgbdcamera_link"/>
     <child  link="rgbdcamera_link_optical"/>
-    <!-- roll = -90°, pitch = 0, yaw = -90° -->
+    <!-- roll=-90°, yaw=-90°: standard optical frame rotation -->
     <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
   </joint>
   <link name="rgbdcamera_link_optical"/>
 
-  <!-- 3) Gazebo ROS2 camera plugin on the OPTICAL link -->
+  <!-- 3) Gazebo RGBD sensor attached to the camera link -->
   <gazebo reference="rgbdcamera_link">
+
     <sensor name="rgbdcamera" type="rgbd">
+
+      <!-- Topic namespace/root for this sensor -->
       <topic>rgbdcamera</topic>
+
+      <!-- Frame id stamped into Gazebo-published messages -->
+      <!-- Consider switching this to rgbdcamera_link_optical if you want optical stamping -->
       <gz_frame_id>rgbdcamera_link</gz_frame_id>
+
+      <!-- Keep zero if mounting is already defined by the joint -->
       <pose>0 0 0 0 0 0</pose>
+
+      <!-- Publish rate (Hz) -->
       <update_rate>30</update_rate>
+
       <camera>
         <horizontal_fov>1.2042771838760875</horizontal_fov>
-         <image>
-                <width>640</width>
+
+        <!-- Color image stream -->
+        <image>
+          <width>640</width>
           <height>360</height>
           <format>R8G8B8</format>
         </image>
 
-        <!-- Depth image (640×480, L16) -->
+        <!-- Depth image stream -->
         <depth>
-           <width>640</width>
+          <width>640</width>
           <height>360</height>
           <format>L16</format>
         </depth>
+
+        <!-- Clipping planes -->
         <clip>
           <near>0.1</near>
           <far>20.0</far>
         </clip>
       </camera>
+
     </sensor>
   </gazebo>
 

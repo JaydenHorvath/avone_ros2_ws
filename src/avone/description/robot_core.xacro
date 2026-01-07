@@ -1,98 +1,134 @@
 <?xml version="1.0"?>
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro" >
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-    <xacro:include filename="inertial_macros.xacro"/>
+  <!-- ========================================================= -->
+  <!-- AV.ONE Robot Core Model (robot_core.xacro)                 -->
+  <!-- ========================================================= -->
+  <!-- Purpose:
+       - Defines the main kinematic tree (links + joints)
+       - Adds visual + collision geometry (meshes)
+       - Provides inertial approximations via inertial macros
+       - Acts as the base include for sensors/controllers xacros
 
-    <!-- FOR GAZEBO SIM - CHANGE MESH TO FULL PATH - EG: -->
-    <!-- Replace package:// with file:///home/avone/avone_ws/src/ (user and folder dependant)-->
-
-    <!-- <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/chassis.stl"/> -->
-    
-
-    <material name="white">
-        <color rgba="1 1 1 1" />
-    </material>
-
-    <material name="orange">
-        <color rgba="1 0.3 0.1 1"/>
-    </material>
-
-    <material name="blue">
-        <color rgba="0.2 0.2 1 1"/>
-    </material>
-
-    <material name="black">
-        <color rgba="0 0 0 1"/>
-    </material>
-
-   <!-- BASE LINK -->
-
-    <!-- BASE LINK -->
-    <link name="base_link">
-      <!-- You can add visual, collision, and inertial info here -->
-    </link>
-
-    <joint name="base_footprint_joint" type="fixed">
-        <parent link="base_link"/>
-        <child link="base_footprint"/>
-        <origin xyz="1.0 0 0" rpy="0 0 0"/>
-    </joint>
-
-    <link name="base_footprint">
-    </link>
+       Notes:
+       - Mesh paths are hard-coded to a local workspace path for Gazebo.
+         If you move machines/users, update the file:///home/... paths.
+       - This file defines the vehicle body, wheels, and steering joints.
+       - Gazebo plugin blocks at the end are currently disabled via XML comments.
 
 
-    <!-- Fixed joint connecting base_link to chassis -->
-    <joint name="base_to_chassis" type="fixed">
-      <parent link="base_link"/>
-      <child link="chassis"/>
-      <origin xyz="0 0 0.2028" rpy="0 0 0"/>
-    </joint>
+  -->
 
+  <!-- ========================================================= -->
+  <!-- Includes                                                   -->
+  <!-- ========================================================= -->
+  <xacro:include filename="inertial_macros.xacro"/>
 
+  <!-- ========================================================= -->
+  <!-- Mesh path notes                                             -->
+  
+  <!-- ========================================================= -->
 
-   
+  <!-- Could not figure out a way to have meshes work for both gazebo simulator and rviz  -->
+  <!-- without hard-coding path. Using package is ideal way, but doesnt work with gazebo. -->
 
-    <link name="chassis">
-        <visual>
-            <origin xyz="2.2924 -0.00985747 0.0751" rpy="3.14159 0 1.5708"/>
-            <geometry>
+  <!-- Default (recommended): use package:// so it works on any machine -->
+  <!-- Example: <mesh filename="package://avone/description/assets/chassis.stl"/> -->
 
+  <!-- Gazebo / sim fallback: if your simulator does NOT resolve package:// URIs,
+       swap package://avone/description/assets/... with an absolute file:// path.
+       Example:
+       <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/chassis.stl"/> -->
 
-                  <mesh filename="package://avone/description/assets/chassis.stl"/>
+  <!-- ========================================================= -->
+  <!-- Materials                                                   -->
+  <!-- ========================================================= -->
+  <material name="white">
+    <color rgba="1 1 1 1"/>
+  </material>
 
-              
- 
+  <material name="orange">
+    <color rgba="1 0.3 0.1 1"/>
+  </material>
 
-            </geometry>
-            <material name="blue"/>
-        </visual>
-        <collision>
-            <origin xyz="2.2924 -0.00985747 0.0751" rpy="3.14159 0 1.5708"/>
-            <geometry>
-                    <mesh filename="package://avone/description/assets/chassis.stl"/>      
+  <material name="blue">
+    <color rgba="0.2 0.2 1 1"/>
+  </material>
 
+  <material name="black">
+    <color rgba="0 0 0 1"/>
+  </material>
 
-            </geometry>
-        </collision>
-        <xacro:inertial_box mass="152" x="2.4" y="0.67" z="0.5">
-            <origin xyz="0.812063 -0.000266118 0.127823" rpy="0 0 0"/>
-        </xacro:inertial_box>
-   
+  <!-- ========================================================= -->
+  <!-- Base frames                                                 -->
+  <!-- ========================================================= -->
+  <!-- base_link: primary robot base frame (REP-103 style root) -->
+  <link name="base_link">
+    <!-- You can add visual, collision, and inertial info here -->
+  </link>
 
-     <!-- Part rear_suspension -->
+  <!-- base_footprint: typically planar reference for navigation -->
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="base_footprint"/>
+    <origin xyz="1.0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="base_footprint"/>
+
+  <!-- ========================================================= -->
+  <!-- Chassis connection                                          -->
+  <!-- ========================================================= -->
+  <!-- Fixed joint connecting base_link to chassis -->
+  <joint name="base_to_chassis" type="fixed">
+    <parent link="base_link"/>
+    <child link="chassis"/>
+    <origin xyz="0 0 0.2028" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ========================================================= -->
+  <!-- Chassis link                                                 -->
+  <!-- ========================================================= -->
+  <link name="chassis">
+
+    <!-- Main chassis body mesh -->
     <visual>
-      <origin xyz="-0.170629 -0.28192 0.105" rpy="3.14159 5.47382e-48 -0.0851102"/>
+      <origin xyz="2.2924 -0.00985747 0.0751" rpy="3.14159 0 1.5708"/>
       <geometry>
-        <mesh filename="package://avone/description/assets/rear_suspension.stl"/>      
-        
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/chassis.stl"/>
       </geometry>
       <material name="blue"/>
     </visual>
+
+    <collision>
+      <origin xyz="2.2924 -0.00985747 0.0751" rpy="3.14159 0 1.5708"/>
+      <geometry>
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/chassis.stl"/>
+      </geometry>
+    </collision>
+
+    <!-- Approx inertial model for chassis -->
+    <xacro:inertial_box mass="152" x="2.4" y="0.67" z="0.5">
+      <origin xyz="0.812063 -0.000266118 0.127823" rpy="0 0 0"/>
+    </xacro:inertial_box>
+
+    <!-- ===================================================== -->
+    <!-- Rear suspension meshes                                  -->
+    <!-- ===================================================== -->
+
+    <!-- Part rear_suspension -->
+    <visual>
+      <origin xyz="-0.170629 -0.28192 0.105" rpy="3.14159 5.47382e-48 -0.0851102"/>
+      <geometry>
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/rear_suspension.stl"/>
+      </geometry>
+      <material name="blue"/>
+    </visual>
+
     <collision>
       <origin xyz="-0.170629 -0.28192 0.105" rpy="3.14159 5.47382e-48 -0.0851102"/>
       <geometry>
-        <mesh filename="package://avone/description/assets/rear_suspension.stl"/>      
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/rear_suspension.stl"/>
       </geometry>
     </collision>
 
@@ -100,29 +136,35 @@
     <visual>
       <origin xyz="0.189017 0.312761 0.105" rpy="-3.14159 2.33363e-61 -3.05648"/>
       <geometry>
-        <mesh filename="package://avone/description/assets/rear_suspension.stl"/>      
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/rear_suspension.stl"/>
       </geometry>
       <material name="blue"/>
     </visual>
+
     <collision>
       <origin xyz="0.189017 0.312761 0.105" rpy="-3.14159 2.33363e-61 -3.05648"/>
       <geometry>
-        <mesh filename="package://avone/description/assets/rear_suspension.stl"/>      
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/rear_suspension.stl"/>
       </geometry>
     </collision>
+
+    <!-- ===================================================== -->
+    <!-- Front suspension meshes                                 -->
+    <!-- ===================================================== -->
 
     <!-- Part front_suspension -->
     <visual>
       <origin xyz="1.6032 0.2935 0.075" rpy="3.14159 -1.54112e-16 1.5708"/>
       <geometry>
-        <mesh filename="package://avone/description/assets/front_suspension.stl"/>      
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/front_suspension.stl"/>
       </geometry>
       <material name="blue"/>
     </visual>
+
     <collision>
       <origin xyz="1.6032 0.2935 0.075" rpy="3.14159 -1.54112e-16 1.5708"/>
       <geometry>
-        <mesh filename="package://avone/description/assets/front_suspension.stl"/>      
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/front_suspension.stl"/>
       </geometry>
     </collision>
 
@@ -130,380 +172,347 @@
     <visual>
       <origin xyz="1.8748 -0.2935 0.075" rpy="-3.14159 1.54112e-16 -1.5708"/>
       <geometry>
-        <mesh filename="package://avone/description/assets/front_suspension.stl"/>      
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/front_suspension.stl"/>
       </geometry>
       <material name="blue"/>
     </visual>
+
     <collision>
       <origin xyz="1.8748 -0.2935 0.075" rpy="-3.14159 1.54112e-16 -1.5708"/>
       <geometry>
-        <mesh filename="package://avone/description/assets/front_suspension.stl"/>      
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/front_suspension.stl"/>
       </geometry>
     </collision>
-  
 
+    <!-- ===================================================== -->
+    <!-- Rear wheel hub meshes (cosmetic on chassis link)         -->
+    <!-- ===================================================== -->
 
-
-
-  <!-- REAR WHEEL HUB LEFT -->
-
+    <!-- REAR WHEEL HUB LEFT -->
     <visual>
       <origin xyz="-0.181377 0.297001 -0.105" rpy="6.30462e-15 0 -6.18615e-05"/>
       <geometry>
-        <mesh filename="package://avone/description/assets/rear_wheel_hub.stl"/>      
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/rear_wheel_hub.stl"/>
       </geometry>
       <material name="white"/>
     </visual>
+
     <collision>
       <origin xyz="-0.181377 0.297001 -0.105" rpy="6.30462e-15 0 -6.18615e-05"/>
       <geometry>
-        <mesh filename="package://avone/description/assets/rear_wheel_hub.stl"/>      
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/rear_wheel_hub.stl"/>
       </geometry>
     </collision>
- 
 
- 
-
-  <!-- REAR WHEEL HUB RIGHT -->
-
+    <!-- REAR WHEEL HUB RIGHT -->
     <visual>
       <origin xyz="0.181423 -0.296978 -0.105" rpy="3.10966e-15 7.00787e-15 -3.14153"/>
       <geometry>
-        <mesh filename="package://avone/description/assets/rear_wheel_hub.stl"/>      
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/rear_wheel_hub.stl"/>
       </geometry>
       <material name="white"/>
     </visual>
+
     <collision>
       <origin xyz="0.181423 -0.296978 -0.105" rpy="3.10966e-15 7.00787e-15 -3.14153"/>
       <geometry>
-        <mesh filename="package://avone/description/assets/rear_wheel_hub.stl"/>      
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/rear_wheel_hub.stl"/>
       </geometry>
     </collision>
+
   </link>
 
+  <!-- ========================================================= -->
+  <!-- Gazebo material override for chassis                        -->
+  <!-- ========================================================= -->
   <gazebo reference="chassis">
     <material>Gazebo/Blue</material>
   </gazebo>
 
+  <!-- ========================================================= -->
+  <!-- Rear drivetrain joints and wheel links                      -->
+  <!-- ========================================================= -->
 
+  <!-- LEFT WHEEL LINK (RLMotor) -->
+  <joint name="RLMotor" type="continuous">
+    <origin xyz="4.71381e-05 0.693977 3.30291e-15" rpy="1.5708 0 -6.18615e-05"/>
+    <parent link="chassis"/>
+    <child link="left_motor"/>
+    <axis xyz="0 0 -1"/>
+    <dynamics damping="0.02" friction="0.2"/> 
+    <limit effort="108.6" velocity="36.65"/>
+  </joint>
 
-    <!-- LEFT WHEEL LINK (RLMotor) -->
-    <joint name="RLMotor" type="continuous">
-        <origin xyz="4.71381e-05 0.693977 3.30291e-15" rpy="1.5708 0 -6.18615e-05"/>
-        <parent link="chassis"/>
-        <child link="left_motor"/>
-        <axis xyz="0 0 -1"/>
+  <link name="left_motor">
+    <visual>
+      <origin xyz="-8.09391e-17 7.65875e-18 0.17" rpy="1.5708 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/wheel.stl"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
 
-     <dynamics damping="0.02" friction="0.2"/>
+    <collision>
+      <origin xyz="-8.09391e-17 7.65875e-18 0.17" rpy="1.5708 0 0"/>
+      <geometry>
+        <sphere radius="0.220"/>
+      </geometry>
+    </collision>
 
-      <limit 
-          effort="108.6"         
-          velocity="36.65"/>  
-          <!-- NEED TO FIND THIS ^^ -->
-        <!-- 
-            effort (Nm) = kT × I_cont  
-              ≈ 0.955 Nm/A × 95 A = 91 Nm 
-            velocity (rad/s) = Kv × V  
-              ≈ (10 rpm/V × 96 V) × (2π/60) ≈ 100.7 rad/s 
-            :contentReference[oaicite:0]{index=0} 
-        -->
-      </joint>
+    <xacro:inertial_cylinder mass="9.8" length="0.2" radius="0.2">
+      <origin xyz="-8.09407e-17 -1.33567e-17 0.0496398" rpy="0 0 0"/>
+    </xacro:inertial_cylinder>
+  </link>
 
+  <gazebo reference="left_motor">
+    <material>Gazebo/Grey</material>
+  </gazebo>
 
+  <!-- RIGHT WHEEL LINK (RRMotor) -->
+  <joint name="RRMotor" type="continuous">
+    <origin xyz="4.71381e-05 -0.693977 2.30371e-15" rpy="1.5708 0 -3.14153"/>
+    <parent link="chassis"/>
+    <child link="right_motor"/>
+    <axis xyz="0 0 1"/>
 
-    <link name="left_motor">
-        <visual>
-            <origin xyz="-8.09391e-17 7.65875e-18 0.17" rpy="1.5708 0 0"/>
-            <geometry>
-                    <mesh filename="package://avone/description/assets/wheel.stl"/>      
-                 <!--  <box size="0.3 0.3 0.15"/> -->
+    <dynamics damping="0.02" friction="0.2"/>
+    <limit effort="108.6" velocity="36.65"/>
+    <!-- Could be wrong ;) -->
 
-            </geometry>
-            <material name="black"/>
-        </visual>
-        <collision>
-            <origin xyz="-8.09391e-17 7.65875e-18 0.17" rpy="1.5708 0 0"/>
-            <geometry>
-                     <!--<mesh filename="package://avone/description/assets/wheel.stl"/>    -->  
-                                        <sphere radius="0.203"/>    
-                 <!--  <box size="0.3 0.3 0.15"/> -->
-            </geometry>
-        </collision>
-        <xacro:inertial_cylinder mass="9.8" length="0.2" radius="0.2">
-            <origin xyz="-8.09407e-17 -1.33567e-17 0.0496398" rpy="0 0 0"/>
-        </xacro:inertial_cylinder>
-    </link>
+  </joint>
 
-    <gazebo reference="left_motor">
-        <material>Gazebo/Grey</material>
-    </gazebo>
+  <link name="right_motor">
+    <visual>
+      <origin xyz="-1.59877e-17 7.65404e-18 0.17" rpy="1.5708 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/wheel.stl"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
 
+    <collision>
+      <origin xyz="-1.59877e-17 7.65404e-18 0.17" rpy="1.5708 0 0"/>
+      <geometry>
+        <sphere radius="0.220"/>
+      </geometry>
+    </collision>
 
-    <!-- RIGHT WHEEL LINK (RRMotor) -->
-    <joint name="RRMotor" type="continuous">
-        <origin xyz="4.71381e-05 -0.693977 2.30371e-15" rpy="1.5708 0 -3.14153"/>
-        <parent link="chassis"/>
-        <child link="right_motor"/>
-        <axis xyz="0 0 1"/>
+    <xacro:inertial_cylinder mass="9.8" length="0.2" radius="0.2">
+      <origin xyz="-1.66794e-17 -1.33614e-17 0.0496398" rpy="0 0 0"/>
+    </xacro:inertial_cylinder>
+  </link>
 
-      <dynamics damping="0.02" friction="0.2"/>
+  <gazebo reference="right_motor">
+    <material>Gazebo/Grey</material>
+  </gazebo>
 
-      <limit 
-          effort="108.6"         
-          velocity="36.65"/>   
-    </joint>
-       
-    <link name="right_motor">
-        <visual>
-            <origin xyz="-1.59877e-17 7.65404e-18 0.17" rpy="1.5708 0 0"/>
-            <geometry>
-                    <mesh filename="package://avone/description/assets/wheel.stl"/>      
-                 <!--  <box size="0.3 0.3 0.15"/> -->
-            </geometry>
-            <material name="black"/>
-        </visual>
-        <collision>
-            <origin xyz="-1.59877e-17 7.65404e-18 0.17" rpy="1.5708 0 0"/>
-            <geometry>
-                     <sphere radius="0.203"/>    
-                 <!--  <box size="0.3 0.3 0.15"/> -->
-            </geometry>
-        </collision>
-        <xacro:inertial_cylinder mass="9.8" length="0.2" radius="0.2">
-            <origin xyz="-1.66794e-17 -1.33614e-17 0.0496398" rpy="0 0 0"/>
-        </xacro:inertial_cylinder>
-    </link>
+  <!-- ========================================================= -->
+  <!-- Front right steering and wheel                              -->
+  <!-- ========================================================= -->
 
-    <gazebo reference="right_motor">
-        <material>Gazebo/Grey</material>
-    </gazebo>
+  <!-- FRONT RIGHT STEERING ASSEMBLY -->
+  <joint name="RSteer" type="revolute">
+    <origin xyz="1.739 -0.584139 0.075" rpy="-3.14159 0 -1.5708"/>
+    <parent link="chassis"/>
+    <child link="front_right_wheel_hub"/>
+    <axis xyz="0 0 -1"/>
+    <limit effort="33.4" velocity="1.0" lower="-0.610865" upper="0.610865"/>
+    <dynamics damping="0.1" friction="0.05"/>
+  </joint>
 
+  <link name="front_right_wheel_hub">
+    <visual>
+      <origin xyz="-0.290639 0.1358 0.18" rpy="-3.14159 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/front_wheel_hub.stl"/>
+      </geometry>
+      <material name="white"/>
+    </visual>
 
-    <!-- FRONT RIGHT STEERING ASSEMBLY -->
-    <!-- FRONT RIGHT STEERING ASSEMBLY -->
-    <joint name="RSteer" type="revolute">
-        <origin xyz="1.739 -0.584139 0.075" rpy="-3.14159 0 -1.5708"/>
-        <parent link="chassis"/>
-        <child link="front_right_wheel_hub"/>
-        <axis xyz="0 0 -1"/>
-        <limit  effort="33.4" 
-          velocity="1.0" 
-          lower="-0.610865" 
-          upper="0.610865"/>
-         
-          <dynamics damping="0.1" friction="0.05"/>
-    </joint>
+    <collision>
+      <origin xyz="-0.290639 0.1358 0.18" rpy="-3.14159 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/front_wheel_hub.stl"/>
+      </geometry>
+    </collision>
 
-    <link name="front_right_wheel_hub">
-        <visual>
-            <origin xyz="-0.290639 0.1358 0.18" rpy="-3.14159 0 0"/>
-            <geometry>
-                    <mesh filename="package://avone/description/assets/front_wheel_hub.stl"/>      
-                 <!--  <box size="0.3 0.3 0.15"/> -->
-            </geometry>
-            <material name="white"/>
-        </visual>
-        <collision>
-            <origin xyz="-0.290639 0.1358 0.18" rpy="-3.14159 0 0"/>
-            <geometry>
-                    <mesh filename="package://avone/description/assets/front_wheel_hub.stl"/>      
-                 <!--  <box size="0.3 0.3 0.15"/> -->
-            </geometry>
-        </collision>
-        <xacro:inertial_box mass="1.6" x="0.1" y="0.1" z="0.1">
-            <origin xyz="0.0824722 0 0.09" rpy="0 0 0"/>
-        </xacro:inertial_box>
-    </link>
+    <xacro:inertial_box mass="1.6" x="0.1" y="0.1" z="0.1">
+      <origin xyz="0.0824722 0 0.09" rpy="0 0 0"/>
+    </xacro:inertial_box>
+  </link>
 
-    <gazebo reference="front_right_wheel_hub">
-        <material>Gazebo/Black</material>
-    </gazebo>
+  <gazebo reference="front_right_wheel_hub">
+    <material>Gazebo/Black</material>
+  </gazebo>
 
-   
+  <!-- Front right wheel spin joint -->
+  <joint name="FRWheel" type="continuous">
+    <origin xyz="0.10836 0 0.09" rpy="1.5708 0 -1.5708"/>
+    <parent link="front_right_wheel_hub"/>
+    <child link="front_right_wheel"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="50" velocity="100"/>
+    <dynamics damping="0.0" friction="0.0"/>
+  </joint>
 
+  <link name="front_right_wheel">
+    <visual>
+      <origin xyz="2.22045e-16 0 0.17" rpy="1.5708 0 1.5708"/>
+      <geometry>
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/wheel.stl"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
 
-    <joint name="FRWheel" type="continuous">
-        <origin xyz="0.10836 0 0.09" rpy="1.5708 0 -1.5708"/>
-        <parent link="front_right_wheel_hub"/>
-        <child link="front_right_wheel"/>
-        <axis xyz="0 0 1"/>
-        <limit effort="50" velocity="100"/>
-        <dynamics damping="0.0" friction="0.0"/>
-    </joint>
+    <collision>
+      <origin xyz="2.22045e-16 0 0.17" rpy="1.5708 0 1.5708"/>
+      <geometry>
+        <sphere radius="0.220"/>
+      </geometry>
+    </collision>
 
-    <link name="front_right_wheel">
-        <visual>
-            <origin xyz="2.22045e-16 0 0.17" rpy="1.5708 0 1.5708"/>
-            <geometry>
-                    <mesh filename="package://avone/description/assets/wheel.stl"/>      
-                 <!--  <box size="0.3 0.3 0.15"/> -->
-            </geometry>
-            <material name="black"/>
-        </visual>
-        <collision>
-            <origin xyz="2.22045e-16 0 0.17" rpy="1.5708 0 1.5708"/>
-            <geometry>
-                   <!--<mesh filename="package://avone/description/assets/wheel.stl"/>    -->  
-                                        <sphere radius="0.203"/>    
-                 <!--  <box size="0.3 0.3 0.15"/> -->
-            </geometry>
-        </collision>
-        <xacro:inertial_cylinder mass="9.8" length="0.2" radius="0.2">
-            <origin xyz="2.33038e-16 0 0.0496398" rpy="0 0 0"/>
-        </xacro:inertial_cylinder>
-    </link>
+    <xacro:inertial_cylinder mass="9.8" length="0.2" radius="0.2">
+      <origin xyz="2.33038e-16 0 0.0496398" rpy="0 0 0"/>
+    </xacro:inertial_cylinder>
+  </link>
 
-    <gazebo reference="front_right_wheel">
-        <material>Gazebo/Grey</material>
-    </gazebo>
+  <gazebo reference="front_right_wheel">
+    <material>Gazebo/Grey</material>
+  </gazebo>
 
- 
+  <!-- ========================================================= -->
+  <!-- Front left steering and wheel                              -->
+  <!-- ========================================================= -->
 
+  <!-- FRONT LEFT STEERING ASSEMBLY -->
+  <joint name="LSteer" type="revolute">
+    <origin xyz="1.739 0.584139 0.075" rpy="3.14159 0 1.5708"/>
+    <parent link="chassis"/>
+    <child link="front_left_wheel_hub"/>
+    <axis xyz="0 0 -1"/>
+    <limit effort="33.4" velocity="1.0" lower="-0.610865" upper="0.610865"/>
+    <dynamics damping="0.1" friction="0.05"/>
+  </joint>
 
-    <!-- FRONT LEFT STEERING ASSEMBLY -->
-    <joint name="LSteer" type="revolute">
-        <origin xyz="1.739 0.584139 0.075" rpy="3.14159 0 1.5708"/>
-        <parent link="chassis"/>
-        <child link="front_left_wheel_hub"/>
-        <axis xyz="0 0 -1"/>
-         <limit  effort="33.4" 
-          velocity="1.0" 
-          lower="-0.610865" 
-          upper="0.610865"/>
-         
-          <dynamics damping="0.1" friction="0.05"/>
-    </joint>
+  <link name="front_left_wheel_hub">
+    <visual>
+      <origin xyz="-0.290639 0.1358 0.18" rpy="3.14159 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/front_wheel_hub.stl"/>
+      </geometry>
+      <material name="white"/>
+    </visual>
 
-    <link name="front_left_wheel_hub">
-        <visual>
-        <origin xyz="-0.290639 0.1358 0.18" rpy="3.14159 0 0"/>
-        <geometry>
-                    <mesh filename="package://avone/description/assets/front_wheel_hub.stl"/>      
-                 <!--  <box size="0.3 0.3 0.15"/> -->
-        </geometry>
-        <material name="white"/>
-        </visual>
-        <collision>
-        <origin xyz="-0.290639 0.1358 0.18" rpy="3.14159 0 0"/>
-        <geometry>
-                    <mesh filename="package://avone/description/assets/front_wheel_hub.stl"/>      
-                 <!--  <box size="0.3 0.3 0.15"/> -->
-        </geometry>
-        </collision>
-        <xacro:inertial_box mass="1.6" x="0.1" y="0.1" z="0.1">
-        <origin xyz="0.0824722 0 0.09" rpy="0 0 0"/>
-        </xacro:inertial_box>
-    </link>
+    <collision>
+      <origin xyz="-0.290639 0.1358 0.18" rpy="3.14159 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/front_wheel_hub.stl"/>
+      </geometry>
+    </collision>
 
-    <gazebo reference="front_left_wheel_hub">
-        <material>Gazebo/Black</material>
-    </gazebo>
+    <xacro:inertial_box mass="1.6" x="0.1" y="0.1" z="0.1">
+      <origin xyz="0.0824722 0 0.09" rpy="0 0 0"/>
+    </xacro:inertial_box>
+  </link>
 
+  <gazebo reference="front_left_wheel_hub">
+    <material>Gazebo/Black</material>
+  </gazebo>
 
+  <!-- Front left wheel spin joint -->
+  <joint name="FLWheel" type="continuous">
+    <origin xyz="0.10836 0 0.09" rpy="1.5708 0 -1.5708"/>
+    <parent link="front_left_wheel_hub"/>
+    <child link="front_left_wheel"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="50" velocity="100"/>
+    <dynamics damping="0.0" friction="0.0"/>
+  </joint>
 
-    <joint name="FLWheel" type="continuous">
-        <origin xyz="0.10836 0 0.09" rpy="1.5708 0 -1.5708"/>
-        <parent link="front_left_wheel_hub"/>
-        <child link="front_left_wheel"/>
-        <axis xyz="0 0 1"/>
-        <limit effort="50" velocity="100"/>
-        <dynamics damping="0.0" friction="0.0"/>
-    </joint>
+  <link name="front_left_wheel">
+    <visual>
+      <origin xyz="0 0 0.17" rpy="1.5708 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/avone/avone_ws/src/avone/description/assets/wheel.stl"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
 
- 
+    <collision>
+      <origin xyz="0 0 0.17" rpy="1.5708 0 0"/>
+      <geometry>
+        <sphere radius="0.220"/>
+      </geometry>
+    </collision>
 
-    <link name="front_left_wheel">
-        <visual>
-        <origin xyz="0 0 0.17" rpy="1.5708 0 0"/>
-        <geometry>
-                    <mesh filename="package://avone/description/assets/wheel.stl"/>      
-                 <!--  <box size="0.3 0.3 0.15"/> -->
-        </geometry>
-        <material name="black"/>
-        </visual>
-        <collision>
-        <origin xyz="0 0 0.17" rpy="1.5708 0 0"/>
-        <geometry>
-                      <!--<mesh filename="package://avone/description/assets/wheel.stl"/>    -->  
-                                        <sphere radius="0.203"/>   
-                 <!--  <box size="0.3 0.3 0.15"/> -->
-        </geometry>
-        </collision>
-        <xacro:inertial_cylinder mass="9.8" length="0.2" radius="0.2">
-        <origin xyz="0 0 0.0496398" rpy="0 0 0"/>
-        </xacro:inertial_cylinder>
-    </link>
-
-    <gazebo reference="front_left_wheel">
-        <material>Gazebo/Grey</material>
-    </gazebo>
-
-<!--
-
-        <gazebo>
-
-           <plugin
-                filename="libignition-gazebo-ackermann-steering-system.so"
-                name="ignition::gazebo::systems::AckermannSteering">
-                <left_joint>RLMotor</left_joint>
-                <right_joint>RRMotor</right_joint>
-                <left_steering_joint>LSteer</left_steering_joint>
-                <right_steering_joint>RSteer</right_steering_joint>
-                <wheel_separation>1.05</wheel_separation>
-                <kingpin_width>1.17</kingpin_width>
-                <wheel_base>1.74</wheel_base>
-                <steering_limit>0.8</steering_limit>
-                <wheel_radius>0.203</wheel_radius>
-                <odom_publish_frequency>50</odom_publish_frequency>
-                <max_velocity>10</max_velocity>
-                <max_acceleration>5.0</max_acceleration>
-             
-               
-                 <odom_topic>/model/my_robot/odometry</odom_topic>
-              <tf_topic>/model/my_robot/tf</tf_topic>
-              <frame_id>odom</frame_id>
-              <child_frame_id>base_link</child_frame_id>
-                
-              
-            </plugin>
-
-
-
-        
-
-           <plugin name="ignition::gazebo::systems::PosePublisher"
-        filename="libignition-gazebo-pose-publisher-system.so">
-          <publish_link_pose>true</publish_link_pose>
-          <use_pose_vector_msg>true</use_pose_vector_msg>
-          <static_publisher>true</static_publisher>
-          <static_update_frequency>50</static_update_frequency>
-        </plugin>
-
-
- 
-
-     
-              
-              
-
-       
-
-
-   
-
-      <plugin filename="libignition-gazebo-joint-state-publisher-system.so"
-        name="ignition::gazebo::systems::JointStatePublisher">
-          <topic>joint_states</topic>
-          <update_rate>50</update_rate>
-      </plugin>
-       
-   
-
-      </gazebo>
- 
-
--->
-
-
-
+    <xacro:inertial_cylinder mass="9.8" length="0.2" radius="0.2">
+      <origin xyz="0 0 0.0496398" rpy="0 0 0"/>
+    </xacro:inertial_cylinder>
+  </link>
+  
+  <gazebo reference="front_left_wheel">
+    <material>Gazebo/Grey</material>
+  </gazebo>
 </robot>
+<!--
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                          
+                                                                                                                                                                                          
+                                                                                                                                                                                          
+                                                                                                                                                                                          
+                                                                                                                                                                                          
+                                                            ,**(                                                                                                                          
+                                                          ./(/@@&%&&                                                                                                                       
+                                                      ,*((%&&%%&%#%,&                                                                                                                      
+                                                    (/,(@@(&@@//#%%&@@*                                                                                                                    
+                                                .(,*&@/%#@&&&&@   &&&@&(                                                                                                                   
+                                            .,(/.@#    #(@&&&&,      #%@.                                                                                                                  
+                                        .#/(%@&       %#& &&&%        .@                                                                                                                  
+                                    ,*.,(&&. *  ,/////%&##/&%          .&                                                                                                                 
+                                  ./#/#&#      .   , .,&(                 @                                                                                                                
+                                ,%&@&((##/*%%(//#**.,,%@****.             ,@                                                                                                               
+                              &&%  ,%&@@&%#/%,(&**(&%@(&%%##  #   .*%#(%&&%@                                                                                                              
+                            #&*.##*#/(,@&%%*&&&/,(/*#&,,//((&(#%&&&@,,,**&%@@(/.                                                                                                           
+                          %@&&%#((%*,((*&%/,%(####((&@@&(%@@@%%%&%&@@%##%%%%&&@@@&(/*                       ......                                                                         
+                          *@ %@&#&*##%%@&###&%&(*(#%(*&%%@@@###&&@@%###%%%%&&&@&&&&&&@@#//   #%&@@@   **//((/***///(                                                                       
+                          @   &@(#&(@%#@&*@%@@@@@%(/*%##%&&@#%%%&&#####%%%&&@&&&&&&&&&&&&%&@%@((#//**/*////%&%##&#%(##((((@/                                                              
+                          @   ((&@(#%%&(@@@&@%#&@&#*%%%#(**##%%%%@#%%%%%&&&@@##@(#/.#@%&@&@*//***//(/((((//((#&&((*/*./*####((((/%@,                                                      
+                          @,(%/,(%&#%%###@@&@&&%&@###%#*#(*#%(/*%%%%%%%&&@&&@#@&&&@(@&@(@/*#((((//***////#(((((((*  /.((*(########((((///%#                                               
+          .//////((##/     #%&(,@@&(#%.##&/&&(&%/%&###,%##*,/,%%%%%#(//&&&&&&@&&&&@#&&&&&@&/#%#(((//////*,*****/(((((((((((#/(.###(,##(((((////#@@@&%(                                     
+      #%#((*//***///(###   /,(%%&%&%&/**(@@&&&@@&@@%##(,/,*%%%%%%%%%%%%%%#((/&,%&&&%&&&&&@&%%%%%%%%%##((((((//*,**/#%%&%%%%#((((##(#((#(///(((//&@&@%(////.                                
+    @@&&&%%(/(/////((#%#@*/@/@&,&&#&&@@%@#%&&&%%%&@%%#/##%(%%%%%%%%%%%%%%%%%%%#(//&&&&&&%@@#%%%%%%%%%%(&&#&&#(((//*,,,,*((///**..*.(#(&%%/(/%(##/&&&%&(*##                                
+    %@(#&@&&&##(((((((#%&%#(&&@&(##%#%%&@@@%&@%%&%%@%%%%(/*%%%%%%%%%%%%%%%%%%%%%%%%%%%#(/#%/&%%%%%%%%%%%%%%%%#%%###((///****(/((//********//&%&&&&&@#%%%%#%                                
+    &@%%%%%&/&%####%%%%&&&@,%  (%&&@@@@%&@@@%&%%#%%&%%%***%%%%%%%%%%%%%%%%%%%%%%%milfs%%%&%%%%%%%%%%%###%%%%&%%%%%%%%#######(((//(/(#(///***///(%&@@(%@/(##%                                
+    &@%%((&#%%&&%&&&&@@@@@@@&,,,,&,,/#(*//@@@&&&#(%%%%%%%%%/*/##%%%%%%%%%%%%%%%%%%%%%%%%%&&&%%%%%%%(*@%#%%%%%%%%%%%%%%%%%%%%%%%%%#((((#(((##%%%%%&@@@%%#**(                                
+    ,&/(%((&&(@@@@@@@&@@@@@                 /&@&@@(/%(.###%%#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#%%%%%%%%*#@%%(%%####%%%%%%%%%%%%%%%%%%%%%%%%%%###&*%%&&%%%&&*%@%,*                              
+    &&./#//&#@@@@@@@@@@@@.                       .&%((##########%%%%%%%%%%%%%%%%&*,,,,,%%%%%/%&%*,(&@&%%%#%%#%%%%%%%%#%%%%%%%%%%%%%%%%%%###%@&,,(&@@&%%(%%% ..                            
+      &/#*.#/(@@@@@@@@@@@,                                /(#####%%%%%%%%%/,,,,.,,,*****,,,%/%&@%/*&@@&@@%%%##%%%%%%%%%#%%%%%%%%%%%%%%%%%%&%&@@#(##&#%%#&%.#((/*..,.,.  ,*.                
+        &/###@@@@@@@@@@                                             (/#(((//**********,**,***%@///%@@@@@%#*/*@@%%%%%%%%#######%%%%%%%%%%%&&&&@@((#%&@@@/&%@&@#%.**,,. ..//%(               
+          ,&@@@@#                                                    #@@@@%((//**//******/****(##%@@@&&&&@@@@&@##%%%%%%########%%%%%%%%%%@&&@@@@@@@#@&(&(*/&&#%(*/////..*//*               
+                                                                    @@@@@&@%#(////(///////////(/@@@@@@@@@%&@@@%%%%%%%%#########%%%%%%%%%@&&@@@@@@@&@@&&@&%&&*&(&&%(%&#(*                  
+                                                                    @@%%&&&@&#(((((//(/(///((//(@@@@@%(&@@@@@@%%%%%%%%#########%##%%%%%%&&&&@@@@@@@@&###&%&&%%##*##,(  /,                 
+                                                                    &@&%%&%&*&%##((((((/(((((((#%%%%&@@@@@@&%&&%%%%%%%#############%%%%%@&%&&&&&%%%@&&%%##&@&@@,@@*##%  %@                
+                                                                    &@&##%#/&/#%%###(#####(####%%%@@&%%%%(     /%%%%%%############%*#%%%@%%%%&%%&&   .&@%&%&           #&*/               
+                                                                    /&%(%(#%(&(&&&%###%%###%%%%&&@.                    .############%%%%&&&&&&&                                           
+                                                                      &%/(#(#&%@&&&%%%%&&&&&&@@@@@@                             .(#(##%%%%&@@                                              
+                                                                      #%/((*&/&#@@@&&&@@@@@@@@@@@@                                      .                                                 
+                                                                      .%%,/#(/@#&@@@@@@@@@@@@@@@@&                                                                                        
+                                                                        .&##.(##&#@@@@@@@@@&@@@@@@                                                                                         
+                                                                          %%#@@@#(@@@&@@@@@@@@@@&                                                                                          
+                                                                            %&%#%@@@@@@@@@@@&                                                                                              
+                                                                              %&@@@@@@#                                                                                                    
+                                                                                                                                                                                          
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+-->                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        

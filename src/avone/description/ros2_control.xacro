@@ -1,6 +1,38 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
+<!-- ========================================================= -->
+<!-- AV.ONE ros2_control (SIMULATION / GAZEBO)                   -->
+<!-- File: ros2_control.xacro                                    -->
+<!-- ========================================================= -->
+<!-- Purpose:
+     - Defines the ros2_control "system" used in Gazebo simulation.
+     - Uses the GazeboSimSystem hardware plugin (gz_ros2_control) so Gazebo
+       provides joint states and accepts joint commands via ros2_control.
+     - Loads the Gazebo ROS 2 Control plugin that connects Gazebo to
+       controller_manager and reads the controller YAML.
+
+     What this file contains:
+     1) <ros2_control name="GazeboSimSystem" type="system">
+          <hardware>
+            <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+          </hardware>
+        - Joint interface declarations:
+            LSteer, RSteer: position command + position state
+            RLMotor, RRMotor: velocity command + velocity + position state
+            FLWheel, FRWheel: position state only
+
+     2) <gazebo> plugin block:
+        - gz_ros2_control::GazeboSimROS2ControlPlugin
+        - Reads robot_description from robot_state_publisher
+        - Loads controller parameters from:
+            $(find avone)/config/ackermann_drive_controller.yaml
+
+     How it is used:
+     - Included by robot.urdf.xacro when running in Gazebo.
+     - For real hardware you normally include ros2_control_hardware.xacro instead. -->
+
+
   <ros2_control name="GazeboSimSystem" type="system">
     <hardware>
        <plugin>gz_ros2_control/GazeboSimSystem</plugin>

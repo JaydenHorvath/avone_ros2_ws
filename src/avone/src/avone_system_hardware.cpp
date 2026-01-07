@@ -1,4 +1,47 @@
-// Copyright...
+/*
+  AV.ONE ros2_control System Hardware Plugin
+  -----------------------------------------
+  This file implements a ros2_control "SystemInterface" for the AV.ONE driverless car.
+
+  - Was build from standardised ros2_control Hardware Interface template
+  - Articulated Robotics video on this procedure:
+        https://www.youtube.com/watch?v=J02jEKawE5U
+
+  Purpose in the stack:
+  - Provides the bridge between ROS 2 controllers (Ackermann steering controller) and the vehicle IO.
+  - Exposes joint state interfaces (positions and velocities) to the controller_manager.
+  - Accepts joint commands (steer position, rear wheel velocities) from controllers and converts them into CAN messages.
+
+  Parameters:
+  - Paramters for this hardware interface are found in ros2_control_hardware.xacro
+
+  Operating modes:
+  - sim_mode = true:
+      No CAN is opened and no frames are sent or read.
+      Joint states are simulated from the commanded values so controllers and RViz can run without hardware.
+  - sim_mode = false:
+      CAN is opened via AvoneCanInterface (SocketCAN).
+      read() consumes feedback frames (motor RPM and steering angle) and updates joint states.
+      write() transmits command frames (rear motor RPM setpoints and steering setpoint).
+      on_activate() sends an "enable" command and on_deactivate() sends a "disable" command.
+
+  Data flow summary:
+  - Controller outputs -> write():
+      rlmotor_cmd_, rrmotor_cmd_ (rad/s) are converted to RPM bytes and sent on cmd_* CAN IDs.
+      lsteer_cmd_, rsteer_cmd_ (rad) are combined into a central steer angle and encoded into a single byte.
+  - Vehicle feedback -> read():
+      Motor RPM frames (l_motor_can_id_, r_motor_can_id_) are decoded to rad/s.
+      Steering feedback frame (steer_can_id_) is decoded to radians.
+      Position is integrated over time from velocity.
+
+  Notes:
+  - The steering encoding is a simple linear mapping into 0..255 and then inverted, 
+
+  This is some crazy magic 
+*/
+
+
+
 #include <limits>
 #include <vector>
 #include <cmath>
@@ -13,20 +56,21 @@
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "rclcpp/rclcpp.hpp"
 
-bool sim_mode_ = false; // Set to true to test without hardware
 
 namespace avone
 {
 
 hardware_interface::CallbackReturn AvoneSystemHardware::on_init(
   const hardware_interface::HardwareInfo & info)
-{
+{ 
+  // Base class init reads joint definitions and hardware parameters from URDF.
   if (hardware_interface::SystemInterface::on_init(info) != CallbackReturn::SUCCESS)
   {
     return CallbackReturn::ERROR;
   }
 
-  // Map joint indices (robust auto-mapping)
+  // Map joint indices so read/write can reference joints reliably by name.
+  // This avoids relying on a specific joint ordering in the URDF.
   for (size_t i = 0; i < info.joints.size(); ++i) {
     const auto & j = info.joints[i].name;
     if      (j == "LSteer")  lsteer_idx_  = i;
@@ -39,19 +83,27 @@ hardware_interface::CallbackReturn AvoneSystemHardware::on_init(
   try {
     auto & p = info.hardware_parameters;
 
+    auto parse_bool = [](const std::string & s) -> bool {
+      std::string v = s;
+      std::transform(v.begin(), v.end(), v.begin(), ::tolower);
+      return (v == "1" || v == "true" || v == "yes" || v == "on");
+    };
+
+    sim_mode_        = p.count("sim_mode") ? parse_bool(p.at("sim_mode")) : true;
+
     max_steer_angle_ = p.count("max_steer_angle") ? std::stod(p.at("max_steer_angle")) : 0.610865;
     min_steer_angle_ = p.count("min_steer_angle") ? std::stod(p.at("min_steer_angle")) : -0.610865;
     max_rpm_         = p.count("max_rpm")         ? std::stoi(p.at("max_rpm"))         : 300;
 
-    can_interface_ = p.count("can_interface") ? p.at("can_interface") : "can0";
-    can_baudrate_  = p.count("can_baudrate")  ? std::stoi(p.at("can_baudrate")) : 250000;
+    can_interface_   = p.count("can_interface")   ? p.at("can_interface") : "can0";
+    can_baudrate_    = p.count("can_baudrate")    ? std::stoi(p.at("can_baudrate")) : 250000;
     read_timeout_ms_ = p.count("read_timeout_ms") ? std::stoi(p.at("read_timeout_ms")) : 20;
 
-    l_motor_can_id_ = p.count("l_motor_can_id") ?
+    l_motor_can_id_  = p.count("l_motor_can_id") ?
       std::stoul(p.at("l_motor_can_id"), nullptr, 0) : 0x0CF11E05;
-    r_motor_can_id_ = p.count("r_motor_can_id") ?
+    r_motor_can_id_  = p.count("r_motor_can_id") ?
       std::stoul(p.at("r_motor_can_id"), nullptr, 0) : 0x0CF11E06;
-    steer_can_id_   = p.count("steer_can_id") ?
+    steer_can_id_    = p.count("steer_can_id") ?
       std::stoul(p.at("steer_can_id"),   nullptr, 0) : 0x0D;
 
     cmd_l_motor_can_id_ = p.count("cmd_l_motor_can_id") ?
@@ -77,9 +129,16 @@ hardware_interface::CallbackReturn AvoneSystemHardware::on_init(
     }
   }
 
-  RCLCPP_INFO(rclcpp::get_logger("AvoneSystemHardware"),
-              "Initialized AVONE hardware on %s, baud %d, steer_id=0x%X, Lmotor_id=0x%X, Rmotor_id=0x%X",
-              can_interface_.c_str(), can_baudrate_, steer_can_id_, l_motor_can_id_, r_motor_can_id_);
+  RCLCPP_INFO(
+    rclcpp::get_logger("AvoneSystemHardware"),
+    "Initialized AVONE hardware sim_mode=%s on %s, baud %d, steer_id=0x%X, Lmotor_id=0x%X, Rmotor_id=0x%X",
+    sim_mode_ ? "true" : "false",
+    can_interface_.c_str(),
+    can_baudrate_,
+    steer_can_id_,
+    l_motor_can_id_,
+    r_motor_can_id_
+  );
 
   return CallbackReturn::SUCCESS;
 }
@@ -205,7 +264,7 @@ hardware_interface::return_type AvoneSystemHardware::read(
   for (int i = 0; i < 20; ++i) {
     uint32_t can_id = 0;
     std::vector<uint8_t> data;
-    if (!can_iface_->read_frame(can_id, data))
+    if (!can_iface_->read_frame(can_id, data, read_timeout_ms_))
       break;
     // if (can_id == steer_can_id_ || can_id == 0x00D) {
     //   RCLCPP_INFO(rclcpp::get_logger("AvoneSystemHardware"),

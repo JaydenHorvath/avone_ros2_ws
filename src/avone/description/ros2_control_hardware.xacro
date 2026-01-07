@@ -1,23 +1,73 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
+<!-- ========================================================= -->
+<!-- AV.ONE ros2_control (HARDWARE)                             -->
+<!-- File: ros2_control_hardware.xacro                          -->
+<!-- ========================================================= -->
+<!-- Purpose:
+     - Defines the ros2_control "system" for REAL hardware.
+     - Loads the AvoneSystemHardware plugin and exposes steering + drive joints.
+     - Provides CAN IDs and limits as parameters to the hardware plugin.
+
+     What this file contains:
+     - <ros2_control ... type="system"> block
+     - <hardware><plugin>avone/AvoneSystemHardware</plugin> + <param> list
+     - Joint interface declarations:
+         LSteer, RSteer: position command + position state
+         RLMotor, RRMotor: velocity command + velocity + position state
+         FLWheel, FRWheel: position state only
+
+     How it is used:
+     - Included by robot.urdf.xacro when running on the real car.
+     - In simulation you normally include ros2_control.xacro instead.
+
+-->
+
   <ros2_control name="AVONE_ros2_control" type="system">
     <hardware>
       <plugin>avone/AvoneSystemHardware</plugin>
 
-      <!-- Your existing params -->
+      
+      <!-- Maximum allowed steering angle in radians (soft limit for steering commands and safety clamping) -->
       <param name="max_steer_angle">0.610865</param>
+
+      <!-- Minimum allowed steering angle in radians (negative direction limit for steering commands and safety clamping) -->
       <param name="min_steer_angle">-0.610865</param>
+
+      <!-- Maximum rear motor speed in RPM used as a limit when converting commands or clamping outputs -->
       <param name="max_rpm">300</param>
+
+      <!-- If true, do not open CAN or transmit real frames; simulate joint states from commands instead -->
+      <param name="sim_mode">false</param>
+
+      <!-- Linux SocketCAN interface name to bind to, e.g. can0 for real bus or vcan0 for virtual testing -->
       <param name="can_interface">can0</param>
+
+      <!-- CAN bus bitrate   -->
       <param name="can_baudrate">250000</param>
+
+      <!-- Read timeout in milliseconds for polling CAN receive  -->
       <param name="read_timeout_ms">20</param>
+
+      <!-- CAN ID for left motor rpm-->
       <param name="l_motor_can_id">0x8CF11E05</param>
+
+      <!-- CAN ID for rights motor rpm-->
       <param name="r_motor_can_id">0x8CF11E06</param>
+
+      <!-- CAN ID for steering angle reading-->
       <param name="steer_can_id">0x0D</param>
+
+      <!-- CAN ID that this interface transmits left motor speed commands on  -->
       <param name="cmd_l_motor_can_id">0x0B</param>
+
+      <!-- CAN ID that this interface transmits right motor speed commands on ( -->
       <param name="cmd_r_motor_can_id">0x0A</param>
+
+      <!-- CAN ID that this interface transmits steering commands on -->
       <param name="cmd_steer_can_id">0x09</param>
+
 
 
     </hardware>

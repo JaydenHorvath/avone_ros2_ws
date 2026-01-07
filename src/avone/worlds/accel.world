@@ -101,13 +101,7 @@
       <direction>-0.5 0.5 -1</direction>
     </light>
 
-   
-   <!-- Oval “donut” of cones -->
-<!-- Angles: 0°, 30°, …, 330° -->
-<!-- Inner ellipse: a=5, b=3 (blue) -->
-<!-- Outer ellipse: a=6, b=4 (yellow) -->
-<!-- Oval “donut” of cones, start‐line at 0,0 facing north -->
-<!-- Angles: 90°, 120°, 150°, …, 360° (0°), 30°, 60° -->
+  
 
  <include>
       <pose>-45.0 1.5 0.15 0 0 0</pose>

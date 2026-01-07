@@ -1,5 +1,0 @@
-teleop_twist_joy_node:
-  ros__parameters:
-    qos_overrides:
-      /cmd_vel:
-        reliability: reliable

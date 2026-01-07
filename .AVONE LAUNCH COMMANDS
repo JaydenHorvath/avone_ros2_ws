@@ -189,3 +189,94 @@ Optional: Single-EKF Localisation (All Sensors Fused)
 
   Command:
     ros2 launch avone_localisation avone_ekf.launch.py
+
+
+
+=====================
+NAV2 BRINGUP
+=====================
+
+Command:
+  ros2 launch avone avone_nav2_bringup.launch.py
+
+What this launches:
+  - Starts the AV.ONE Nav2 navigation stack
+  - Launches the core Nav2 lifecycle nodes and planners
+  - Enables path planning and path following
+  - Provides autonomous navigation capability
+  - Starts a Nav2 cancellation watchdog for safety and recovery
+
+Individual Commands:
+
+• Nav2 cancel watchdog
+  - Monitors navigation state
+  - Listens for CAN messages triggered by RC to start or cancel goal
+  - Used as a safety and recovery mechanism
+
+  Command:
+    ros2 run avone_nav nav2_cancel.py
+
+
+• Nav2 core stack
+  - Starts Nav2 lifecycle manager and navigation servers
+  - Includes planner, controller, and behavior tree execution
+  - Provides autonomous path planning and tracking
+
+  Command:
+    ros2 launch avone_nav nav2.launch.py
+
+
+=====================
+NUC BOOT BRINGUP
+=====================
+
+Command:
+  ros2 launch avone avone_nuc_boot.launch.py
+
+What this launches:
+  - Starts the CAN DBC bridge for vehicle communication
+  - Decodes CAN messages using the AV.ONE DBC file
+  - Starts the LED matrix drive-state controller
+  - Publishes system heartbeat messages from the NUC
+  - Monitors sensor timeouts and communication health
+  - Intended to run automatically on NUC boot
+
+Individual Commands:
+
+• DBC CAN bridge
+  - Bridges CAN traffic into ROS topics
+  - Decodes messages using the AV.ONE DBC file
+  - Provides vehicle state data to the autonomy stack
+
+  Command:
+    ros2 run can_simulation test_cantoros \
+      --ros-args \
+      -p dbc_file:=/home/avone/NUTEAMSGIT/NUCAN/DBC\ Files/AV1.dbc \
+      -p dbc_path:=/home/avone/NUTEAMSGIT/NUCAN/DBC\ Files/AV1.dbc
+
+
+• Drive-state LED matrix controller
+  - Controls the external LED matrix
+  - Displays current AV state (READY, DRIVING, FAULT, etc.)
+  - Used for scrutineering and test-day visibility
+
+  Command:
+    ros2 run avone_utils drive_state_led
+
+
+• NUC heartbeat publisher
+  - Publishes periodic heartbeat messages
+  - Indicates that the NUC and ROS stack are alive
+  - Used by safety and watchdog systems
+
+  Command:
+    ros2 run avone_utils ros_cmd_heartbeat
+
+
+• Sensor timeout monitor
+  - Monitors critical sensor topics
+  - Detects missing or stale sensor data
+  - Triggers fault handling on timeout conditions
+
+  Command:
+    ros2 run avone_utils sensor_timeout

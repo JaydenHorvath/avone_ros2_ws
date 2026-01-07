@@ -1,12 +1,34 @@
 <?xml version="1.0"?>
+<!--
+camera.xacro
+
+Purpose
+  Adds a simple simulated camera to the AV.ONE URDF for Gazebo.
+  Creates a physical mount frame (camera_link) and a REP-103 optical frame
+  (camera_link_optical), then attaches a Gazebo camera sensor.
+
+Frames
+  chassis -> camera_link -> camera_link_optical
+
+Topics
+  camera/image_raw
+  camera/camera_info
+
+Main tuning points
+  camera_joint origin: mount position and aim on the chassis
+  Gazebo sensor: update_rate, horizontal_fov, resolution, near/far clip
+-->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" >
 
+    <!-- Fixed mount from chassis to the camera housing frame -->
     <joint name="camera_joint" type="fixed">
         <parent link="chassis"/>
         <child link="camera_link"/>
+        <!-- xyz in meters, rpy in radians -->
         <origin xyz="0.6909 0 0.772413" rpy="0 0 0"/>
     </joint>
 
+    <!-- Small visual box so the camera is visible in RViz and Gazebo -->
     <link name="camera_link">
         <visual>
             <geometry>
@@ -16,45 +38,54 @@
         </visual>
     </link>
 
-
+    <!-- Optical frame for vision pipelines (REP-103 optical convention)
+         This rotation makes the optical frame axes match typical camera usage:
+           X right, Y down, Z forward -->
     <joint name="camera_optical_joint" type="fixed">
         <parent link="camera_link"/>
         <child link="camera_link_optical"/>
         <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
     </joint>
 
+    <!-- Optical frame link (no geometry, used for TF and frame_id) -->
     <link name="camera_link_optical"></link>
 
-
-
+    <!-- Gazebo sensor attached to camera_link, publishing using camera_link_optical -->
     <gazebo reference="camera_link">
         <material>Gazebo/Red</material>
 
         <sensor name="camera" type="camera">
 
+            <!-- Frame id that Gazebo will report for the image stream -->
             <gz_frame_id>camera_link_optical</gz_frame_id>
 
+            <!-- Pose relative to camera_link (leave zero if the joint origin is the mount) -->
             <pose> 0 0 0 0 0 0 </pose>
+
             <visualize>true</visualize>
             <update_rate>30</update_rate>
+
+            <!-- Image topic from the Gazebo camera sensor -->
             <topic>camera/image_raw</topic>
+
             <camera>
-            <camera_info_topic>camera/camera_info</camera_info_topic>
-                      <horizontal_fov>1.2042771838760875</horizontal_fov>
+                <camera_info_topic>camera/camera_info</camera_info_topic>
+
+                <!-- Horizontal FOV in radians -->
+                <horizontal_fov>1.2042771838760875</horizontal_fov>
+
                 <image>
                     <format>R8G8B8</format>
-                           <width>640</width>
-          <height>360</height>
+                    <width>640</width>
+                    <height>360</height>
                 </image>
+
                 <clip>
                     <near>0.1</near>
                     <far>20.0</far>
                 </clip>
             </camera>
-           
         </sensor>
-
-            
     </gazebo>
 
 </robot>

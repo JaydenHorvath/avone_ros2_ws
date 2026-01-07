@@ -1,9 +1,32 @@
+<!--
+  Pluginlib export description for the AV.ONE ros2_control hardware plugin.
+
+  What this file does:
+  - Tells pluginlib that the shared library called "avone" contains a class plugin
+    that implements hardware_interface::SystemInterface.
+  - controller_manager loads this plugin at runtime using the "name" field.
+
+  Key fields:
+  - library path="avone"
+      Refers to the installed shared library (libavone.so) built from your CMake add_library(avone ...).
+  - class name="avone/AvoneSystemHardware"
+      This is the plugin name string you reference from ros2_control config/URDF.
+  - type="avone::AvoneSystemHardware"
+      The C++ fully qualified class type that pluginlib constructs.
+  - base_class_type="hardware_interface::SystemInterface"
+      The interface ros2_control expects this plugin to implement.
+-->
+
+
+
 <library path="avone">
   <class name="avone/AvoneSystemHardware"
          type="avone::AvoneSystemHardware"
          base_class_type="hardware_interface::SystemInterface">
     <description>
-      ros2_control hardware interface.
+      AV.ONE ros2_control SystemInterface plugin.
+      Exposes steering and rear motor joints to ros2_control and bridges commands and feedback through SocketCAN.
+      Supports sim_mode for running controllers without physical CAN hardware.ros2_control hardware interface.
     </description>
   </class>
 </library>

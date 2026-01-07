@@ -1,25 +1,30 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="robot">
 
-  <!-- 2) Core links/visuals etc -->
+  <!-- ========================================================= -->
+  <!-- Robot top-level URDF (robot.urdf.xacro)                    -->
+  <!-- ========================================================= -->
+  <!-- This file composes the robot from smaller xacro parts.     -->
 
-
+  <!-- Core vehicle kinematic tree + visuals + collisions -->
   <xacro:include filename="robot_core.xacro"/>
 
+
+  <!-- Control interface -->
+
   <!-- FOR SIMULATION -->
-  <!-- <xacro:include filename="ros2_control.xacro"/> -->
+  <xacro:include filename="ros2_control.xacro"/>
 
   <!-- FOR REAL HARDWARE -->
-  <xacro:include filename="ros2_control_hardware.xacro"/>
+  <!-- <xacro:include filename="ros2_control_hardware.xacro"/> -->
 
 
-  <!-- 5) Sensors, cameras, lidar, etc. -->
+
+ <!-- Sensors, cameras, lidar, etc. --> 
   <xacro:include filename="camera.xacro"/>
   <xacro:include filename="rgbdcamera.xacro"/>
   <xacro:include filename="sensors.xacro"/>
   <xacro:include filename="lidar.xacro"/>
- <!-- <xacro:include filename="depthcamera.xacro"/>  -->
-  <!-- <xacro:include filename="dualcamera.xacro"/>  -->
 
 
 </robot>

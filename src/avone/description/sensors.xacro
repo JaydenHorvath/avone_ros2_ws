@@ -1,14 +1,40 @@
 <?xml version="1.0"?>
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro" >
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-    <joint name="imu_joint" type="fixed">
-        <parent link="chassis"/>
-        <child link="imu_link"/>
-          <origin xyz="0.450 0 0.39137" rpy="0 0 0"/>
-    </joint>
+  <!-- ========================================================= -->
+  <!-- AV.ONE Sensors (SIMULATION / GAZEBO)                       -->
+  <!-- File: sensors.xacro                                        -->
+  <!-- ========================================================= -->
+  <!-- Purpose:
+       - Defines simulated sensors attached to the chassis for Gazebo.
+       - IMU publishes orientation/ang vel/lin acc on a ROS topic.
+       - Dual NavSat sensors emulate front/rear GPS antenna positions.
 
-  <link name="imu_link"></link>
+       Contents:
+       1) imu_link fixed to chassis + gazebo imu sensor (topic: imu)
+       2) gps_link1 fixed to chassis + gazebo navsat sensor (topic: navsat1)
+       3) gps_link2 fixed to chassis + gazebo navsat sensor (topic: navsat2)
 
+       Notes:
+       - These are Gazebo sensors, so they only produce data in simulation.
+       - Link/joint names must remain consistent with TF usage in your stack.
+  -->
+
+  <!-- ========================================================= -->
+  <!-- IMU                                                        -->
+  <!-- ========================================================= -->
+
+  <!-- Fixed mount point for IMU -->
+  <joint name="imu_joint" type="fixed">
+    <parent link="chassis"/>
+    <child link="imu_link"/>
+    <origin xyz="0.450 0 0.39137" rpy="0 0 0"/>
+  </joint>
+
+  <!-- IMU link (no visual geometry by default) -->
+  <link name="imu_link"/>
+
+  <!-- Gazebo IMU sensor publishing on topic "imu" -->
   <gazebo reference="imu_link">
     <sensor name="imu_sensor" type="imu">
       <gz_frame_id>imu_link</gz_frame_id>
@@ -19,13 +45,18 @@
     </sensor>
   </gazebo>
 
-  <!-- FRONT GPS ANTENNA -->
-  <joint name="gps_joint1" type="fixed">
-        <parent link="chassis"/>
-        <child link="gps_link1"/>
-          <origin xyz="-0.107 0 0.4434" rpy="0 0 0"/>
-    </joint>
+  <!-- ========================================================= -->
+  <!-- GPS ANTENNA 1 (FRONT)                                      -->
+  <!-- ========================================================= -->
 
+  <!-- Fixed mount point for GPS antenna 1 -->
+  <joint name="gps_joint1" type="fixed">
+    <parent link="chassis"/>
+    <child link="gps_link1"/>
+    <origin xyz="-0.107 0 0.4434" rpy="0 0 0"/>
+  </joint>
+
+  <!-- GPS antenna 1 link with simple cylinder geometry -->
   <link name="gps_link1">
     <visual>
       <geometry>
@@ -40,30 +71,36 @@
     </collision>
   </link>
 
+  <!-- Gazebo NavSat sensor publishing on topic "navsat1" -->
   <gazebo reference="gps_link1">
     <sensor name="navsat1" type="navsat">
-    <gz_frame_id>gps_link1</gz_frame_id>
+      <gz_frame_id>gps_link1</gz_frame_id>
       <always_on>1</always_on>
       <update_rate>50</update_rate>
       <topic>navsat1</topic>
 
-    <noise type="gaussian">
-      <mean>0.0</mean>
-      <stddev>10</stddev>
-    </noise>
-     
+      <!-- Optional measurement noise (gaussian) -->
+      <noise type="gaussian">
+        <mean>0.0</mean>
+        <stddev>10</stddev>
+      </noise>
     </sensor>
   </gazebo>
 
+  <!-- ========================================================= -->
+  <!-- GPS ANTENNA 2 (REAR)                                       -->
+  <!-- ========================================================= -->
 
-<joint name="gps_joint2" type="fixed">
-        <parent link="chassis"/>
-        <child link="gps_link2"/>
-          <origin xyz="1.693 0 0.4434" rpy="0 0 0"/>
-    </joint> 
+  <!-- Fixed mount point for GPS antenna 2 -->
+  <joint name="gps_joint2" type="fixed">
+    <parent link="chassis"/>
+    <child link="gps_link2"/>
+    <origin xyz="1.693 0 0.4434" rpy="0 0 0"/>
+  </joint>
 
+  <!-- GPS antenna 2 link with simple cylinder geometry -->
   <link name="gps_link2">
-   <visual>
+    <visual>
       <geometry>
         <cylinder radius="0.0625" length="0.085"/>
       </geometry>
@@ -76,16 +113,14 @@
     </collision>
   </link>
 
+  <!-- Gazebo NavSat sensor publishing on topic "navsat2" -->
   <gazebo reference="gps_link2">
     <sensor name="navsat2" type="navsat">
-    <gz_frame_id>gps_link2</gz_frame_id>
+      <gz_frame_id>gps_link2</gz_frame_id>
       <always_on>1</always_on>
       <update_rate>50</update_rate>
       <topic>navsat2</topic>
-
-     
     </sensor>
   </gazebo>
-
 
 </robot>

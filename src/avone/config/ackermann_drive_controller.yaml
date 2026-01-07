@@ -1,53 +1,67 @@
+# ==============================================================================
+# avone/config/ackermann_drive_controller.yaml
+# ------------------------------------------------------------------------------
+# Configuration file for the Ackermann Steering Controller used on AV.ONE.
+#
+# This YAML defines:
+#   - the controller manager update frequency and plugin list
+#   - parameters for the ackermann_steering_controller, which handles converting
+#     Twist commands into front steering angles and rear wheel velocities.
+#
+# Notes:
+#   • `front_wheels_radius` is set to DOUBLE the real radius because the Kelly
+#     controllers report wheel RPM that is twice the actual wheel rotation.
+#   • `use_stamped_vel: true` allows smooth velocity command input from
+#     geometry_msgs/TwistStamped, used in both sim and hardware.
+#   • `enable_odom_tf: false` prevents the controller from publishing its own TF,
+#     since odometry is fused by robot_localization.
+#   • The wheel and track parameters must match the real or simulated AV.ONE geometry.
+# ==============================================================================
+
 controller_manager:
   ros__parameters:
-    update_rate: 50  # Hz
+    update_rate: 50  # Hz, how often controller_manager updates
     use_sim_time: false        
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
-
     ackermann_steering_controller:
       type: 'ackermann_steering_controller/AckermannSteeringController'
 
 
-
-
+# ------------------------------------------------------------------------------
+# Ackermann steering controller parameters
+# ------------------------------------------------------------------------------
 ackermann_steering_controller:
   ros__parameters:
-    wheelbase: 1.74
-    front_wheel_track: 1.245
-    rear_wheel_track: 1.245
-    front_wheels_radius: 0.440 # THIS IS DOUBLE THE REAL WHEEL SIZE DUE TO DOUBLE WHEEL RPM FROM KELLY  CONTROLLER 
-    rear_wheels_radius: 0.440
-    front_steering: true
-    reference_timeout: 2.0
-    rear_wheels_names: ['RRMotor','RLMotor']
-    front_wheels_names: ['LSteer',  'RSteer']
-    # false for joystick control
-    use_stamped_vel: true
+    wheelbase: 1.74                 # Distance between front and rear axles (m)
+    front_wheel_track: 1.245        # Distance between front left and front right wheels (m)
+    rear_wheel_track: 1.245         # Distance between rear left and rear right wheels (m)
 
-    open_loop: false
+    # Radius of wheels. Note doubled radius compensates for doubled RPM from Kelly controllers.
+    front_wheels_radius: 0.440
+    rear_wheels_radius: 0.440
+
+    front_steering: true            # Enable front axle steering
+    reference_timeout: 2.0          # Stop if no command within 2 seconds
+
+    rear_wheels_names: ['RRMotor', 'RLMotor']   # Drive wheel joints
+    front_wheels_names: ['LSteer', 'RSteer']    # Steering joints
+
+    # Velocity command mode
+    use_stamped_vel: true           # True for TwistStamped topic (preferred)
+    open_loop: false                # False enables odometry feedback
+
     velocity_rolling_window_size: 10
     base_frame_id: base_link
     odom_frame_id: odom
 
-    # false for localalised sim
-    enable_odom_tf: false
-    
-    twist_covariance_diagonal: [0.05, 0.05, 0.0, 0.0, 0.0, 0.5]
-    pose_covariance_diagonal: [0.05, 0.05, 0.0, 0.0, 0.0, 0.5]
-    position_feedback: true
-    publish_rate: 50.0   # Hz, or whatever rate you want
+    enable_odom_tf: false           # Odometry TF published separately by EKF/localization
+    position_feedback: true         # Use encoder feedback for wheel positions
 
-    linear.x.max_velocity: 5.0
-    linear.x.min_velocity: -5.0
-    linear.x.max_acceleration: 2.0
-    linear.x.min_acceleration: -2.0
-    
-        # --- Steering limits ---
-    front_steering_joint_names: ['LSteer', 'RSteer']
-    steering.max_position: 0.5236  # 30° in radians
-    steering.min_position: -0.5236
-    steering.max_velocity: 2.0     # rad/s steering rate limit
-    steering.max_acceleration: 3.0  # rad/s² steering acceleration limit
+    # Covariance matrices used for odometry
+    twist_covariance_diagonal: [0.05, 0.05, 0.0, 0.0, 0.0, 0.5]
+    pose_covariance_diagonal:  [0.05, 0.05, 0.0, 0.0, 0.0, 0.5]
+
+    publish_rate: 50.0              # Hz — odometry and state update rate
