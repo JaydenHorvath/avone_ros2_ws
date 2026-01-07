@@ -1,4 +1,5 @@
-
+<!-- Standard Nav2 Behavior Tree
+File: navigate_through_poses_w_replanning_and_recovery.xml -->
 <!--
   This Behavior Tree replans the global path periodically at 1 Hz through an array of poses continuously
    and it also has recovery actions specific to planning / control as well as general system issues.

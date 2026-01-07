@@ -1,5 +1,39 @@
 #!/usr/bin/env python3
 
+
+# AV.ONE Nav2 Goal Gate and Cancel Controller
+# Package: avone_nav
+# Node: nav2_cancel (Nav2ControlNode)
+
+# Purpose:
+#   - Gate Nav2 NavigateToPose goals behind an explicit "Start" command from the remote controller
+#   - Allow the remote controller to cancel any active Nav2 goal at any time
+#   - Support a workflow where operators can:
+#       1) Set a goal in RViz (/goal_pose)
+#       2) Confirm safety / readiness
+#       3) Press Start to begin moving
+#       4) Press Cancel to stop and abandon the goal
+
+# How it works:
+#   - Subscribes to:
+#       - /goal_pose (PoseStamped) from RViz "2D Goal Pose"
+#       - /av1/nav2_start_cmd/nav2_start_cmd (Int32) remote start button
+#       - /av1/nav2_cancel_cmd/nav2_cancel_cmd (Int32) remote cancel button
+#   - When a new /goal_pose arrives:
+#       - Stores it as last_goal
+#       - Sets goal_pending = True (holding state)
+#       - Immediately cancels any currently running Nav2 goals so the robot does not move
+#   - When Start is pressed (rising edge 0->1):
+#       - If a goal is pending, it sends the stored goal to NavigateToPose
+#   - When Cancel is pressed (rising edge 0->1):
+#       - Calls the Nav2 CancelGoal service to cancel active goals
+
+# Notes:
+#   - Uses edge detection on Start/Cancel so holding the button does not repeatedly trigger actions.
+#   - Cancel uses CancelGoal service with stamp=0 to cancel "all goals" behaviour in Nav2 action cancel.
+#   - This node does not check navigation state feedback; it only gates when goals are allowed to begin.
+
+
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Int32
@@ -11,16 +45,15 @@ from rclpy.action import ActionClient
 
 class Nav2ControlNode(Node):
     def __init__(self):
-        super().__init__('nav2_control_node')
+        super().__init__("nav2_control_node")
 
         # Cancel service client
         self._cancel_client = self.create_client(
-            CancelGoal,
-            'navigate_to_pose/_action/cancel_goal'
+            CancelGoal, "navigate_to_pose/_action/cancel_goal"
         )
 
         # NavigateToPose action client
-        self._action_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
+        self._action_client = ActionClient(self, NavigateToPose, "navigate_to_pose")
 
         # Last goal storage
         self.last_goal = None
@@ -31,22 +64,19 @@ class Nav2ControlNode(Node):
         self.prev_start = 0
 
         # Subscriptions
-        self.create_subscription(Int32,
-                                 '/av1/nav2_cancel_cmd/nav2_cancel_cmd',
-                                 self.cancel_callback,
-                                 10)
+        self.create_subscription(
+            Int32, "/av1/nav2_cancel_cmd/nav2_cancel_cmd", self.cancel_callback, 10
+        )
 
-        self.create_subscription(Int32,
-                                 '/av1/nav2_start_cmd/nav2_start_cmd',
-                                 self.start_callback,
-                                 10)
+        self.create_subscription(
+            Int32, "/av1/nav2_start_cmd/nav2_start_cmd", self.start_callback, 10
+        )
 
-        self.create_subscription(PoseStamped,
-                                 '/goal_pose',
-                                 self.goal_tap_callback,
-                                 10)
+        self.create_subscription(PoseStamped, "/goal_pose", self.goal_tap_callback, 10)
 
-        self.get_logger().info("Nav2 gated control node ready (requires start button to move).")
+        self.get_logger().info(
+            "Nav2 gated control node ready (requires start button to move)."
+        )
 
     def goal_tap_callback(self, msg: PoseStamped):
         # Wrap PoseStamped into a NavigateToPose.Goal
@@ -55,7 +85,9 @@ class Nav2ControlNode(Node):
         self.last_goal = goal
         self.goal_pending = True
 
-        self.get_logger().warn("New goal received → holding until Start button is pressed.")
+        self.get_logger().warn(
+            "New goal received → holding until Start button is pressed."
+        )
 
         # Cancel any active goals right away
         if self._cancel_client.service_is_ready():
@@ -118,5 +150,5 @@ def main(args=None):
         rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

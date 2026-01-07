@@ -1,336 +1,346 @@
-################################################################################
-# 🧭 NAVIGATION CONFIGURATION — AV.ONE DRIVERLESS (SIMPLE BT VERSION)
+# Nav2 Configuration: AV.ONE Driverless (rolling costmaps, simple BT)
+# File: nav2_config.yaml
 #
-# Simplified setup for direct ComputePathToPose → FollowPath behavior.
-# Behavior Server (Spin/Backup/etc.) removed.
+# Purpose:
+#   - Configure Nav2 for AV.ONE using a minimal behavior tree:
+#       ComputePathToPose -> FollowPath
+#   - Assume global localisation comes from robot_localization (EKF + GPS),
+#   - Use rolling-window costmaps for large GPS based navigation areas.
 #
-# GPS WPF Changes:
-# - AMCL removed (global localization from EKF/GPS)
-# - Static layers removed (no global map)
-# - Global costmap uses rolling window (for large GPS-driven navigation)
-################################################################################
+# Key ideas:
+#   - bt_navigator runs a simple BT XML (avone_bt.xml) to plan + track.
+#   - controller_server uses MPPI in Ackermann mode for steering control.
+#   - planner_server uses SMAC Hybrid (Dubins) for Ackermann feasible paths.
+#   - local_costmap and global_costmap both ingest a PointCloud2 obstacle source.
+#
+# Notes:
+#   - If running in simulation, set use_sim_time: true consistently across nodes.
+#   - Your odom_topic must match what your localisation stack publishes.
+#   - Voxel layers are heavier than 2D obstacle layers, but help with 3D filtering.
+#   - Getting any slight bit of formatting wrong, may cause some of the systems to not 
+#     work properly - so watch out  😛 😛 😛 😛 😛 😛 
+# 
+# 
+# 
+#  Future Planning:
+#   - The velocity smoother and MPPI controller will require tuning, the more it drives, but
+#     serves as a solid control system
+#   - Currently this nav2 is utilized by sending an (x,y,yaw) goal pose, path plan to that goal,
+#     and follow the path to given goal. An ideal step forward would to pass a path directly to the 
+#     MPPI controller, instead of goal based following
+#       
+# 
+
+
+
 lifecycle_manager_navigation:
   ros__parameters:
-    use_sim_time: False
-    autostart: True
-    node_names: 
-      - 'controller_server'
-      - 'smoother_server'
-      - 'planner_server'
-      - 'behavior_server'
-      - 'bt_navigator'
-      - 'waypoint_follower'
-      - 'velocity_smoother'
-      - 'collision_monitor'  # Add this line
+    use_sim_time: False                 # If true, use /clock from simulation or rosbag
+    autostart: True                     # Automatically transition nodes through lifecycle to active
+    node_names:                         # Nav2 nodes managed by the lifecycle manager
+      - 'controller_server'             # Computes control commands to follow the path
+      - 'smoother_server'               # Optional path smoothing server (node listed even if lightly used)
+      - 'planner_server'                # Plans a global path to the goal
+      - 'behavior_server'               # Behavior actions (spin/backup/etc) even if not used by your BT
+      - 'bt_navigator'                  # Runs the Behavior Tree for navigation
+      - 'waypoint_follower'             # Handles waypoint following logic
+      - 'velocity_smoother'             # Smooths cmd_vel output commands
 
-##############################
-# 🧠 Behavior Tree Navigator
-##############################
+################################################################################
+# Behavior Tree Navigator
+################################################################################
 bt_navigator:
   ros__parameters:
-    use_sim_time: false                     # Use sim time (Gazebo or rosbag)
-    default_nav_to_pose_bt_xml: $(find-pkg-share avone_nav)/behaviour_trees/avone_bt.xml
-    global_frame: map                      # Frame of goals
-    robot_base_frame: base_link            # Robot’s main reference frame
-    odom_topic: /odometry/local1
+    use_sim_time: false                 # Use sim clock if running in Gazebo/rosbag
+    default_nav_to_pose_bt_xml: $(find-pkg-share avone_nav)/behaviour_trees/avone_bt.xml  # BT XML used for NavigateToPose
+    global_frame: map                   # Frame that goals are expressed in (typically map)
+    robot_base_frame: base_link         # Robot base frame used by Nav2
+    odom_topic: /odometry/global1        # Odometry topic Nav2 uses for velocity + motion estimation
 
-    # odom_topic: /ackermann_steering_controller/odometry
-    bt_loop_duration: 10                   # Tick rate of behavior tree (Hz^-1)
+    bt_loop_duration: 10                # BT tick period in milliseconds (10ms = 100 Hz ticking)
 
-    # Single navigator plugin (no NavThroughPoses)
-    navigators: ["navigate_to_pose"]
+    navigators: ["navigate_to_pose"]    # Which navigator plugins are enabled
     navigate_to_pose:
-      plugin: "nav2_bt_navigator/NavigateToPoseNavigator"
+      plugin: "nav2_bt_navigator/NavigateToPoseNavigator"   # Handles NavigateToPose action requests
 
-
-##############################
-# ⚙️ Controller Server
-#    - Regulated Pure Pursuit Controller
-#    - Responsible for real-time velocity & path following
-##############################
+################################################################################
+# Controller Server
+################################################################################
 controller_server:
   ros__parameters:
-    controller_frequency: 20.0     # Hz control loop  
-    min_vel_x: 1.0      
-    # min_x_velocity_threshold: 0.001
-    # min_y_velocity_threshold: 0.001
-    # min_theta_velocity_threshold: 0.001
-    failure_tolerance: 0.3                 # Allowable deviation before abort
-    progress_checker_plugins: ["progress_checker"]
-    goal_checker_plugins: ["general_goal_checker"]
-    current_goal_checker: "general_goal_checker"   # <-- required!  
-    controller_plugins: ["FollowPath"]
+    controller_frequency: 20.0          # Controller update rate in Hz
+    min_vel_x: 1.0                      # Minimum forward velocity command allowed (m/s)
+    failure_tolerance: 0.3              # Allowed oscillation/stall distance before declaring failure (m), controller-dependent
 
-    # --- Progress Checker ---
+    progress_checker_plugins: ["progress_checker"]          # List of progress checker plugin IDs
+    goal_checker_plugins: ["general_goal_checker"]          # List of goal checker plugin IDs
+    current_goal_checker: "general_goal_checker"            # Which goal checker is used for NavigateToPose
+    controller_plugins: ["FollowPath"]                      # List of controller plugin IDs
+
+    # Progress Checker: determines if the robot is making progress toward goal
     progress_checker:
-      plugin: "nav2_controller::SimpleProgressChecker"
-      required_movement_radius: 0.2        # Must move this far to count as progress
-      movement_time_allowance: 10.0         # Time window for progress (s)
+      plugin: "nav2_controller::SimpleProgressChecker"      # Simple distance-over-time progress check
+      required_movement_radius: 0.2                         # Must move this far to be considered progress (m)
+      movement_time_allowance: 10.0                         # Time allowed without required movement before failing (s)
 
-    # --- Goal Checker ---
+    # Goal Checker: determines when the goal is reached
     general_goal_checker:
-      stateful: True
-      plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.8               # Distance tolerance (m)
-      yaw_goal_tolerance: 1.0             # Orientation tolerance (rad)
-      latch_xy_goal_tolerance: True        # Latch goal success once inside XY tol
+      stateful: True                                        # If true, latches goal conditions once satisfied
+      plugin: "nav2_controller::SimpleGoalChecker"          # Simple XY + yaw tolerance goal checker
+      xy_goal_tolerance: 0.8                                # Goal position tolerance in meters
+      yaw_goal_tolerance: 1.0                               # Goal heading tolerance in radians
+      latch_xy_goal_tolerance: True                         # Once within XY tolerance, stay "passed" for XY
 
-    # --- Main Path Follower ---
+    ################################################################################
+    # FollowPath Controller Plugin
+    # MPPI Ackermann controller for path tracking with sampled trajectories
+    ################################################################################
     FollowPath:
-          plugin: "nav2_mppi_controller::MPPIController"
-          
-          # REDUCE COMPUTATIONAL LOAD
-          time_steps: 35             # Reduce from 40-50
-          model_dt: 0.05             
-          batch_size: 1000           # CRITICAL: Reduce from 2000
-          
-          iteration_count: 1         # Keep at 1
-          
-          vx_std: 0.8                
-          vy_std: 0.0                
-          wz_std: 0.1                
-          
-          vx_max: 3.0                
-          vx_min: 0.0                
-          vy_max: 0.0                
-          wz_max: 0.2                
-          
-          ax_max: 0.4                
-          ax_min: -0.4               
-          ay_max: 0.0                
-          ay_min: 0.0                
-          az_max: 0.03               
-          
-          temperature: 0.2           
-          gamma: 0.015               
-          
-          motion_model: "Ackermann"  
-          visualize: true           # CRITICAL: Turn OFF - huge CPU hit
-          
-          reset_period: 1.0          
-          regenerate_noises: false   
-          open_loop: false           
-          
-          prune_distance: 20.0       
-          transform_tolerance: 0.1   
-          
-          AckermannConstraints:
-            min_turning_r: 3.0       
-          
-          TrajectoryValidator:
-            plugin: "mppi::DefaultOptimalTrajectoryValidator"
-            collision_lookahead_time: 3.0    # Reduce from 5.0
-            consider_footprint: true         
-          
-          critics: [
-            "ConstraintCritic",
-            "CostCritic",
-            "GoalCritic",
-            "GoalAngleCritic",
-            "PathFollowCritic",
-            "PathAngleCritic",
-            "PathAlignCritic",
-            "PreferForwardCritic",
-            "VelocityDeadbandCritic",
-            "TwirlingCritic"
-          ]
-          # Remove PathAlignCritic temporarily - it's expensive
-          
-          ConstraintCritic:
-            enabled: true
-            cost_power: 1
-            cost_weight: 10.0
+      plugin: "nav2_mppi_controller::MPPIController"        # MPPI controller plugin
 
-          GoalCritic:
-            enabled: true
-            cost_power: 1
-            cost_weight: 7.0
+      # MPPI sampling and time horizon
+      time_steps: 35                                        # Number of prediction steps in each rollout
+      model_dt: 0.05                                        # Time delta per step (s). Horizon = time_steps * model_dt
+      batch_size: 1000                                      # Number of rollouts sampled per iteration (CPU heavy)
 
-          GoalAngleCritic:
-            enabled: true
-            cost_power: 1
-            cost_weight: 10.0
+      iteration_count: 1                                    # Number of MPPI optimisation iterations per control cycle
 
-          PreferForwardCritic:
-            enabled: true
-            cost_power: 1
-            cost_weight: 20.0
+      # Sampling noise (standard deviation) for each control dimension
+      vx_std: 0.8                                           # Std-dev for forward velocity samples (m/s)
+      vy_std: 0.0                                           # Std-dev for lateral velocity samples (m/s), 0 for Ackermann
+      wz_std: 0.1                                           # Std-dev for yaw rate samples (rad/s)
 
-          CostCritic:
-            enabled: true
-            cost_power: 1
-            cost_weight: 3.81
-            critical_cost: 300.0
-            consider_footprint: true
-            collision_cost: 1000000.0
-            near_goal_distance: 8.0
-            trajectory_point_step: 4  # Increase from 2 (check fewer points)
+      # Command limits (hard bounds)
+      vx_max: 3.0                                           # Max forward speed command (m/s)
+      vx_min: 0.0                                           # Min forward speed command (m/s)
+      vy_max: 0.0                                           # Max lateral speed (m/s), 0 for Ackermann
+      wz_max: 0.2                                           # Max yaw rate command (rad/s)
 
-          PathFollowCritic:
-            enabled: true
-            cost_power: 1
-            cost_weight: 10.0
-            offset_from_furthest: 8
-            threshold_to_consider: 1.4
+      # Acceleration limits (rate constraints)
+      ax_max: 0.4                                           # Max longitudinal acceleration (m/s^2)
+      ax_min: -0.4                                          # Max longitudinal deceleration (m/s^2)
+      ay_max: 0.0                                           # Max lateral acceleration (m/s^2)
+      ay_min: 0.0                                           # Min lateral acceleration (m/s^2)
+      az_max: 0.03                                          # Max yaw acceleration (rad/s^2)
 
-          PathAngleCritic:
-            enabled: true
-            cost_power: 1
-            cost_weight: 30.0
-            offset_from_furthest: 10
-            threshold_to_consider: 0.3
-            max_angle_to_furthest: 0.6
-            mode: 0
+      # MPPI cost shaping parameters
+      temperature: 0.2                                      # Controls how strongly low-cost rollouts dominate weighting
+      gamma: 0.015                                          # Smoothing / control penalty weighting term (implementation-specific)
 
-          PathAlignCritic:
-            enabled: true
-            cost_power: 1
-            cost_weight: 5.0                    # Moderate weight - not too aggressive
-            trajectory_point_step: 5            # Check every 5th point (less CPU)
-            offset_from_furthest: 20            # Look 15 points ahead on path
-            threshold_to_consider: 0.2         # Only engage when >0.4m from path
-            max_angle_to_furthest: 0.8        # 90 degrees in radians (π/2)
-            use_path_orientations: false        # CRITICAL: False for straight line stability
+      # Motion model
+      motion_model: "Ackermann"                             # Use Ackermann vehicle kinematics
 
-          VelocityDeadbandCritic:
-            enabled: true
-            cost_power: 1
-            cost_weight: 30.0
-            deadband_velocities: [0.5, 0.0, 0.0]
-          
-          TwirlingCritic:
-            enabled: true
-            twirling_cost_power: 1
-            twirling_cost_weight: 20.0
+      # Visualisation and debug output
+      visualize: true                                       # If true, publishes visualisation topics (can be CPU heavy)
 
+      # Internal behaviour toggles
+      reset_period: 1.0                                     # How often to reset controller internal state (s)
+      regenerate_noises: false                               # If true, resample noises more frequently
+      open_loop: false                                      # If true, does not rely on feedback (generally keep false)
 
+      # Path handling and transforms
+      prune_distance: 20.0                                  # Distance behind robot to prune from path (m)
+      transform_tolerance: 0.1                              # TF lookup timeout tolerance (s)
 
+      # Ackermann constraints block
+      AckermannConstraints:
+        min_turning_r: 3.0                                  # Minimum turning radius (m), limits curvature
+
+      # Trajectory validity checks before accepting the best rollout
+      TrajectoryValidator:
+        plugin: "mppi::DefaultOptimalTrajectoryValidator"    # Default validator plugin
+        collision_lookahead_time: 3.0                       # Time horizon used for collision checking (s)
+        consider_footprint: true                            # Use robot footprint (not point robot) for collisions
+
+      # Critic plugins evaluate each rollout trajectory and add costs
+      critics: [
+        "ConstraintCritic",                                 # Penalise invalid controls/constraints
+        "CostCritic",                                       # Penalise high-costmap cells and collisions
+        "GoalCritic",                                       # Encourage reaching goal position
+        "GoalAngleCritic",                                  # Encourage reaching goal heading
+        "PathFollowCritic",                                 # Encourage staying near the path
+        "PathAngleCritic",                                  # Encourage aligning direction with path tangent
+        "PathAlignCritic",                                  # Encourage lateral alignment with path
+        "PreferForwardCritic",                              # Prefer forward motion (no reversing)
+        "VelocityDeadbandCritic",                           # Avoid too-slow commands (deadband)
+        "TwirlingCritic"                                    # Penalise spinning in place
+      ]
+
+      ConstraintCritic:
+        enabled: true                                       # Enable this critic
+        cost_power: 1                                       # Power applied to the critic cost
+        cost_weight: 10.0                                   # Weight applied to this critic cost
+
+      GoalCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 7.0                                    # Higher drives stronger goal attraction
+
+      GoalAngleCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 10.0                                   # Higher drives stronger heading alignment at goal
+
+      PreferForwardCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 20.0                                   # Strong preference to keep moving forward
+
+      CostCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 3.81                                   # General obstacle/costmap weight
+        critical_cost: 300.0                                # Costmap value above which it is considered critical
+        consider_footprint: true                            # Use footprint for cost evaluation
+        collision_cost: 1000000.0                           # Huge penalty for collisions
+        near_goal_distance: 8.0                             # Distance near goal where behaviour may change (m)
+        trajectory_point_step: 4                            # Evaluate every Nth trajectory point for cost (less CPU)
+
+      PathFollowCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 10.0                                   # Weight for staying near the path
+        offset_from_furthest: 8                             # How far ahead on the path to measure (index based)
+        threshold_to_consider: 1.4                          # Only applies when error exceeds this threshold (m)
+
+      PathAngleCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 30.0                                   # Strong alignment with path direction
+        offset_from_furthest: 10                            # How far ahead on path to measure heading
+        threshold_to_consider: 0.3                          # Only applies when angle error exceeds threshold
+        max_angle_to_furthest: 0.6                          # Max angle considered to furthest point (rad)
+        mode: 0                                             # Mode selection (plugin specific)
+
+      PathAlignCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0                                    # Moderate alignment weight
+        trajectory_point_step: 5                            # Check every 5th point (reduces CPU)
+        offset_from_furthest: 20                            # Look further ahead on the path
+        threshold_to_consider: 0.2                          # Engage when lateral error > threshold (m)
+        max_angle_to_furthest: 0.8                          # Limit on lookahead heading deviation (rad)
+        use_path_orientations: false                        # If true, uses path orientation instead of tangent
+
+      VelocityDeadbandCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 30.0                                   # Push away from low-speed commands
+        deadband_velocities: [0.5, 0.0, 0.0]                # [vx, vy, wz] deadband thresholds
+
+      TwirlingCritic:
+        enabled: true
+        twirling_cost_power: 1                              # Power for twirling penalty
+        twirling_cost_weight: 20.0                          # Weight for spinning penalty
+
+################################################################################
+# Velocity Smoother
+################################################################################
 velocity_smoother:
   ros__parameters:
-    use_sim_time: false
-    smoothing_frequency: 40.0
-    scale_velocities: false
-    feedback: "OPEN_LOOP"
-    
-    # --- Velocity Limits ---
-    max_velocity: [2.0, 0.0, 0.3]
-    min_velocity: [0.0, 0.0, -0.3]
-    
-    # --- Deadband Velocities ---
-    # deadband_velocity: [0.0, 0.5, 0.0]   # Disabled for now - was killing your output
-    
-    # --- Acceleration Limits ---
-    max_accel: [0.5, 0.0, 0.2]
-    max_decel: [-1.0, 0.0, -0.2]
-    
-    # --- Timeout ---
-    velocity_timeout: 1.0
-    
-    # --- Odometry Configuration ---
-    odom_topic: /odometry/local1
-    # odom_topic: /ackermann_steering_controller/odometry
+    use_sim_time: false                     # Use sim clock if true
+    smoothing_frequency: 40.0               # Output smoothing update frequency (Hz)
+    scale_velocities: false                 # If true, scales output within limits instead of clipping
+    feedback: "OPEN_LOOP"                   # OPEN_LOOP uses cmd history; CLOSED_LOOP uses odom feedback
 
-    odom_duration: 0.1
-    
-    # --- Performance ---
-    use_realtime_priority: false
-    
-    # --- Message Type ---
-    enable_stamped_cmd_vel: false
+    # Velocity bounds for [vx, vy, wz]
+    max_velocity: [2.0, 0.0, 0.3]           # Maximum allowed cmd_vel values
+    min_velocity: [0.0, 0.0, -0.3]          # Minimum allowed cmd_vel values
 
-# ##############################
-# 🗺 Local Costmap
-#    - Short-range obstacle avoidance region
-##############################
+    # Acceleration limits for [vx, vy, wz]
+    max_accel: [0.5, 0.0, 0.2]              # Maximum acceleration limits
+    max_decel: [-1.0, 0.0, -0.2]            # Maximum deceleration limits (negative)
+
+    velocity_timeout: 1.0                   # If cmd input is stale for this long, output goes to zero (s)
+
+    odom_topic: /odometry/global1            # Odometry topic for CLOSED_LOOP feedback
+    odom_duration: 0.1                      # How long odom is considered valid (s)
+
+    use_realtime_priority: false            # If true, tries to set RT priority for smoother thread
+    enable_stamped_cmd_vel: false           # If true, uses TwistStamped for output (topic type changes)
+
+################################################################################
+# Local Costmap
+################################################################################
 local_costmap:
   local_costmap:
     ros__parameters:
-      footprint: "[
+      footprint: "[                         # Robot footprint polygon in meters, in base_link frame
         [-0.17, -0.744],
         [ 2.445, -0.744],
         [ 2.445,  0.744],
         [-0.17,  0.744]
-      ]"                            # Vehicle footprint (m)
-      update_frequency: 10.0
-      publish_frequency: 2.0
-      global_frame: map
-      robot_base_frame: base_link
-      rolling_window: true
-      width: 50
-      height: 50
-      resolution: 0.05
-      # robot_radius: 3.0
+      ]"
+      update_frequency: 10.0                # Costmap update frequency (Hz)
+      publish_frequency: 2.0                # Costmap publish frequency (Hz)
+      global_frame: map                     # Costmap global reference frame
+      robot_base_frame: base_link           # Robot base frame
+      rolling_window: true                  # Local costmap follows robot (window moves with robot)
+      width: 50                             # Local costmap width (m)
+      height: 50                            # Local costmap height (m)
+      resolution: 0.05                      # Costmap resolution (m/cell)
 
-      plugins: ["voxel_layer", "inflation_layer"]
+      plugins: ["voxel_layer", "inflation_layer"]   # List of layers composing the costmap
 
-      # --- 3D Voxel Obstacle Layer ---
       voxel_layer:
-        plugin: "nav2_costmap_2d::VoxelLayer"
-        enabled: True
-        publish_voxel_map: True
-        origin_z: 0.0
-        z_resolution: 0.2
-        z_voxels: 16
-        max_obstacle_height: 3.2
-        mark_threshold: 1
-        unknown_threshold: 2147483647
-        combination_method: 1
-        obstacle_max_range: 50.0
-        raytrace_max_range: 50.0
-        voxel_decay: 1.0           # 100% decay per cycle
-        clearing: true
-        inf_is_valid: true
-        decay_model: 1             # Exponential decay
-        observation_sources: pointcloud
-        
+        plugin: "nav2_costmap_2d::VoxelLayer"       # 3D voxel obstacle layer using PointCloud2
+        enabled: True                               # Enable this layer
+        publish_voxel_map: True                     # Publish voxel grid for debugging
+        origin_z: 0.0                               # Voxel grid Z origin (m)
+        z_resolution: 0.2                           # Voxel height resolution (m)
+        z_voxels: 16                                # Number of voxels in Z dimension
+        max_obstacle_height: 3.2                    # Max obstacle height considered (m)
+        mark_threshold: 1                           # Minimum voxel hits to mark obstacle
+        unknown_threshold: 2147483647               # Threshold used internally for unknown space
+        combination_method: 1                       # How to combine observation sources (plugin specific)
+        obstacle_max_range: 50.0                    # Max range to add obstacles (m)
+        raytrace_max_range: 50.0                    # Max range to clear obstacles (m)
+        voxel_decay: 1.0                            # Decay rate per cycle (fraction)
+        clearing: true                              # Enable clearing via raytracing
+        inf_is_valid: true                          # Treat inf values as valid for clearing
+        decay_model: 1                              # Decay model selection (plugin specific)
+        observation_sources: pointcloud             # Name(s) of observation sources
+
         pointcloud:
-          # topic: /lidar/points
-          topic: /quanergy/points
-          # topic: /nav2_points
-          data_type: PointCloud2
-          marking: true
-          clearing: true
-          min_obstacle_height: 0.0
-          max_obstacle_height: 3.2
-          obstacle_max_range: 50.0
-          raytrace_max_range: 50.0
-          observation_persistence: 0.0
+          topic: /quanergy/points                   # Input PointCloud2 topic, NEED TO CHANGE FOR SIM 
+          data_type: PointCloud2                    # Data type of observation source
+          marking: true                             # Mark obstacles from this source
+          clearing: true                            # Clear obstacles using this source
+          min_obstacle_height: 0.0                  # Minimum Z to consider as obstacle (m)
+          max_obstacle_height: 3.2                  # Maximum Z to consider as obstacle (m)
+          obstacle_max_range: 50.0                  # Max range for marking (m)
+          raytrace_max_range: 50.0                  # Max range for clearing (m)
+          observation_persistence: 0.0              # How long to keep observations (0 = only current scan)
 
-
-      # --- Inflation Layer ---
       inflation_layer:
-        plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 5.0
-        cost_scaling_factor: 6.0
+        plugin: "nav2_costmap_2d::InflationLayer"   # Inflates obstacles to create safety buffer
+        inflation_radius: 5.0                       # Inflation radius (m)
+        cost_scaling_factor: 6.0                    # How quickly inflated cost decays with distance
 
-
-##############################
-# 🌏 Global Costmap
-#    - Long-range global planner reference
-#    - Rolling to follow GPS-based motion
-##############################
+################################################################################
+# Global Costmap
+################################################################################
 global_costmap:
   global_costmap:
     ros__parameters:
-      footprint: "[
+      footprint: "[                         # Robot footprint polygon
         [-0.17, -0.744],
         [ 2.445, -0.744],
         [ 2.445,  0.744],
         [-0.17,  0.744]
       ]"
 
-      update_frequency: 1.0
-      publish_frequency: 1.0
-      global_frame: map
-      robot_base_frame: base_link
-      # robot_radius: 3.0
-      resolution: 0.1
-      rolling_window: true                 # Rolling costmap for large-scale GPS nav
-      width: 150
-      height: 150
-      track_unknown_space: true
+      update_frequency: 1.0                 # Update frequency (Hz)
+      publish_frequency: 1.0                # Publish frequency (Hz)
+      global_frame: map                     # Global frame for planning
+      robot_base_frame: base_link           # Robot base frame
+      resolution: 0.1                       # Resolution (m/cell)
+      rolling_window: true                  # Rolling window global costmap (mapless GPS nav)
+      width: 150                            # Width of rolling window (m)
+      height: 150                           # Height of rolling window (m)
+      track_unknown_space: true             # Keep unknown space as unknown (important for allow_unknown planning)
 
-      plugins: ["voxel_layer", "inflation_layer"]
+      plugins: ["voxel_layer", "inflation_layer"]   # Layers used by global costmap
 
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
@@ -347,9 +357,7 @@ global_costmap:
         raytrace_max_range: 50.0
         observation_sources: pointcloud
         pointcloud:
-          # topic: /lidar/points
-          topic: /quanergy/points
-          # topic: /nav2_points
+          topic: /quanergy/points            # PointCloud2 used to populate global obstacles NEED TO CHANGE FOR SIM 
           data_type: PointCloud2
           marking: true
           clearing: true
@@ -360,115 +368,39 @@ global_costmap:
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 6.0
+        inflation_radius: 6.0               # Larger inflation in global map for safer global plans
         cost_scaling_factor: 5.0
 
-
-##############################
-# 🧮 Planner Server
-#    - Smac Hybrid Planner (Dubins)
-#    - Generates Ackermann-feasible global paths
-##############################
+################################################################################
+# Planner Server
+################################################################################
 planner_server:
   ros__parameters:
-    use_sim_time: false
-    planner_plugins: ["GridBased"]
+    use_sim_time: false                     # Use simulation clock if true
+    planner_plugins: ["GridBased"]          # List of planner plugin IDs
 
     GridBased:
-      plugin: "nav2_smac_planner/SmacPlannerHybrid"
-      tolerance: 1.0
-      downsample_costmap: false
-      allow_unknown: true
-      motion_model_for_search: "DUBIN"     # For Ackermann steering
-      minimum_turning_radius: 4.5          # Wheelbase / tan(max_steer_angle)
-      angle_quantization_bins: 72
-      analytic_expansion_ratio: 0.0
-      analytic_expansion_max_length: 0.0
-      smooth_path: true
-      goal_heading_mode: DEFAULT
-      # cost_penalty: 10.0
+      plugin: "nav2_smac_planner/SmacPlannerHybrid"  # Hybrid A* / Smac Hybrid planner
+      tolerance: 1.0                     # How close (m) planner needs to get to goal if exact not possible
+      downsample_costmap: false          # If true, downsample costmap for speed at the expense of accuracy
+      allow_unknown: true                # Allow planning through unknown cells (important for mapless / rolling)
+      motion_model_for_search: "DUBIN"   # Dubins model for forward-only Ackermann feasible motion
+      minimum_turning_radius: 4.5        # Min turning radius used by planner (m)
+      angle_quantization_bins: 72        # Heading discretisation bins for search (higher is more accurate, slower)
+      analytic_expansion_ratio: 0.0      # Ratio of expansions that use analytic shortcuts (0 disables)
+      analytic_expansion_max_length: 0.0 # Max length of analytic expansion (0 disables)
+      smooth_path: true                 # Run planner smoothing on output path
+      goal_heading_mode: DEFAULT         # How planner treats goal heading requirement
 
-      cost_penalty: 6.0             # start around 2.5–3.0
-      change_penalty: 0.5           # penalty for switching left/right
-      non_straight_penalty: 3.0     # slight preference for straight
-      reverse_penalty: 2.0           # only matters if you use Reeds-Shepp
-      retrospective_penalty: 0.015
-      lookup_table_size: 20.0
-      cache_obstacle_heuristic: false
-      use_quadratic_cost_penalty: false   # see next section
-      downsample_obstacle_heuristic: true
-      allow_primitive_interpolation: false
+      # Cost and penalty terms used in Smac Hybrid
+      cost_penalty: 6.0                 # Penalty for higher-cost cells (higher avoids obstacles more)
+      change_penalty: 0.5               # Penalty for switching steering direction
+      non_straight_penalty: 3.0         # Penalty for non-straight motion
+      reverse_penalty: 2.0              # Penalty for reverse motion (mostly irrelevant for Dubins)
+      retrospective_penalty: 0.015      # Penalises frequent heading changes over the path
+      lookup_table_size: 20.0           # Size of motion primitive lookup table (m)
+      cache_obstacle_heuristic: false   # Cache obstacle heuristic between plans
+      use_quadratic_cost_penalty: false # If true, cost penalty grows quadratically
+      downsample_obstacle_heuristic: true   # Downsample obstacle heuristic computations (speed)
+      allow_primitive_interpolation: false  # If true, interpolates primitives for smoother results
 
-
-##############################
-# 🪄 Smoother Server
-#    - Post-processes planner path for curvature & smoothness
-##############################
-# smoother_server:
-#   ros__parameters:
-#     smoother_plugins: ["simple_smoother"]
-#     simple_smoother:
-#       plugin: "nav2_smoother::SimpleSmoother"
-#       tolerance: 1.0e-10
-#       max_its: 1000
-#       do_refinement: True
-
-
-##############################
-# 📍 Waypoint Follower
-#    - Optional waypoint behavior for multi-goal sequences
-##############################
-# waypoint_follower:
-#   ros__parameters:
-#     loop_rate: 20
-#     stop_on_failure: false
-#     waypoint_task_executor_plugin: "wait_at_waypoint"
-#     wait_at_waypoint:
-#       plugin: "nav2_waypoint_follower::WaitAtWaypoint"
-#       enabled: True
-#       waypoint_pause_duration: 200
-
-
-##############################
-# 🧤 Velocity Smoother
-#    - Smooths acceleration and braking between cmd_vel updates
-# ##############################
-# velocity_smoother:
-#   ros__parameters:
-#     smoothing_frequency: 20.0        # 20 Hz output is fine
-#     scale_velocities: False
-
-#     # Use odometry to close the loop if your /odometry/global twist is sane.
-#     # If /odometry/global twist is noisy or laggy, keep OPEN_LOOP for now.
-#     feedback: "OPEN_LOOP"
-
-#     # ---------------------------
-#     # velocity clamps [vx, vy, ω]
-#     # ---------------------------
-#     max_velocity: [3.0, 0.0, 0.3]    # match max_speed (1.0 m/s) and max_vel_theta (0.15 rad/s)
-#     min_velocity: [0.0, 0.0, -0.3]  # allow gentle reverse if you ever do reversing later;
-#                                       # can leave negative vx unused for now, it's just a floor
-
-#     # ---------------------------------
-#     # accel/decel shaping [vx, vy, ωdot]
-#     # ---------------------------------
-#     max_accel: [0.3, 0.0, 0.1]        # vx accel matches controller accel_limit (0.3 m/s²)
-#                                       # angular accel 0.1 rad/s² matches max_angular_accel vibe
-#     max_decel: [-0.8, 0.0, -0.1]      # braking in x: same 0.8 m/s² you gave controller
-#                                       # braking in ω: mirror 0.1 so yaw changes are still damped
-
-#     # ---------------------------
-#     # odom feedback / timeout
-#     # ---------------------------
-#     odom_topic: /ackermann_steering_controller/odometry
-#     odom_duration: 0.1                # 100 ms window for "am I moving like I think I am"
-#     velocity_timeout: 0.1             # was 0.05 → relax this so a tiny comm hiccup
-#                                       # doesn’t instantly zero your command and cause a steering snap
-
-#     # ---------------------------
-#     # deadband
-#     # ---------------------------
-#     deadband_velocity: [0.1, 0.0, 0.0]
-#     # before: 0.02
-#     # why higher: anything below ~0.05 m/s on these hub motors is usually just cogging noise.
-# #     # This stops the smoother from chasing tiny oscillatory corrections near standstill.

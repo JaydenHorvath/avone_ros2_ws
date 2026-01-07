@@ -1,3 +1,33 @@
+<!--
+Nav2 Behavior Tree: Minimal Plan + Track Sequence
+File: avone_bt.xml
+
+Purpose:
+  - Defines the simplest end to end Nav2 navigation pipeline:
+      1) Plan a path from the robot's current pose to the requested goal
+      2) Execute path following until completion (or failure)
+
+How it works:
+  - MainTree runs a single Sequence (NavSequence).
+  - ComputePathToPose:
+      - Inputs:  {goal}   (PoseStamped provided by the Nav2 BT navigator)
+      - Outputs: {path}   (nav_msgs/Path)
+      - planner_id="GridBased" selects the planner plugin configured under Nav2 (often NavFn or SMAC depending on your setup).
+  - FollowPath:
+      - Inputs:  {path} from the planner
+      - controller_id="FollowPath" selects the controller plugin configured under Nav2 (often RPP, MPPI, etc. depending on your setup).
+      - Drives the robot along the path until success or failure.
+
+Notes:
+  - This tree has no recovery behaviors.
+    If planning fails or the controller gets stuck, the whole Sequence fails immediately.
+  - For real running you usually add:
+      - Replanning / path update rate
+      - Clear costmap recoveries
+      - Spin / backup recoveries
+      - Goal updates and cancel handling
+-->
+
 <root main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
     <Sequence name="NavSequence">

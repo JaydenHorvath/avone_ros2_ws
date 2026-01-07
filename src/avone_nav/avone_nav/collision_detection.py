@@ -1,4 +1,37 @@
 #!/usr/bin/env python3
+
+
+# AV.ONE Front LiDAR Collision Detection
+# Package: avone_nav
+# Node: collision_detection (FrontLidarSocketCan)
+
+# Purpose:
+#   - Subscribe to a LiDAR PointCloud2 topic
+#   - Filter points to a forward arc in the vehicle frame, with range + Z limits
+#   - Publish the filtered points for debugging/visualisation
+#   - Raise a simple binary collision flag over SocketCAN when an obstacle is detected
+
+# How it works:
+#   - Reads XYZ points from the incoming PointCloud2.
+#   - Computes point distance and horizontal bearing (atan2(y, x)).
+#   - Applies a yaw offset (lidar_yaw_deg) so the detection arc aligns with vehicle forward.
+#   - Applies:
+#       1) distance threshold (max_distance)
+#       2) Z band-pass (min_z, max_z)
+#       3) angular window centered at center_deg with half width half_arc_deg
+#   - If the number of remaining points is >= min_points_for_detection, it triggers detection.
+
+# CAN behaviour:
+#   - Sends an 8-byte CAN frame with byte0 = 1 (detected) or 0 (clear), rest zeros.
+#   - If send_on_every_scan is false, only sends on state change (edge triggered).
+#   - Supports standard or extended CAN identifiers via extended_id.
+
+# Notes:
+#   - This node uses raw SocketCAN and will error if can_interface does not exist or is not up.
+#   - Angle window supports wrap-around at 0 degrees (eg center near 0 with wide arc).
+#   - Output filtered cloud is useful to verify arc alignment in RViz.
+
+
 import rclpy
 from rclpy.node import Node
 
@@ -11,69 +44,64 @@ from sensor_msgs_py import point_cloud2
 
 class FrontLidarSocketCan(Node):
     def __init__(self):
-        super().__init__('Lidar_Collision_Detection')
+        super().__init__("Lidar_Collision_Detection")
 
         # Parameters
-        self.declare_parameter('cloud_topic', '/quanergy/points')
-        self.declare_parameter('filtered_cloud_topic', '/collision_points')
+        self.declare_parameter("cloud_topic", "/quanergy/points")
+        self.declare_parameter("filtered_cloud_topic", "/collision_points")
 
         # Car frame detection arc
-        self.declare_parameter('center_deg', 0.0)        # 0 degrees = vehicle forward
-        self.declare_parameter('half_arc_deg', 15.0)     # +/- 20 degrees
+        self.declare_parameter("center_deg", 0.0)  # 0 degrees = vehicle forward
+        self.declare_parameter("half_arc_deg", 15.0)  # +/- 15 degrees
 
         # Lidar mounting rotation relative to vehicle frame
         # Example: lidar rotated 90 degrees left -> lidar_yaw_deg = +90
         # Example: lidar rotated 180 degrees (facing backward) -> +180
-        self.declare_parameter('lidar_yaw_deg', 0.0)
+        self.declare_parameter("lidar_yaw_deg", 0.0)
 
         # Distance limits
-        self.declare_parameter('max_distance', 3.0)
+        self.declare_parameter("max_distance", 3.0)
 
         # Z filtering
-        self.declare_parameter('min_z', -0.3)
-        self.declare_parameter('max_z', 2.0)
+        self.declare_parameter("min_z", -0.3)
+        self.declare_parameter("max_z", 2.0)
 
         # Detection logic
-        self.declare_parameter('min_points_for_detection', 3)
+        self.declare_parameter("min_points_for_detection", 3)
 
         # CAN settings
-        self.declare_parameter('can_interface', 'can0')
-        self.declare_parameter('can_id', 0x04)
-        self.declare_parameter('extended_id', False)
-        self.declare_parameter('send_on_every_scan', False)
+        self.declare_parameter("can_interface", "can0")
+        self.declare_parameter("can_id", 0x04)
+        self.declare_parameter("extended_id", False)
+        self.declare_parameter("send_on_every_scan", False)
 
         # Resolve params
-        cloud_topic = self.get_parameter('cloud_topic').value
-        filtered_topic = self.get_parameter('filtered_cloud_topic').value
+        cloud_topic = self.get_parameter("cloud_topic").value
+        filtered_topic = self.get_parameter("filtered_cloud_topic").value
 
-        self.center_deg = float(self.get_parameter('center_deg').value)
-        self.half_arc = float(self.get_parameter('half_arc_deg').value)
-        self.lidar_yaw = float(self.get_parameter('lidar_yaw_deg').value)
+        self.center_deg = float(self.get_parameter("center_deg").value)
+        self.half_arc = float(self.get_parameter("half_arc_deg").value)
+        self.lidar_yaw = float(self.get_parameter("lidar_yaw_deg").value)
 
-        self.max_distance = float(self.get_parameter('max_distance').value)
-        self.min_z = float(self.get_parameter('min_z').value)
-        self.max_z = float(self.get_parameter('max_z').value)
+        self.max_distance = float(self.get_parameter("max_distance").value)
+        self.min_z = float(self.get_parameter("min_z").value)
+        self.max_z = float(self.get_parameter("max_z").value)
 
-        self.min_points_for_detection = int(self.get_parameter('min_points_for_detection').value)
+        self.min_points_for_detection = int(
+            self.get_parameter("min_points_for_detection").value
+        )
 
-        self.can_interface = self.get_parameter('can_interface').value
-        self.can_id = self.get_parameter('can_id').value
-        self.extended_id = self.get_parameter('extended_id').value
-        self.send_on_every_scan = self.get_parameter('send_on_every_scan').value
+        self.can_interface = self.get_parameter("can_interface").value
+        self.can_id = self.get_parameter("can_id").value
+        self.extended_id = self.get_parameter("extended_id").value
+        self.send_on_every_scan = self.get_parameter("send_on_every_scan").value
 
         # Subscribers and publishers
         self.cloud_sub = self.create_subscription(
-            PointCloud2,
-            cloud_topic,
-            self.cloud_cb,
-            10
+            PointCloud2, cloud_topic, self.cloud_cb, 10
         )
 
-        self.cloud_pub = self.create_publisher(
-            PointCloud2,
-            filtered_topic,
-            10
-        )
+        self.cloud_pub = self.create_publisher(PointCloud2, filtered_topic, 10)
 
         # Internal detection state
         self.last_detection_state = False
@@ -90,18 +118,24 @@ class FrontLidarSocketCan(Node):
 
     def _setup_can_socket(self):
         try:
-            self.can_socket = socket.socket(socket.AF_CAN, socket.SOCK_RAW, socket.CAN_RAW)
+            self.can_socket = socket.socket(
+                socket.AF_CAN, socket.SOCK_RAW, socket.CAN_RAW
+            )
             self.can_socket.bind((self.can_interface,))
             self.get_logger().info(f"Bound to CAN interface {self.can_interface}")
         except OSError as e:
-            self.get_logger().error(f"Failed to open CAN interface {self.can_interface}: {e}")
+            self.get_logger().error(
+                f"Failed to open CAN interface {self.can_interface}: {e}"
+            )
             self.can_socket = None
 
     # ---------------- POINT CLOUD HANDLING ---------------- #
 
     def cloud_cb(self, msg):
 
-        pts_iter = point_cloud2.read_points(msg, field_names=["x", "y", "z"], skip_nans=True)
+        pts_iter = point_cloud2.read_points(
+            msg, field_names=["x", "y", "z"], skip_nans=True
+        )
 
         xs = []
         ys = []
@@ -114,9 +148,9 @@ class FrontLidarSocketCan(Node):
                 ys.append(float(p[1]))
                 zs.append(float(p[2]))
             except Exception:
-                xs.append(float(p['x']))
-                ys.append(float(p['y']))
-                zs.append(float(p['z']))
+                xs.append(float(p["x"]))
+                ys.append(float(p["y"]))
+                zs.append(float(p["z"]))
 
         if len(xs) == 0:
             self._handle_detection(False)
@@ -126,13 +160,12 @@ class FrontLidarSocketCan(Node):
         y = np.array(ys, dtype=np.float32)
         z = np.array(zs, dtype=np.float32)
 
-
         # Distance filter
         dist = np.sqrt(x * x + y * y + z * z)
         mask_dist = dist <= self.max_distance
 
         # Compute raw lidar angle
-        ang = np.degrees(np.arctan2(y, x))   # -180..+180
+        ang = np.degrees(np.arctan2(y, x))  # -180..+180
 
         # Convert to vehicle frame by removing lidar yaw offset
         ang = ang - self.lidar_yaw
@@ -161,7 +194,6 @@ class FrontLidarSocketCan(Node):
             return
 
         filtered_pts = np.column_stack((x[mask], y[mask], z[mask]))
-
 
         # Publish filtered cloud
         out_msg = point_cloud2.create_cloud_xyz32(msg.header, filtered_pts.tolist())
@@ -221,5 +253,5 @@ def main(args=None):
         rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
