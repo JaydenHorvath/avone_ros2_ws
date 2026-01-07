@@ -3,8 +3,8 @@
 <package format="3">
   <name>avone_mapping</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="c3350128@uon.edu.au">jay</maintainer>
+  <description>AV.ONE Mapping package</description>
+  <maintainer email="c3350128@uon.edu.au">Jayden Horvath</maintainer>
   <license>TODO: License declaration</license>
 
   <exec_depend>message_filters</exec_depend>

@@ -1,6 +1,37 @@
 #!/usr/bin/env python3
 
-import sys
+
+# avone_mapping/delaunay_planner.py (centerline from cone map via Delaunay triangulation)
+# --------------------------------------------------------------------------------------
+# This node consumes the persistent cone markers (blue and yellow) and generates a simple
+# "track centerline" by:
+#   1) Running a Delaunay triangulation over all cone XY positions
+#   2) Keeping only "mixed-colour" triangles (triangles that include both blue and yellow cones)
+#      so the triangulation tends to form across the track rather than within a single boundary
+#   3) Extracting internal edges (edges shared by more than one mixed triangle)
+#      which roughly correspond to cross-track connections in the interior of the corridor
+#   4) Taking midpoints of those internal edges as candidate centerline points
+#   5) Ordering the midpoints using a greedy nearest-neighbour chain and publishing a nav_msgs/Path
+
+# Published topics:
+#   - /delaunay_triangles (Marker, LINE_LIST): filtered triangulation edges for visual debug
+#   - /delaunay_midpoints (Marker, POINTS): midpoints of internal edges (candidate centerline points)
+#   - /delaunay_path (nav_msgs/Path): ordered path through midpoints
+
+# Inputs:
+#   - /cluster_markers_blue   (MarkerArray): blue cones in map frame (from pointcloud_cluster_mapper)
+#   - /cluster_markers_yellow (MarkerArray): yellow cones in map frame
+
+# Assumptions / gotchas:
+#   - Markers must be in a consistent frame (this script assumes "map" for output).
+#   - The MarkerArray will often include a DELETEALL marker. The callbacks currently store ALL markers,
+#     including DELETEALL, which can inject a bogus point at (0,0,0). Filtering DELETEALL is recommended.
+#   - Nearest-neighbour ordering is not a true path planner; it can zig-zag or loop on complex layouts.
+#   - MAX_EDGE_LENGTH is a crucial tuning knob. Too high and you connect across unrelated cones; too low and
+#     you get no internal edges and therefore no path.
+# """
+
+
 import math
 import rclpy
 from rclpy.node import Node
@@ -10,28 +41,31 @@ from nav_msgs.msg import Path
 import numpy as np
 from scipy.spatial import Delaunay
 
+
 class DelaunayPlanner(Node):
     def __init__(self):
-        super().__init__('delaunay_planner')
+        super().__init__("delaunay_planner")
 
         # storage for incoming cone positions
-        self.blue_pts = []    # list of [x, y, z]
+        self.blue_pts = []  # list of [x, y, z]
         self.yellow_pts = []  # list of [x, y, z]
 
         # subscribe to your blue/yellow cone topics
         self.create_subscription(
-            MarkerArray, '/cluster_markers_blue', self._blue_cb, 10)
+            MarkerArray, "/cluster_markers_blue", self._blue_cb, 10
+        )
         self.create_subscription(
-            MarkerArray, '/cluster_markers_yellow', self._yellow_cb, 10)
+            MarkerArray, "/cluster_markers_yellow", self._yellow_cb, 10
+        )
 
         # publishers for triangles, midpoints, and path
-        self.tri_pub  = self.create_publisher(Marker, '/delaunay_triangles', 10)
-        self.mid_pub  = self.create_publisher(Marker, '/delaunay_midpoints', 10)
-        self.path_pub = self.create_publisher(Path,   '/delaunay_path',      10)
+        self.tri_pub = self.create_publisher(Marker, "/delaunay_triangles", 10)
+        self.mid_pub = self.create_publisher(Marker, "/delaunay_midpoints", 10)
+        self.path_pub = self.create_publisher(Path, "/delaunay_path", 10)
 
         # timer to recompute at 5 Hz
         self.create_timer(0.2, self._timer_cb)
-        self.get_logger().info('DelaunayPlanner ready')
+        self.get_logger().info("DelaunayPlanner ready")
 
     def _blue_cb(self, msg: MarkerArray):
         self.blue_pts = [
@@ -47,14 +81,14 @@ class DelaunayPlanner(Node):
 
     def _timer_cb(self):
         # merge and check
-        n_blue  = len(self.blue_pts)
+        n_blue = len(self.blue_pts)
         n_total = n_blue + len(self.yellow_pts)
         if n_total < 3:
             return  # not enough to triangulate
 
         pts3d = np.vstack((self.blue_pts, self.yellow_pts))
         pts2d = pts3d[:, :2]
-        tri   = Delaunay(pts2d)
+        tri = Delaunay(pts2d)
 
         # keep only mixed-color triangles
         mixed = []
@@ -65,13 +99,13 @@ class DelaunayPlanner(Node):
 
         # build unique edges, with max 4 per cone
         seen_edges = set()
-        edge_degs  = {i: 0 for i in range(n_total)}
+        edge_degs = {i: 0 for i in range(n_total)}
         draw_edges = []
-        
+
         MAX_EDGE_LENGTH = 5.0  # adjust as needed (in meters)
 
         for s in mixed:
-            for i, j in [(0,1),(1,2),(2,0)]:
+            for i, j in [(0, 1), (1, 2), (2, 0)]:
                 e = tuple(sorted((s[i], s[j])))
                 if e not in seen_edges:
                     p1 = pts3d[e[0]]
@@ -87,37 +121,45 @@ class DelaunayPlanner(Node):
         # count interior edges (shared by >1 mixed triangle)
         edge_count = {}
         for s in mixed:
-            for i, j in [(0,1),(1,2),(2,0)]:
+            for i, j in [(0, 1), (1, 2), (2, 0)]:
                 e = tuple(sorted((s[i], s[j])))
                 edge_count[e] = edge_count.get(e, 0) + 1
         internal_edges = [e for e, c in edge_count.items() if c > 1]
 
         # --- publish triangle edges ---
         tri_m = Marker()
-        tri_m.header.frame_id = 'map'
-        tri_m.header.stamp    = self.get_clock().now().to_msg()
-        tri_m.ns    = 'delaunay'
-        tri_m.id    = 0
-        tri_m.type  = Marker.LINE_LIST
+        tri_m.header.frame_id = "map"
+        tri_m.header.stamp = self.get_clock().now().to_msg()
+        tri_m.ns = "delaunay"
+        tri_m.id = 0
+        tri_m.type = Marker.LINE_LIST
         tri_m.action = Marker.ADD
         tri_m.scale.x = 0.02
-        tri_m.color.r = 0.2; tri_m.color.g = 0.6; tri_m.color.b = 0.8; tri_m.color.a = 1.0
+        tri_m.color.r = 0.2
+        tri_m.color.g = 0.6
+        tri_m.color.b = 0.8
+        tri_m.color.a = 1.0
         for i, j in draw_edges:
-            p1 = pts3d[i]; p2 = pts3d[j]
+            p1 = pts3d[i]
+            p2 = pts3d[j]
             tri_m.points.append(Point(x=p1[0], y=p1[1], z=0.0))
             tri_m.points.append(Point(x=p2[0], y=p2[1], z=0.0))
         self.tri_pub.publish(tri_m)
 
         # --- publish midpoints of internal edges only ---
         mid_m = Marker()
-        mid_m.header.frame_id = 'map'
-        mid_m.header.stamp    = tri_m.header.stamp
-        mid_m.ns    = 'delaunay'
-        mid_m.id    = 1
-        mid_m.type  = Marker.POINTS
-        mid_m.action= Marker.ADD
-        mid_m.scale.x = 0.1; mid_m.scale.y = 0.1
-        mid_m.color.r = 0.0; mid_m.color.g = 1.0; mid_m.color.b = 0.0; mid_m.color.a = 1.0
+        mid_m.header.frame_id = "map"
+        mid_m.header.stamp = tri_m.header.stamp
+        mid_m.ns = "delaunay"
+        mid_m.id = 1
+        mid_m.type = Marker.POINTS
+        mid_m.action = Marker.ADD
+        mid_m.scale.x = 0.1
+        mid_m.scale.y = 0.1
+        mid_m.color.r = 0.0
+        mid_m.color.g = 1.0
+        mid_m.color.b = 0.0
+        mid_m.color.a = 1.0
 
         midpoints = []
         for i, j in internal_edges:
@@ -128,22 +170,22 @@ class DelaunayPlanner(Node):
 
         # --- build & publish Path through midpoints ---
         path = Path()
-        path.header.frame_id = 'map'
-        path.header.stamp    = tri_m.header.stamp
+        path.header.frame_id = "map"
+        path.header.stamp = tri_m.header.stamp
 
         if midpoints:
             pts = midpoints.copy()
             ordered = [pts.pop(0)]
             while pts:
                 curr = ordered[-1]
-                dists = [math.hypot(p[0]-curr[0], p[1]-curr[1]) for p in pts]
+                dists = [math.hypot(p[0] - curr[0], p[1] - curr[1]) for p in pts]
                 idx = int(np.argmin(dists))
                 ordered.append(pts.pop(idx))
 
             for x, y in ordered:
                 ps = PoseStamped()
-                ps.header.frame_id = 'map'
-                ps.header.stamp    = path.header.stamp
+                ps.header.frame_id = "map"
+                ps.header.stamp = path.header.stamp
                 ps.pose.position.x = x
                 ps.pose.position.y = y
                 ps.pose.position.z = 0.0
@@ -160,5 +202,6 @@ def main(args=None):
     node.destroy_node()
     rclpy.shutdown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

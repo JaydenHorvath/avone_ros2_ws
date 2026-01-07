@@ -1,4 +1,33 @@
 #!/usr/bin/env python3
+
+
+# avone_mapping/pointcloud_cluster_mapper.py (LiDAR cone clustering + persistent cone map)
+# --------------------------------------------------------------------------------------
+# This node takes a raw LiDAR PointCloud2 stream and extracts cone-like clusters using DBSCAN.
+# Each detected cluster is converted into a single representative (x,y) observation, transformed into a
+# chosen mapping frame (default `map`), and then associated to an existing saved cone if it is nearby.
+# If no saved cone is close enough, a new cone is created.
+
+# Key features (what this script is doing for AV.ONE):
+#   - Z filtering: keeps only points in a band (z_min..z_max) to remove ground and tall objects.
+#   - DBSCAN clustering: groups nearby points into "cone candidates" (typically in XY only).
+#   - Robust representative point: uses median of near-base points, optionally snapped to an actual point
+#     so the marker sits on real point cloud data rather than a mean centroid.
+#   - Left/right colour classification: transforms the representative into `side_frame` (default base_link)
+#     and assigns "blue" vs "yellow" based on the sign of lateral Y.
+#   - Persistent cone map: keeps a list of cones in `marker_frame` (default map) and merges new observations
+#     via nearest-neighbour association + optional exponential averaging.
+#   - RViz visualisation: publishes 3 marker arrays (all cones, blue cones, yellow cones) and clears old
+#     markers each cycle with DELETEALL.
+#   - CSV export on shutdown: saves lat/lon (if origin provided) + colour for each saved cone.
+
+# Assumptions / gotchas:
+#   - Your TF tree must support transforms: pointcloud frame -> marker_frame and pointcloud frame -> side_frame.
+#   - If side_frame is base_link, "left/right" is meaningful only if the vehicle frame is correct (REP-103).
+#   - association_distance and update_alpha control map stability vs responsiveness.
+#   - The lat/lon CSV export uses a simple local tangent approximation; useful for data analysis
+
+
 import rclpy
 from rclpy.node import Node
 
@@ -34,9 +63,11 @@ class PointCloudClusterMapper(Node):
         self.declare_parameter("z_max", 1.0)
 
         # Extra robustness
-        self.declare_parameter("base_z_max", 0.35)          # use near-base points for centroid
-        self.declare_parameter("snap_to_point", True)       # snap marker onto nearest actual point
-        self.declare_parameter("cluster_xy_only", True)     # DBSCAN on XY only
+        self.declare_parameter("base_z_max", 0.35)  # use near-base points for centroid
+        self.declare_parameter(
+            "snap_to_point", True
+        )  # snap marker onto nearest actual point
+        self.declare_parameter("cluster_xy_only", True)  # DBSCAN on XY only
 
         # Frame used to determine left/right side of vehicle
         self.declare_parameter("side_frame", "base_link")
@@ -79,7 +110,9 @@ class PointCloudClusterMapper(Node):
 
         self.gps_origin_lat = float(self.get_parameter("gps_origin_lat").value)
         self.gps_origin_lon = float(self.get_parameter("gps_origin_lon").value)
-        self.local_xy_rotation_deg = float(self.get_parameter("local_xy_rotation_deg").value)
+        self.local_xy_rotation_deg = float(
+            self.get_parameter("local_xy_rotation_deg").value
+        )
 
         assoc = float(self.get_parameter("association_distance").value)
         alpha = float(self.get_parameter("update_alpha").value)
@@ -99,16 +132,19 @@ class PointCloudClusterMapper(Node):
 
         # Sub
         self.sub_map = self.create_subscription(
-            PointCloud2,
-            "/lidar/points",
-            self.map_callback,
-            5
+            PointCloud2, "/lidar/points", self.map_callback, 5
         )
 
         # Pubs
-        self.pub_markers_all = self.create_publisher(MarkerArray, "/cluster_markers", 20)
-        self.pub_markers_blue = self.create_publisher(MarkerArray, "/cluster_markers_blue", 20)
-        self.pub_markers_yellow = self.create_publisher(MarkerArray, "/cluster_markers_yellow", 20)
+        self.pub_markers_all = self.create_publisher(
+            MarkerArray, "/cluster_markers", 20
+        )
+        self.pub_markers_blue = self.create_publisher(
+            MarkerArray, "/cluster_markers_blue", 20
+        )
+        self.pub_markers_yellow = self.create_publisher(
+            MarkerArray, "/cluster_markers_yellow", 20
+        )
 
         self.get_logger().info(
             "PointCloud Cluster Mapper running "
@@ -119,6 +155,10 @@ class PointCloudClusterMapper(Node):
 
     # ----------------------------------------------------------------------
     def _transform_point_latest(self, x, y, z, source_frame, target_frame):
+
+        #  Transform a point (x,y,z) from source_frame -> target_frame using the latest available TF.
+        # Returns (x,y,z) in target_frame, or None if transform fails.
+
         ps = PointStamped()
         ps.header.frame_id = source_frame
         ps.header.stamp = rclpy.time.Time().to_msg()  # latest available
@@ -128,21 +168,27 @@ class PointCloudClusterMapper(Node):
 
         try:
             out = self.tf_buffer.transform(
-                ps,
-                target_frame,
-                timeout=rclpy.duration.Duration(seconds=0.05)
+                ps, target_frame, timeout=rclpy.duration.Duration(seconds=0.05)
             )
             return out.point.x, out.point.y, out.point.z
         except TransformException as ex:
-            self.get_logger().warn(f"Transform failed {source_frame} -> {target_frame}: {ex}")
+            self.get_logger().warn(
+                f"Transform failed {source_frame} -> {target_frame}: {ex}"
+            )
             return None
 
     # ----------------------------------------------------------------------
     def _classify_colour(self, x_src, y_src, source_frame):
+
+        # Determine cone side (blue/yellow) by transforming point into side_frame (usually base_link)
+        # and checking sign of lateral Y.
+
         if self.force_color in ("blue", "yellow"):
             return self.force_color
 
-        tf_out = self._transform_point_latest(x_src, y_src, 0.0, source_frame, self.side_frame)
+        tf_out = self._transform_point_latest(
+            x_src, y_src, 0.0, source_frame, self.side_frame
+        )
         if tf_out is None:
             return None
 
@@ -152,7 +198,12 @@ class PointCloudClusterMapper(Node):
 
     # ----------------------------------------------------------------------
     def _to_marker_frame_xy(self, x_src, y_src, source_frame):
-        tf_out = self._transform_point_latest(x_src, y_src, 0.0, source_frame, self.marker_frame)
+
+        # Transform (x,y,0) into marker_frame and return (mx,my) for storage/markers
+
+        tf_out = self._transform_point_latest(
+            x_src, y_src, 0.0, source_frame, self.marker_frame
+        )
         if tf_out is None:
             return None
         mx, my, _ = tf_out
@@ -160,6 +211,9 @@ class PointCloudClusterMapper(Node):
 
     # ----------------------------------------------------------------------
     def _nearest_cone_index(self, x, y):
+
+        # Find nearest saved cone to (x,y) in marker_frame. Returns (index, distance) or (None, None)
+
         if not self.saved_cones:
             return None, None
 
@@ -174,6 +228,12 @@ class PointCloudClusterMapper(Node):
 
     # ----------------------------------------------------------------------
     def _associate_or_create(self, x_obs, y_obs, colour_obs):
+
+        # Nearest-neighbour association:
+        #   - If observation is within association_distance of a saved cone, update votes and optionally position.
+        #   - Else create a new cone entry.
+        # Returns True if a new cone was created, False if it was associated.
+
         i, d = self._nearest_cone_index(x_obs, y_obs)
 
         if i is not None and d is not None and d < self.association_distance:
@@ -202,20 +262,31 @@ class PointCloudClusterMapper(Node):
 
     # ----------------------------------------------------------------------
     def _cone_colour(self, cone):
+
+        # Final colour decision based on vote counts.
+
         return "blue" if cone["blue_votes"] >= cone["yellow_votes"] else "yellow"
 
     # ----------------------------------------------------------------------
     def _cluster_representative_xy(self, cluster_points_xyz):
-        """
-        Returns a representative (x,y) in the source frame that lies on the cluster points.
-        Uses median of near-base points, then snaps to nearest actual point.
-        """
+
+        # Compute a representative (x,y) for a cluster in the SOURCE frame.
+
+        # Approach:
+        #   1) Prefer near-base points (z <= base_z_max) to reduce influence of sparse top returns.
+        #   2) Use median XY for robustness against outliers.
+        #   3) Optionally snap that median location to the nearest actual point.
+
         if cluster_points_xyz.shape[0] == 0:
             return None
 
         # Prefer near-base points if available
         base = cluster_points_xyz[cluster_points_xyz[:, 2] <= self.base_z_max]
-        use = base if base.shape[0] >= max(3, self.min_samples // 2) else cluster_points_xyz
+        use = (
+            base
+            if base.shape[0] >= max(3, self.min_samples // 2)
+            else cluster_points_xyz
+        )
 
         # Robust center (median resists outliers)
         center_xy = np.median(use[:, :2], axis=0)
@@ -233,8 +304,18 @@ class PointCloudClusterMapper(Node):
 
     # ----------------------------------------------------------------------
     def map_callback(self, msg: PointCloud2):
+
+        # Compute a representative (x,y) for a cluster in the SOURCE frame.
+
+        # Approach:
+        #   1) Prefer near-base points (z <= base_z_max) to reduce influence of sparse top returns.
+        #   2) Use median XY for robustness against outliers.
+        #   3) Optionally snap that median location to the nearest actual point.
+
         raw_points = []
-        for p in point_cloud2.read_points(msg, field_names=("x", "y", "z"), skip_nans=True):
+        for p in point_cloud2.read_points(
+            msg, field_names=("x", "y", "z"), skip_nans=True
+        ):
             z = float(p[2])
             if self.z_min < z < self.z_max:
                 raw_points.append([float(p[0]), float(p[1]), z])
@@ -294,11 +375,19 @@ class PointCloudClusterMapper(Node):
         for c in self.saved_cones:
             colour = self._cone_colour(c)
 
-            markers_all.markers.append(self.make_marker(c["id"], c["x"], c["y"], colour, ns="cones_all"))
+            markers_all.markers.append(
+                self.make_marker(c["id"], c["x"], c["y"], colour, ns="cones_all")
+            )
             if colour == "blue":
-                markers_blue.markers.append(self.make_marker(c["id"], c["x"], c["y"], "blue", ns="cones_blue"))
+                markers_blue.markers.append(
+                    self.make_marker(c["id"], c["x"], c["y"], "blue", ns="cones_blue")
+                )
             else:
-                markers_yellow.markers.append(self.make_marker(c["id"], c["x"], c["y"], "yellow", ns="cones_yellow"))
+                markers_yellow.markers.append(
+                    self.make_marker(
+                        c["id"], c["x"], c["y"], "yellow", ns="cones_yellow"
+                    )
+                )
 
         self.pub_markers_all.publish(markers_all)
         self.pub_markers_blue.publish(markers_blue)
@@ -311,6 +400,9 @@ class PointCloudClusterMapper(Node):
 
     # ----------------------------------------------------------------------
     def make_deleteall_marker(self):
+
+        # """Marker helper: clears all previous markers in the namespace for clean redraw."""
+
         m = Marker()
         m.header.frame_id = self.marker_frame
         m.header.stamp = self.get_clock().now().to_msg()
@@ -319,6 +411,10 @@ class PointCloudClusterMapper(Node):
 
     # ----------------------------------------------------------------------
     def make_marker(self, marker_id, x, y, colour, ns="cones"):
+
+        # Create a cylinder marker at (x,y) in marker_frame.
+        # Note: Colour is chosen based on your blue/yellow convention.
+
         m = Marker()
         m.header.frame_id = self.marker_frame
         m.header.stamp = self.get_clock().now().to_msg()
@@ -345,6 +441,10 @@ class PointCloudClusterMapper(Node):
 
     # ----------------------------------------------------------------------
     def _marker_xy_to_latlon(self, x_m, y_m):
+
+        # Convert local (x,y) in meters back to (lat,lon) using a simple tangent plane approximation.
+        # Requires gps_origin_lat/lon to be set (non-zero).
+
         lat0 = self.gps_origin_lat
         lon0 = self.gps_origin_lon
 
@@ -367,6 +467,10 @@ class PointCloudClusterMapper(Node):
 
     # ----------------------------------------------------------------------
     def save_csv(self):
+
+        # Save the current persistent cone list to CSV.
+        # If gps_origin_lat/lon are not set, lat/lon columns are left blank.
+
         with open(self.csv_path, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["lat", "lon", "colour"])

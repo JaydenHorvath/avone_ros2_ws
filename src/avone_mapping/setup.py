@@ -1,33 +1,31 @@
 from setuptools import setup
 
-package_name = 'avone_mapping'
+package_name = "avone_mapping"
 
 setup(
     name=package_name,
-    version='0.1.0',
+    version="0.1.0",
     packages=[package_name],
     data_files=[
         # let ROS 2 know about this package
-        ('share/ament_index/resource_index/packages',
-            ['resource/' + package_name]),
+        ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         # install package.xml
-        ('share/' + package_name, ['package.xml']),
+        ("share/" + package_name, ["package.xml"]),
     ],
     install_requires=[
-        'setuptools',
+        "setuptools",
     ],
     zip_safe=True,
-    maintainer='jay',
-    maintainer_email='c3350128@uon.edu.au',
-    description='Maps cone landmarks using an RGB-D camera',
-    license='Apache License 2.0',
+    maintainer="jay",
+    maintainer_email="c3350128@uon.edu.au",
+    description="AVONE Mapping package - cone detection/path planning",
+    license="Proprietary",
     # tests_require=['pytest'],
     entry_points={
-        'console_scripts': [
-            # <executable_name> = <module>:<function>
-              'lidar_groundremoval = avone_mapping.lidar_groundremoval:main',
-              'delaunay_planner = avone_mapping.delaunay_planner:main',
-              'coloured_cone_cluster = avone_mapping.coloured_cone_cluster:main',
+        "console_scripts": [
+            "lidar_groundremoval = avone_mapping.lidar_groundremoval:main",
+            "delaunay_planner = avone_mapping.delaunay_planner:main",
+            "coloured_cone_cluster = avone_mapping.coloured_cone_cluster:main",
         ],
     },
 )
