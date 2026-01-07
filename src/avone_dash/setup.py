@@ -2,27 +2,26 @@ from setuptools import setup
 import os
 from glob import glob
 
-package_name = 'avone_dash'
+package_name = "avone_dash"
 
 setup(
     name=package_name,
-    version='0.0.0',
+    version="0.0.0",
     packages=[package_name],
     data_files=[
-        ('share/ament_index/resource_index/packages',
-            ['resource/' + package_name]),
-        ('share/' + package_name, ['package.xml']),
+        ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
+        ("share/" + package_name, ["package.xml"]),
     ],
-    install_requires=['setuptools'],
+    install_requires=["setuptools"],
     zip_safe=True,
-    maintainer='your_name',
-    maintainer_email='your_email@example.com',
-    description='AVONE Dashboard',
-    license='Apache License 2.0',
-    tests_require=['pytest'],
+    maintainer="Jayden Horvath",
+    maintainer_email="c3350128@uon.edu.au",
+    description="ROS 2 dashboard package providing a user interface for monitoring AV.ONE status by visualizing ROS 2 topics bridged from CAN.",
+    license="Proprietary",
+    tests_require=["pytest"],
     entry_points={
-        'console_scripts': [
-            'dashboard = avone_dash.dashboard:main',
+        "console_scripts": [
+            "dashboard = avone_dash.dashboard:main",
         ],
     },
 )

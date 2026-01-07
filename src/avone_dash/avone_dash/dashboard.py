@@ -1,4 +1,35 @@
 #!/usr/bin/env python3
+
+# dashboard(AV.ONE live signal dashboard)
+# ----------------------------------------
+# PyQt5 + PyQtGraph dashboard that visualises AV.ONE ROS 2 topics derived from the AV1 DBC.
+
+# What it does:
+#   - Loads the AV1 DBC file (cantools) and enumerates every message and signal.
+#   - For each DBC signal, subscribes to the corresponding ROS topic published by the CAN→ROS bridge:
+#       /av1/<message_name_lower>/<signal_name_lower>
+#   - Displays each signal in a tabbed UI, grouped by message name:
+#       - Live numeric value (and enum label if the signal has choices)
+#       - Optional progress bar when DBC min/max exist
+#       - Optional scrolling plot (last ~100 samples) via PyQtGraph
+#   - Runs ROS 2 spinning on a background thread, and forwards updates into the GUI thread safely using Qt signals.
+
+# Intended use:
+#   - Fast bring-up tool for CAN and autonomy stack debugging.
+#   - Confirm heartbeats, modes/states, faults, and sensor streams are alive without needing rqt.
+
+# How to run:
+#   - Start your CAN→ROS bridge (topics must exist), then:
+#       ros2 run avone_dash dashboard
+#   - Close with Q or Esc (or the Exit button).
+
+# Key assumptions / gotchas:
+#   - DBC path is currently hard coded (dbc_path). Will need to be updated with NUCAN git repository path
+#   - Topic message types are inferred from the running ROS graph at startup. If topics appear later,
+#     the type may default to Float32 and the subscription may not match.
+#   - Many subscriptions are created (one per signal). On slower machines this may be heavy.
+
+
 import sys
 import os
 import threading
@@ -9,13 +40,31 @@ from rclpy.node import Node
 
 # ROS2 message types
 from std_msgs.msg import (
-    Bool, Int8, UInt8, Int16, UInt16, Int32, UInt32, Float32, Float64
+    Bool,
+    Int8,
+    UInt8,
+    Int16,
+    UInt16,
+    Int32,
+    UInt32,
+    Float32,
+    Float64,
 )
 
 # PyQt5 imports
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QProgressBar,
-    QScrollArea, QGroupBox, QGridLayout, QPushButton, QTabWidget, QAction
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QLabel,
+    QProgressBar,
+    QScrollArea,
+    QGroupBox,
+    QGridLayout,
+    QPushButton,
+    QTabWidget,
+    QAction,
 )
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont, QKeySequence
@@ -25,16 +74,19 @@ import pyqtgraph as pg
 
 
 # =====================================================
-# 🧭 MANUAL CLASSIFICATION MAP
+# Manual classification map (tabs)
 # =====================================================
-CLASS_MAP = {
-    'Drive': ['THROTTLE', 'BRK', 'RPM', 'GEAR','ROS', 'CMD'],
-    'Faults': ['FAULT', 'ERROR', 'TIMEOUT', 'ERR'],
-    'Sensors': [ 'IMU', 'GPS'],
-    'Motors': ['MOTOR', 'CURR', 'VOLT'],
-    'System': ['HEARTBEAT','MODE', 'ARMED',  'STATE', 'HEARTBEAT', 'HB'],
-    'SLAB': [ 'MSGID', 'DCDC', 'CHARGER'],
+# Tab classification is based on *message name* keyword matching.
+# If a message name contains one of the keywords, it is placed into that tab.
+# Messages that match nothing end up in "Misc".
 
+CLASS_MAP = {
+    "Drive": ["THROTTLE", "BRK", "RPM", "GEAR", "ROS", "CMD"],
+    "Faults": ["FAULT", "ERROR", "TIMEOUT", "ERR"],
+    "Sensors": ["IMU", "GPS"],
+    "Motors": ["MOTOR", "CURR", "VOLT"],
+    "System": ["HEARTBEAT", "MODE", "ARMED", "STATE", "HEARTBEAT", "HB"],
+    "SLAB": ["MSGID", "DCDC", "CHARGER"],
 }
 # Any message not matching a keyword above goes into “Misc”
 
@@ -43,18 +95,28 @@ CLASS_MAP = {
 class SignalBridge(QObject):
     update_signal = pyqtSignal(str, object, dict)
 
+    #     Qt signal carrier to move data from ROS thread → GUI thread safely.
+
+    # Why this exists:
+    #   - ROS callbacks are executed on the ROS thread.
+    #   - Qt widgets must only be updated from the main GUI thread.
+    #   - pyqtSignal queues the update into the GUI event loop.
+
 
 # ---------- ROS2 Node ----------
 class AVONEDashboard(Node):
+
+    # ROS 2 node that subscribes to all DBC-derived signal topics and pushes updates to the GUI via SignalBridge.
+
     def __init__(self, bridge, dbc_path):
-        super().__init__('avone_dashboard')
+        super().__init__("avone_dashboard")
         self.bridge = bridge
 
         try:
             self.db = cantools.database.load_file(dbc_path)
-            self.get_logger().info(f'Loaded DBC file: {dbc_path}')
+            self.get_logger().info(f"Loaded DBC file: {dbc_path}")
         except Exception as e:
-            self.get_logger().error(f'Failed to load DBC file: {e}')
+            self.get_logger().error(f"Failed to load DBC file: {e}")
             sys.exit(1)
 
         self.signal_values = {}
@@ -68,39 +130,55 @@ class AVONEDashboard(Node):
         for msg in self.db.messages:
             for sig in msg.signals:
                 self.signal_values[f"{msg.name}/{sig.name}"] = {
-                    'name': sig.name,
-                    'message': msg.name,
-                    'unit': sig.unit or '',
-                    'min': sig.minimum,
-                    'max': sig.maximum,
-                    'choices': getattr(sig, 'choices', None),
-                    'value': None,
+                    "name": sig.name,
+                    "message": msg.name,
+                    "unit": sig.unit or "",
+                    "min": sig.minimum,
+                    "max": sig.maximum,
+                    "choices": getattr(sig, "choices", None),
+                    "value": None,
                 }
 
     def _create_subscriptions(self):
+
+        # #
+        # Creates one subscription per DBC signal.
+
+        # Topic convention (must match your CAN→ROS bridge):
+        #   /av1/<message_name_lower>/<signal_name_lower>
+
+        # Message type selection:
+        #   - We inspect the existing ROS graph at startup (get_topic_names_and_types()).
+        #   - If the topic exists, we pick its exact std_msgs type to avoid type mismatches.
+        #   - If the topic is not present at startup, we fall back to Float32 (may not match later).
+
         type_map = {
-            'bool': Bool, 'int8': Int8, 'uint8': UInt8,
-            'int16': Int16, 'uint16': UInt16,
-            'int32': Int32, 'uint32': UInt32,
-            'float32': Float32, 'float64': Float64
+            "bool": Bool,
+            "int8": Int8,
+            "uint8": UInt8,
+            "int16": Int16,
+            "uint16": UInt16,
+            "int32": Int32,
+            "uint32": UInt32,
+            "float32": Float32,
+            "float64": Float64,
         }
         topics = dict(self.get_topic_names_and_types())
 
         for key, info in self.signal_values.items():
-            msg, sig = info['message'], info['name']
-            topic = f'/av1/{msg.lower()}/{sig.lower()}'
+            msg, sig = info["message"], info["name"]
+            topic = f"/av1/{msg.lower()}/{sig.lower()}"
             self.callback_count[key] = 0
 
             msg_type = Float32  # default
             if topic in topics:
                 full = topics[topic][0]
-                base = full.split('/')[-1].lower()
+                base = full.split("/")[-1].lower()
                 msg_type = type_map.get(base, Float32)
 
             try:
                 self.create_subscription(
-                    msg_type, topic,
-                    lambda m, k=key: self._callback(m, k), 10
+                    msg_type, topic, lambda m, k=key: self._callback(m, k), 10
                 )
                 self.get_logger().info(f"Subscribed: {topic} ({msg_type.__name__})")
             except Exception as e:
@@ -109,8 +187,8 @@ class AVONEDashboard(Node):
     def _callback(self, msg, key):
         if key not in self.signal_values:
             return
-        val = getattr(msg, 'data', msg)
-        self.signal_values[key]['value'] = val
+        val = getattr(msg, "data", msg)
+        self.signal_values[key]["value"] = val
         self.callback_count[key] += 1
         self.bridge.update_signal.emit(key, val, self.signal_values[key])
 
@@ -122,6 +200,11 @@ class AVONEDashboard(Node):
 
 # ---------- GUI ----------
 class DashboardGUI(QMainWindow):
+
+    #     Tabbed dashboard GUI:
+    #   - Each tab contains groups (QGroupBox) per CAN message.
+    #   - Each row is a DBC signal: name | (bar) | value | unit | (plot).
+
     def __init__(self, enable_plots=True):
         super().__init__()
         self.setWindowTitle("AV.ONE Dashboard (Tabbed)")
@@ -148,7 +231,9 @@ class DashboardGUI(QMainWindow):
         quit_button = QPushButton("Exit (Q/Esc)")
         quit_button.clicked.connect(self._exit_app)
         quit_button.setFixedWidth(150)
-        quit_button.setStyleSheet("background-color:#b33a3a; color:white; font-weight:bold;")
+        quit_button.setStyleSheet(
+            "background-color:#b33a3a; color:white; font-weight:bold;"
+        )
         self.addToolBarBreak()
         self.addToolBar("Exit").addWidget(quit_button)
         self.addAction(self._make_shortcut("Q", self._exit_app))
@@ -165,12 +250,19 @@ class DashboardGUI(QMainWindow):
 
     # ---------- UI Build ----------
     def build_ui(self, signal_values):
-        # Classify messages
+
+        # Builds the full UI once at startup using the DBC signal catalog.
+
+        # Layout logic:
+        #   1) Classify signals into tabs based on message name keywords (CLASS_MAP).
+        #   2) Within each tab, group rows by message name (QGroupBox per message).
+        #   3) Within each message group, render each signal as a row.
+
         classified = {k: [] for k in CLASS_MAP.keys()}
         classified["Misc"] = []
 
         for key, info in signal_values.items():
-            msg = info['message']
+            msg = info["message"]
             found = False
             for class_name, keywords in CLASS_MAP.items():
                 if any(kw in msg.upper() for kw in keywords):
@@ -190,29 +282,29 @@ class DashboardGUI(QMainWindow):
             # Group by message name
             grouped = {}
             for info in signals:
-                grouped.setdefault(info['message'], []).append(info)
+                grouped.setdefault(info["message"], []).append(info)
 
             for msg, sig_list in grouped.items():
                 group = QGroupBox(msg)
-                group.setFont(QFont('Arial', 11, QFont.Bold))
+                group.setFont(QFont("Arial", 11, QFont.Bold))
                 grid = QGridLayout()
                 row = 0
 
-                for sig in sorted(sig_list, key=lambda x: x['name']):
+                for sig in sorted(sig_list, key=lambda x: x["name"]):
                     key = f"{msg}/{sig['name']}"
-                    name_lbl = QLabel(sig['name'])
+                    name_lbl = QLabel(sig["name"])
                     name_lbl.setMinimumWidth(250)
-                    value_lbl = QLabel('--')
+                    value_lbl = QLabel("--")
                     value_lbl.setAlignment(Qt.AlignRight)
-                    unit_lbl = QLabel(sig['unit'])
+                    unit_lbl = QLabel(sig["unit"])
                     unit_lbl.setMinimumWidth(60)
 
                     # Progress bar
                     bar = None
-                    if sig['min'] is not None and sig['max'] is not None:
+                    if sig["min"] is not None and sig["max"] is not None:
                         bar = QProgressBar()
-                        bar.setMinimum(int(sig['min']))
-                        bar.setMaximum(int(sig['max']))
+                        bar.setMinimum(int(sig["min"]))
+                        bar.setMaximum(int(sig["max"]))
                         bar.setTextVisible(False)
                         bar.setMinimumWidth(150)
                         grid.addWidget(bar, row, 1)
@@ -228,18 +320,18 @@ class DashboardGUI(QMainWindow):
                         plot_widget = pg.PlotWidget()
                         plot_widget.setFixedHeight(100)
                         plot_widget.showGrid(x=True, y=True, alpha=0.3)
-                        plot_curve = plot_widget.plot(pen=pg.mkPen('#00BFFF', width=2))
+                        plot_curve = plot_widget.plot(pen=pg.mkPen("#00BFFF", width=2))
                         data_buffer = collections.deque(maxlen=100)
                         grid.addWidget(plot_widget, row, 4, 1, 1)
 
                     grid.addWidget(name_lbl, row, 0)
                     self.signal_widgets[key] = {
-                        'value_label': value_lbl,
-                        'bar': bar,
-                        'choices': sig['choices'],
-                        'plot_widget': plot_widget,
-                        'plot_curve': plot_curve,
-                        'data_buffer': data_buffer
+                        "value_label": value_lbl,
+                        "bar": bar,
+                        "choices": sig["choices"],
+                        "plot_widget": plot_widget,
+                        "plot_curve": plot_curve,
+                        "data_buffer": data_buffer,
                     }
                     row += 1
 
@@ -252,28 +344,37 @@ class DashboardGUI(QMainWindow):
 
     # ---------- Signal Update ----------
     def _update_signal(self, key, val, info):
+
+        # Slot called on the GUI thread when a ROS signal update arrives.
+
+        # Handles:
+        #   - Enum decoding (choices dict) when present
+        #   - Numeric formatting for floats
+        #   - Progress bar update where applicable
+        #   - Buffering samples for plotting
+
         if key not in self.signal_widgets:
             return
         w = self.signal_widgets[key]
-        lbl = w['value_label']
+        lbl = w["value_label"]
         if not lbl:
             return
 
-        choices = w['choices']
+        choices = w["choices"]
         if choices:
             lbl.setText(str(choices.get(int(val), int(val))))
         else:
             lbl.setText(f"{val:.2f}" if isinstance(val, float) else str(val))
 
-        if w['bar']:
+        if w["bar"]:
             try:
-                w['bar'].setValue(int(val))
+                w["bar"].setValue(int(val))
             except Exception:
                 pass
 
-        if self.enable_plots and w['data_buffer'] is not None:
+        if self.enable_plots and w["data_buffer"] is not None:
             try:
-                w['data_buffer'].append(float(val))
+                w["data_buffer"].append(float(val))
             except Exception:
                 pass
 
@@ -282,21 +383,22 @@ class DashboardGUI(QMainWindow):
         if not self.enable_plots:
             return
         for w in self.signal_widgets.values():
-            if w['plot_curve'] and w['data_buffer']:
-                data = list(w['data_buffer'])
-                w['plot_curve'].setData(data)
+            if w["plot_curve"] and w["data_buffer"]:
+                data = list(w["data_buffer"])
+                w["plot_curve"].setData(data)
                 if data:
                     ymin, ymax = min(data), max(data)
                     if ymin == ymax:
                         ymin -= 0.5
                         ymax += 0.5
-                    w['plot_widget'].setYRange(ymin, ymax)
+                    w["plot_widget"].setYRange(ymin, ymax)
 
     # ---------- Dark Theme ----------
     def _apply_dark_theme(self):
-        pg.setConfigOption('background', '#1e1e1e')
-        pg.setConfigOption('foreground', '#e0e0e0')
-        self.setStyleSheet("""
+        pg.setConfigOption("background", "#1e1e1e")
+        pg.setConfigOption("foreground", "#e0e0e0")
+        self.setStyleSheet(
+            """
             QMainWindow { background-color: #1e1e1e; }
             QWidget { background-color: #1e1e1e; color: #e0e0e0; }
             QGroupBox { border: 1px solid #3d3d3d; border-radius: 5px; padding: 8px; margin-top: 1ex; }
@@ -305,13 +407,14 @@ class DashboardGUI(QMainWindow):
             QProgressBar::chunk { background-color: #2196F3; }
             QTabBar::tab { background: #2d2d2d; color: #e0e0e0; padding: 10px; }
             QTabBar::tab:selected { background: #2196F3; color: white; }
-        """)
+        """
+        )
 
 
 # ---------- Main ----------
 def main():
     rclpy.init()
-    dbc_path = '/home/avone/NUTEAMSGIT/NUCAN/DBC Files/AV1.dbc'
+    dbc_path = "/home/avone/NUTEAMSGIT/NUCAN/DBC Files/AV1.dbc"
     if not os.path.exists(dbc_path):
         print("DBC file not found:", dbc_path)
         sys.exit(1)
@@ -333,5 +436,5 @@ def main():
         rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
