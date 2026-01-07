@@ -3,9 +3,9 @@
 <package format="3">
   <name>avone_yolo</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>AVONES YOLO Cone Detection Package</description>
   <maintainer email="c3350128@uon.edu.au">jay</maintainer>
-  <license>TODO: License declaration</license>
+  <license>Proprietary</license>
 
   <buildtool_depend>ament_python</buildtool_depend>
 

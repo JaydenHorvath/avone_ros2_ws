@@ -1,4 +1,42 @@
 #!/usr/bin/env python3
+
+# YOLO ROS Node (Developed Version)
+# File: yolo_node.py
+
+# Purpose:
+#   - Run Ultralytics YOLO on a camera stream (LIVE mode) or on a single image file (FILE mode).
+#   - Publish:
+#       1) /yolo/image          Annotated image output (boxes only, colour-coded by class)
+#       2) /yolo/camera_info    CameraInfo pass-through in LIVE mode, or basic CameraInfo in FILE mode
+#       3) /yolo/detections     Detection2DArray with bbox + class_id + score
+
+# Modes:
+#   LIVE mode (default):
+#     - Subscribes to:
+#         * image_topic (sensor_msgs/Image)
+#         * camera_info_topic (sensor_msgs/CameraInfo)
+#     - Publishes annotated image and forwards CameraInfo.
+
+#   FILE mode (when image_path is set):
+#     - Loads a still image (jpg/png) from disk.
+#     - Publishes annotated image at publish_rate_hz.
+#     - Publishes a basic CameraInfo message that matches the output image size.
+#     - Does NOT subscribe to camera topics.
+
+# Outputs and coordinate conventions:
+#   - The /yolo/image output can be resized for viewing (enable_output_resize, output_height/output_width).
+#   - Detection2DArray bboxes are kept in the ORIGINAL input image coordinates
+#     (not the resized /yolo/image coordinates). This avoids breaking downstream perception nodes.
+
+# Display behaviour:
+#   - Draws rectangles only (no labels by default).
+#   - Colour is selected by class_id using a hard-coded class -> BGR map.
+
+# How to run:
+#   # Live mode (subscribe to camera topics)
+#   ros2 run yolo_ros yolo_node
+
+
 import os
 
 import rclpy
@@ -9,7 +47,12 @@ import numpy as np
 from cv_bridge import CvBridge
 
 from sensor_msgs.msg import Image, CameraInfo
-from vision_msgs.msg import Detection2D, Detection2DArray, BoundingBox2D, ObjectHypothesisWithPose
+from vision_msgs.msg import (
+    Detection2D,
+    Detection2DArray,
+    BoundingBox2D,
+    ObjectHypothesisWithPose,
+)
 from geometry_msgs.msg import PoseWithCovariance
 from ament_index_python.packages import get_package_share_directory
 from ultralytics import YOLO
@@ -32,7 +75,7 @@ class YoloRosNode(Node):
         self.declare_parameter("frame_id", "camera")
 
         default_weights = os.path.join(
-            get_package_share_directory("yolo_ros"),
+            get_package_share_directory("avone_yolo"),
             "weights",
             "best.pt",
         )
@@ -41,24 +84,30 @@ class YoloRosNode(Node):
         # Output sizing for /yolo/image
         # Typical use: set output_height:=1080 and leave output_width:=0 for auto width
         self.declare_parameter("enable_output_resize", True)
-        self.declare_parameter("output_height", 1080)   # set to 0 to disable height constraint
-        self.declare_parameter("output_width", 0)       # 0 means auto-compute if keep_aspect is True
+        self.declare_parameter(
+            "output_height", 1080
+        )  # set to 0 to disable height constraint
+        self.declare_parameter(
+            "output_width", 0
+        )  # 0 means auto-compute if keep_aspect is True
         self.declare_parameter("keep_aspect", True)
-        self.declare_parameter("letterbox", False)      # if True and both w/h given, pads to fit instead of stretching
+        self.declare_parameter(
+            "letterbox", False
+        )  # if True and both w/h given, pads to fit instead of stretching
 
         # -----------------------------
         # Display tuning
         # -----------------------------
         self.draw_boxes = True
-        self.draw_text = False          # no labels
+        self.draw_text = False  # no labels
         self.box_thickness = 2
 
         # Your class-id -> BGR colour mapping
         self.color_map = {
-            "0": (255, 0, 0),      # blue
-            "4": (0, 255, 255),    # yellow
-            "2": (0, 165, 255),    # small orange
-            "1": (0, 0, 255),      # large orange (red)
+            "0": (255, 0, 0),  # blue
+            "4": (0, 255, 255),  # yellow
+            "2": (0, 165, 255),  # small orange
+            "1": (0, 0, 255),  # large orange (red)
         }
         self.default_color = (0, 255, 0)
 
@@ -72,7 +121,9 @@ class YoloRosNode(Node):
         # -----------------------------
         # YOLO model
         # -----------------------------
-        weights_path = self.get_parameter("weights_path").get_parameter_value().string_value
+        weights_path = (
+            self.get_parameter("weights_path").get_parameter_value().string_value
+        )
         self.model = YOLO(weights_path)
 
         # For live mode: store latest CameraInfo
@@ -81,7 +132,9 @@ class YoloRosNode(Node):
         # -----------------------------
         # Mode selection: live vs image file
         # -----------------------------
-        self.image_path = self.get_parameter("image_path").get_parameter_value().string_value.strip()
+        self.image_path = (
+            self.get_parameter("image_path").get_parameter_value().string_value.strip()
+        )
 
         if self.image_path:
             if not os.path.exists(self.image_path):
@@ -89,24 +142,44 @@ class YoloRosNode(Node):
 
             self.static_cv_img = cv2.imread(self.image_path, cv2.IMREAD_COLOR)
             if self.static_cv_img is None:
-                raise RuntimeError(f"Failed to read image_path with OpenCV: {self.image_path}")
+                raise RuntimeError(
+                    f"Failed to read image_path with OpenCV: {self.image_path}"
+                )
 
-            rate_hz = float(self.get_parameter("publish_rate_hz").get_parameter_value().double_value)
+            rate_hz = float(
+                self.get_parameter("publish_rate_hz").get_parameter_value().double_value
+            )
             rate_hz = max(0.1, rate_hz)
             period = 1.0 / rate_hz
 
-            self.frame_id = self.get_parameter("frame_id").get_parameter_value().string_value
+            self.frame_id = (
+                self.get_parameter("frame_id").get_parameter_value().string_value
+            )
             self.timer = self.create_timer(period, self.timer_callback)
 
-            self.get_logger().info(f"YOLO node up and running in FILE mode: {self.image_path}")
+            self.get_logger().info(
+                f"YOLO node up and running in FILE mode: {self.image_path}"
+            )
         else:
-            image_topic = self.get_parameter("image_topic").get_parameter_value().string_value
-            caminfo_topic = self.get_parameter("camera_info_topic").get_parameter_value().string_value
+            image_topic = (
+                self.get_parameter("image_topic").get_parameter_value().string_value
+            )
+            caminfo_topic = (
+                self.get_parameter("camera_info_topic")
+                .get_parameter_value()
+                .string_value
+            )
 
-            self.image_sub = self.create_subscription(Image, image_topic, self.image_callback, 10)
-            self.info_sub = self.create_subscription(CameraInfo, caminfo_topic, self.caminfo_callback, 10)
+            self.image_sub = self.create_subscription(
+                Image, image_topic, self.image_callback, 10
+            )
+            self.info_sub = self.create_subscription(
+                CameraInfo, caminfo_topic, self.caminfo_callback, 10
+            )
 
-            self.get_logger().info(f"YOLO node up and running in LIVE mode, subscribing to {image_topic}")
+            self.get_logger().info(
+                f"YOLO node up and running in LIVE mode, subscribing to {image_topic}"
+            )
 
     def caminfo_callback(self, info_msg: CameraInfo):
         self.latest_caminfo = info_msg
@@ -116,14 +189,24 @@ class YoloRosNode(Node):
         return self.color_map.get(str(cls_id_int), self.default_color)
 
     def _compute_output_size(self, in_w: int, in_h: int):
-        enable = bool(self.get_parameter("enable_output_resize").get_parameter_value().bool_value)
+        enable = bool(
+            self.get_parameter("enable_output_resize").get_parameter_value().bool_value
+        )
         if not enable:
             return in_w, in_h, 1.0, 1.0, 0, 0, False
 
-        out_h = int(self.get_parameter("output_height").get_parameter_value().integer_value)
-        out_w = int(self.get_parameter("output_width").get_parameter_value().integer_value)
-        keep_aspect = bool(self.get_parameter("keep_aspect").get_parameter_value().bool_value)
-        letterbox = bool(self.get_parameter("letterbox").get_parameter_value().bool_value)
+        out_h = int(
+            self.get_parameter("output_height").get_parameter_value().integer_value
+        )
+        out_w = int(
+            self.get_parameter("output_width").get_parameter_value().integer_value
+        )
+        keep_aspect = bool(
+            self.get_parameter("keep_aspect").get_parameter_value().bool_value
+        )
+        letterbox = bool(
+            self.get_parameter("letterbox").get_parameter_value().bool_value
+        )
 
         # If both are zero or negative, treat as disabled
         if out_w <= 0 and out_h <= 0:
@@ -166,7 +249,9 @@ class YoloRosNode(Node):
 
     def _resize_for_output(self, img_bgr):
         in_h, in_w = img_bgr.shape[:2]
-        out_w, out_h, sx, sy, pad_x, pad_y, do_letterbox = self._compute_output_size(in_w, in_h)
+        out_w, out_h, sx, sy, pad_x, pad_y, do_letterbox = self._compute_output_size(
+            in_w, in_h
+        )
 
         if out_w == in_w and out_h == in_h and pad_x == 0 and pad_y == 0:
             return img_bgr
@@ -175,12 +260,14 @@ class YoloRosNode(Node):
             scale = sx  # sx == sy in letterbox path
             new_w = int(round(in_w * scale))
             new_h = int(round(in_h * scale))
-            resized = cv2.resize(img_bgr, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+            resized = cv2.resize(
+                img_bgr, (new_w, new_h), interpolation=cv2.INTER_LINEAR
+            )
 
             canvas = np.zeros((out_h, out_w, 3), dtype=img_bgr.dtype)
             y0 = pad_y
             x0 = pad_x
-            canvas[y0:y0 + new_h, x0:x0 + new_w] = resized
+            canvas[y0 : y0 + new_h, x0 : x0 + new_w] = resized
             return canvas
 
         return cv2.resize(img_bgr, (out_w, out_h), interpolation=cv2.INTER_LINEAR)
@@ -280,7 +367,9 @@ class YoloRosNode(Node):
         header.stamp = self.get_clock().now().to_msg()
         header.frame_id = self.frame_id
 
-        self._process_and_publish(self.static_cv_img, header, publish_basic_caminfo=True)
+        self._process_and_publish(
+            self.static_cv_img, header, publish_basic_caminfo=True
+        )
 
     def image_callback(self, img_msg: Image):
         # LIVE mode

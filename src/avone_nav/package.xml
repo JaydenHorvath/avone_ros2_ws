@@ -5,7 +5,7 @@
   <version>0.0.0</version>
   <description>AV.ONE's Nav2 Autonomous Mapping and Control Package</description>
   <maintainer email="c3350128@uon.edu.au">Jayden Horvath</maintainer>
-  <license>TODO: License declaration</license>
+  <license>Proprietary</license>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

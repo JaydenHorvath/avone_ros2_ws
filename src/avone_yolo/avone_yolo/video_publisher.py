@@ -1,5 +1,31 @@
 #!/usr/bin/env python3
 
+# Video Publisher (ROS 2)
+# File: video_publisher.py
+
+# Purpose:
+#   - Publish a video file as a ROS 2 sensor_msgs/Image stream.
+#   - Also publishes a matching sensor_msgs/CameraInfo message so downstream vision nodes
+#     (image_proc, calibration, projection, overlays, etc.) can run with sensible intrinsics.
+
+# Publishes:
+#   - Image topic:      /camera/image_raw
+#   - CameraInfo topic: /camera/camera_info
+#   - frame_id:         "camera_frame"
+
+# Notes:
+#   - The video loops when it reaches the end.
+#   - FPS is taken from the video metadata; if invalid, defaults to 30 FPS.
+#   - Intrinsics are estimated from an approximate horizontal FOV (hfov_deg=82.0) and the video resolution.
+#     This is good enough for many testing tasks, but not a substitute for real calibration.
+
+# How to run:
+#   ros2 run avone_yolo video_publisher /full/path/to/video.mp4
+
+#   # Example: publish faster for stress testing with dedicated topic
+#   ros2 run avone_yolo video_publisher /home/avone/test.mp4 --topic /camera/image_raw --speed 2.0
+
+
 import rclpy
 from rclpy.node import Node
 
@@ -15,7 +41,7 @@ import math
 
 class VideoPublisher(Node):
     def __init__(self, video_path: str, topic_name: str, speed: float):
-        super().__init__('video_publisher')
+        super().__init__("video_publisher")
 
         self.bridge = CvBridge()
         self.topic = topic_name
@@ -77,25 +103,26 @@ class VideoPublisher(Node):
         info.height = self.height
 
         # Intrinsic matrix K
-        info.k = [
-            self.fx, 0.0, self.cx,
-            0.0, self.fy, self.cy,
-            0.0, 0.0, 1.0
-        ]
+        info.k = [self.fx, 0.0, self.cx, 0.0, self.fy, self.cy, 0.0, 0.0, 1.0]
 
         # No distortion model (acceptable for this use)
         info.d = []
-        info.r = [
-            1.0, 0.0, 0.0,
-            0.0, 1.0, 0.0,
-            0.0, 0.0, 1.0
-        ]
+        info.r = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
 
         # Projection matrix P
         info.p = [
-            self.fx, 0.0, self.cx, 0.0,
-            0.0, self.fy, self.cy, 0.0,
-            0.0, 0.0, 1.0, 0.0
+            self.fx,
+            0.0,
+            self.cx,
+            0.0,
+            0.0,
+            self.fy,
+            self.cy,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
         ]
 
         return info
@@ -128,23 +155,19 @@ def main(args=None):
     )
     parser.add_argument("video_path", help="Path to the video file")
     parser.add_argument(
-        "--topic",
-        default="/camera/image_raw",
-        help="ROS 2 topic to publish images"
+        "--topic", default="/camera/image_raw", help="ROS 2 topic to publish images"
     )
     parser.add_argument(
         "--speed",
         type=float,
         default=1.0,
-        help="Playback speed factor: 1.0 real-time, <1 slower, >1 faster"
+        help="Playback speed factor: 1.0 real-time, <1 slower, >1 faster",
     )
 
     args = parser.parse_args()
 
     node = VideoPublisher(
-        video_path=args.video_path,
-        topic_name=args.topic,
-        speed=args.speed
+        video_path=args.video_path, topic_name=args.topic, speed=args.speed
     )
 
     try:
