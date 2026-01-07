@@ -3,9 +3,9 @@
 <package format="3">
   <name>avone_utils</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="c3350128@uon.edu.au">jay</maintainer>
-  <license>TODO: License declaration</license>
+  <description>AV.ONES Misc Utilities Package</description>
+  <maintainer email="c3350128@uon.edu.au">Jayden Horvath</maintainer>
+  <license>Proprietary</license>
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
