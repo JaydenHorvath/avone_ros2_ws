@@ -3,9 +3,9 @@
 <package format="3">
   <name>avone_can</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="c3350128@uon.edu.au">jay</maintainer>
-  <license>TODO: License declaration</license>
+  <description>AV.ONE CAN interface package containing a CAN-to-ROS bridge node and simulation publishers for wheel speed and steering angle CAN signals.</description>
+  <maintainer email="c3350128@uon.edu.au">Jayden Horvath</maintainer>
+  <license>Proprietary</license>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

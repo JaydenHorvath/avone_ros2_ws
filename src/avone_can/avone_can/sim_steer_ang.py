@@ -1,3 +1,35 @@
+# sim_steer_angle (sine steering command → CAN)
+# ---------------------------------------------
+# ROS 2 node that generates a synthetic steering angle command (sine wave) and transmits it as a single-signal CAN frame.
+
+# What it does:
+#   - Computes: angle_deg = offset_deg + amplitude_deg * sin(2*pi*frequency_hz*t)
+#   - Clamps the angle into a safety window (min_deg..max_deg) before encoding
+#   - Encodes the command into a 1-byte payload using the DBC linear rule:
+#       angle_deg = scale * raw + offset
+#       raw = round((angle_deg - offset) / scale)
+#   - Sends the CAN message at a fixed publish_rate_hz over SocketCAN
+
+# Intended use:
+#   - Bench testing steering CAN plumbing (interface, gateway, controller) without needing Nav2 / joystick inputs.
+#   - Validating DBC encoding and actuator response with predictable input.
+
+# How to run:
+#   - Bring up SocketCAN: `ip link set can0 up type can bitrate 250000` (example)
+#   - ros2 run avone_can sim_steer_angle --ros-args -p can_interface:=can0
+
+# Key parameters:
+#   - amplitude_deg, offset_deg, frequency_hz, publish_rate_hz
+#   - min_deg, max_deg (software safety clamp before encoding)
+#   - can_id, extended_id (11-bit vs 29-bit), dbc_scale, dbc_offset, dbc_min_raw, dbc_max_raw
+
+# Notes / gotchas:
+#   - This node transmits continuously. If your actuator controller expects an enable state, watchdog, or arming gate,
+#     you should ensure those safety conditions are satisfied before running on real hardware.
+#   - The default can_id is set to 0x009 in this file, even though the comment block mentions BO_ 4.
+#     Make sure can_id matches your actual DBC frame ID for steering target.
+
+
 #!/usr/bin/env python3
 import math
 import rclpy
@@ -6,55 +38,61 @@ from rclpy.duration import Duration
 
 import can  # python-can
 
-class SineSteerCanNode(Node):
-    """
-    Publishes a sine-wave steering command as a CAN frame:
-      BO_ 4 ROS_STEER_ANG_TARGET: 1 ROS
-       SG_ ROS_STEER_ANG_TARGET : 0|8@1+ (0.7,-90) [-90|90] "deg"
 
-    Encoding: raw = round((angle_deg + 90) / 0.7)
-    CAN ID: 0x004 (standard), DLC: 1
-    """
+class SineSteerCanNode(Node):
+
+    # Publishes a sine-wave steering command as a CAN frame.
+
+    # DBC assumption for the steering target signal:
+    #   angle_deg = (dbc_scale * raw) + dbc_offset
+
+    # Typical example from a DBC line like:
+    #   SG_ ROS_STEER_ANG_TARGET : 0|8@1+ (0.7,-90) [-90|90] "deg"
+
+    # That implies:
+    #   raw = round((angle_deg - (-90)) / 0.7) = round((angle_deg + 90) / 0.7)
 
     def __init__(self):
-        super().__init__('sine_steer_can_node')
+        super().__init__("sine_steer_can_node")
 
         # Sine params (degrees, Hz)
-        self.declare_parameter('amplitude_deg', 30.0)
-        self.declare_parameter('offset_deg', 0.0)
-        self.declare_parameter('frequency_hz', 0.1)
-        self.declare_parameter('publish_rate_hz', 50.0)
+        self.declare_parameter("amplitude_deg", 30.0)
+        self.declare_parameter("offset_deg", 0.0)
+        self.declare_parameter("frequency_hz", 0.1)
+        self.declare_parameter("publish_rate_hz", 50.0)
 
         # Safety clamp for angle before encoding
-        self.declare_parameter('min_deg', -35.0)
-        self.declare_parameter('max_deg',  35.0)
+        self.declare_parameter("min_deg", -35.0)
+        self.declare_parameter("max_deg", 35.0)
 
         # CAN params
-        self.declare_parameter('can_interface', 'can0')
-        self.declare_parameter('can_id', 0x009)          # standard 11-bit
-        self.declare_parameter('extended_id', False)     # must be False for BO_ 4
-        self.declare_parameter('dbc_scale', 0.7)         # (0.7, -90)
-        self.declare_parameter('dbc_offset', -90.0)
-        self.declare_parameter('dbc_min_raw', 0)
-        self.declare_parameter('dbc_max_raw', 255)
+        self.declare_parameter("can_interface", "can0")
+        self.declare_parameter("can_id", 0x009)  # standard 11-bit
+        self.declare_parameter("extended_id", False)  # must be False for BO_ 4
+        self.declare_parameter("dbc_scale", 0.7)  # (0.7, -90)
+        self.declare_parameter("dbc_offset", -90.0)
+        self.declare_parameter("dbc_min_raw", 0)
+        self.declare_parameter("dbc_max_raw", 255)
 
         # Read params
-        self.A = float(self.get_parameter('amplitude_deg').value)
-        self.y0 = float(self.get_parameter('offset_deg').value)
-        self.f  = float(self.get_parameter('frequency_hz').value)
-        self.rate = float(self.get_parameter('publish_rate_hz').value)
+        self.A = float(self.get_parameter("amplitude_deg").value)
+        self.y0 = float(self.get_parameter("offset_deg").value)
+        self.f = float(self.get_parameter("frequency_hz").value)
+        self.rate = float(self.get_parameter("publish_rate_hz").value)
 
-        self.min_deg = float(self.get_parameter('min_deg').value)
-        self.max_deg = float(self.get_parameter('max_deg').value)
+        self.min_deg = float(self.get_parameter("min_deg").value)
+        self.max_deg = float(self.get_parameter("max_deg").value)
 
-        self.can_iface = self.get_parameter('can_interface').get_parameter_value().string_value
-        self.can_id = int(self.get_parameter('can_id').value)
-        self.extended_id = bool(self.get_parameter('extended_id').value)
+        self.can_iface = (
+            self.get_parameter("can_interface").get_parameter_value().string_value
+        )
+        self.can_id = int(self.get_parameter("can_id").value)
+        self.extended_id = bool(self.get_parameter("extended_id").value)
 
-        self.scale = float(self.get_parameter('dbc_scale').value)
-        self.offset = float(self.get_parameter('dbc_offset').value)
-        self.min_raw = int(self.get_parameter('dbc_min_raw').value)
-        self.max_raw = int(self.get_parameter('dbc_max_raw').value)
+        self.scale = float(self.get_parameter("dbc_scale").value)
+        self.offset = float(self.get_parameter("dbc_offset").value)
+        self.min_raw = int(self.get_parameter("dbc_min_raw").value)
+        self.max_raw = int(self.get_parameter("dbc_max_raw").value)
 
         # Time base
         self.t0 = self.get_clock().now()
@@ -62,7 +100,7 @@ class SineSteerCanNode(Node):
 
         # Init CAN bus (SocketCAN)
         try:
-            self.bus = can.interface.Bus(channel=self.can_iface, bustype='socketcan')
+            self.bus = can.interface.Bus(channel=self.can_iface, bustype="socketcan")
         except Exception as e:
             self.get_logger().fatal(f"Failed to open {self.can_iface}: {e}")
             raise
@@ -108,6 +146,7 @@ class SineSteerCanNode(Node):
         except can.CanError as e:
             self.get_logger().error(f"CAN send failed: {e}")
 
+
 def main(args=None):
     rclpy.init(args=args)
     node = SineSteerCanNode()
@@ -120,8 +159,20 @@ def main(args=None):
         node.destroy_node()
         rclpy.shutdown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
+
+
+# ------------------------------------------------------------------------------
+# Optional alternative test node (kept here commented-out):
+# StepSteerCanNode
+#
+# Purpose:
+#   - Sends discrete steering steps through a sequence (useful for verifying deadband,
+#     static friction, and direction response without a continuous sine).
+#
+
 
 # #!/usr/bin/env python3
 # import rclpy
