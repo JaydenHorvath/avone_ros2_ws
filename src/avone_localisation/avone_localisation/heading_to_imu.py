@@ -1,4 +1,38 @@
 #!/usr/bin/env python3
+
+# heading_to_imu (GPS heading to imu for yaw + velocity direction visualiser)
+# -------------------------------------------------------------------------------------------
+# ROS 2 node that converts an external heading quaternion (/heading) provided by the dual antenna gps into a minimal sensor_msgs/Imu message
+# published on /imu_gps, intended for use with robot_localization (EKF) as a yaw measurement source.
+
+# It also publishes an RViz Marker (/vel_marker) showing the direction of motion based on /vel (TwistStamped),
+# so you can visually compare:
+#   - heading direction (used to build /imu_gps orientation)
+#   - velocity direction (marker arrow orientation)
+
+# Typical use on AV.ONE:
+#   - When you have a GNSS heading solution (dual antenna, INS, etc.) but not a full IMU stream, EKF can still
+#     fuse yaw if you provide an Imu message with only orientation and proper covariance.
+#   - The marker helps debug frame conventions (ENU vs NED, yaw sign flips, heading offsets).
+
+# Topic IO:
+#   Subscribes:
+#     - /heading (geometry_msgs/QuaternionStamped)
+#     - /vel     (geometry_msgs/TwistStamped)  # for marker only
+#   Publishes:
+#     - /imu_gps    (sensor_msgs/Imu)          # orientation only (yaw), no gyro/accel
+#     - /vel_marker (visualization_msgs/Marker)
+
+# Parameters:
+#   - invert_heading       : subtract pi (180 deg) from yaw before offset
+#   - heading_offset_deg   : constant yaw offset (deg) applied after optional invert
+#   - heading_std_deg      : 1-sigma yaw standard deviation (deg), converted to variance for covariance matrix
+
+# Important covariance behavior:
+#   - roll/pitch covariance is set huge (999) so filters effectively ignore them
+#   - yaw covariance is set from heading_std_deg
+#   - angular_velocity_covariance[0] = -1 and linear_acceleration_covariance[0] = -1 signals "not provided"
+
 import math
 import rclpy
 from rclpy.node import Node
@@ -24,33 +58,39 @@ def yaw_to_quaternion(yaw):
 
 class HeadingVelVisualizer(Node):
     def __init__(self):
-        super().__init__('heading_vel_visualizer')
+        super().__init__("heading_vel_visualizer")
 
         # ---------------- Parameters ----------------
-        self.declare_parameter('invert_heading', False)
-        self.declare_parameter('heading_offset_deg', -90.0)
-        self.declare_parameter('heading_std_deg', 2.0)
+        self.declare_parameter("invert_heading", False)
+        self.declare_parameter("heading_offset_deg", -90.0)
+        self.declare_parameter("heading_std_deg", 2.0)
 
-        self.invert_heading = self.get_parameter('invert_heading').value
-        self.heading_offset_deg = self.get_parameter('heading_offset_deg').value
-        self.heading_std_deg = self.get_parameter('heading_std_deg').value
+        self.invert_heading = self.get_parameter("invert_heading").value
+        self.heading_offset_deg = self.get_parameter("heading_offset_deg").value
+        self.heading_std_deg = self.get_parameter("heading_std_deg").value
 
         heading_std_rad = math.radians(self.heading_std_deg)
         self.heading_var = heading_std_rad * heading_std_rad
 
         # use_sim_time if passed externally
-        if self.has_parameter('use_sim_time'):
-            use_sim_time = self.get_parameter('use_sim_time').value
+        if self.has_parameter("use_sim_time"):
+            use_sim_time = self.get_parameter("use_sim_time").value
             if use_sim_time:
-                self.set_parameters([rclpy.parameter.Parameter(
-                    'use_sim_time', rclpy.Parameter.Type.BOOL, True
-                )])
+                self.set_parameters(
+                    [
+                        rclpy.parameter.Parameter(
+                            "use_sim_time", rclpy.Parameter.Type.BOOL, True
+                        )
+                    ]
+                )
 
         # ---------------- Subscribers ----------------
         self.sub_heading = self.create_subscription(
-            QuaternionStamped, "/heading", self.heading_cb, 10)
+            QuaternionStamped, "/heading", self.heading_cb, 10
+        )
         self.sub_vel = self.create_subscription(
-            TwistStamped, "/vel", self.vel_twist_cb, 10)
+            TwistStamped, "/vel", self.vel_twist_cb, 10
+        )
 
         # ---------------- Publishers ----------------
         self.imu_pub = self.create_publisher(Imu, "/imu_gps", 10)
@@ -90,8 +130,8 @@ class HeadingVelVisualizer(Node):
 
         # ---------------- Covariances (IMPORTANT) ----------------
         # Orientation covariance
-        imu_msg.orientation_covariance[0] = 999.0   # roll (ignored)
-        imu_msg.orientation_covariance[4] = 999.0   # pitch (ignored)
+        imu_msg.orientation_covariance[0] = 999.0  # roll (ignored)
+        imu_msg.orientation_covariance[4] = 999.0  # pitch (ignored)
         imu_msg.orientation_covariance[8] = self.heading_var  # yaw variance
 
         # Angular velocity is NOT provided

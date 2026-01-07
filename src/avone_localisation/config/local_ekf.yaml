@@ -1,21 +1,60 @@
 
+# local_ekf.config (robot_localization local odom EKF, no GPS)
+# ------------------------------------------------------------------------------
+# This is the "local" EKF for AV.ONE: it estimates odom->base_link using only short-term motion sensors.
+# In this version you fuse:
+#   - Wheel/controller odometry from the Ackermann steering controller (vx, vy)
+#   - IMU yaw rate from /imu/data (gyro z)
+#
+# Design intent:
+#   - Provide a smooth, low-latency local odometry estimate for controllers and Nav2.
+#   - Avoid any global corrections (GPS) so the estimate stays stable and responsive even with GPS noise/dropouts.
+#   - Run in two_d_mode so the state is constrained to a flat track plane.
+#
+# Typical use on AV.ONE:
+#   - Feed this EKF output into Nav2 as the "odom" source.
+#   - this local EKF publishes odom->base_link. The Global ekf publishes 
+#   - Supplies odometry to global ekf, which publishes map->odom tf.
+#
+# Common gotchas:
+#   - /ackermann_steering_controller/odometry twist must be in base_link coordinates for vx/vy to make sense.
+#   - /imu/data should be correctly oriented (FLU, REP-103) or you must correct it before fusing.
+
+#
+
 ekf_filter_node_odom:
   ros__parameters:
-    use_sim_time: true
+
+    use_sim_time: false
+
+    # EKF update rate (Hz)
     frequency:  50.0
+
+    # Constrain motion to 2D (track plane)
     two_d_mode: true
-    # Wheel odom input
+
+    # ------------------------------------------------------------------------
+    # Input 0: Wheel/controller odometry
+    # ------------------------------------------------------------------------
+    
     odom0: /ackermann_steering_controller/odometry
+
+    # Fuse vx, vy
     odom0_config: [
       false, false, false,    # X, Y, Z positions
       false, false, false,    #  roll, pitch, yaw orientations
       true,  true,  false,    #  X, Y, Z linear velocities
-      false, false, true,     #  roll, pitch, yaw angular velocities
+      false, false, false,     #  roll, pitch, yaw angular velocities
       false, false, false     #  X, Y, Z linear accelerations
     ]
 
-    # IMU input for orientation
+    # ------------------------------------------------------------------------
+    # Input 1: IMU yaw rate (gyro z)
+    # ------------------------------------------------------------------------
+    
     imu0: /imu/data
+
+    # Fuse vyaw
     imu0_config: [
       false, false, false,    # X, Y, Z positions
       false, false, false,     #  roll, pitch, yaw orientations
@@ -27,18 +66,21 @@ ekf_filter_node_odom:
 
 
 
+    # ------------------------------------------------------------------------
+    # Frames and publishing
+    # ------------------------------------------------------------------------
 
-  # frames
-    odom_frame:     odom
+    odom_frame: odom
     base_link_frame: base_link
-    world_frame:    odom
+    world_frame: odom
 
-    # make sure to publish the TF
-    publish_tf:     true
+    # Publish TF transform odom -> base_link from this EKF
+    publish_tf: true
     publish_odometry_frame: true
-    transform_tolerance: 0.2  # tolerate up to 0.5s of “old” transforms
+
+    # Allow slight TF delay tolerance (seconds)
+    transform_tolerance: 0.2
+
+    # Helps with /clock jumps in sim or bag playback
     reset_on_time_jump: true
     smooth_lagged_data: true
-
-
-

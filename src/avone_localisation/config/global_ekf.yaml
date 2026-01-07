@@ -1,18 +1,54 @@
+# global_ekf.config (robot_localization "map" EKF, GPS corrected)
+# -------------------------------------------------------------------------------
+# This is the "global" EKF for AV.ONE: it produces a pose estimate in the `map` frame and publishes TF.
+# The intent is to combine:
+#   - A smooth local motion estimate (from your local EKF or controller odom) for short-term dynamics
+#   - GPS-derived local position (/odometry/gps1) to correct long-term drift in x/y
+#   - GPS heading (/imu_gps) to anchor absolute yaw in the global frame
+#
+# Frame strategy (typical dual-EKF setup):
+#   - Local EKF:    world_frame=odom, publishes TF odom -> base_link  (fast, drift-y, continuous)
+#   - Global EKF:   world_frame=map,  publishes TF map  -> odom       (slow, GPS-corrected)
+#
+# WARNING:
+#   - robot_localization publishes only ONE transform based on world_frame:
+#       if world_frame is "map" and odom_frame is "odom", the output TF is map -> odom.
+#     That is normally what you want for the global EKF, but make sure your local EKF is the one
+#     publishing odom -> base_link, otherwise you will have gaps or TF conflicts.
+#
+# Common gotchas:
+#   - /odometry/local1 should be the output of your local EKF (or equivalent) and must be in the `odom` frame.
+#   - /odometry/gps1 must be local Cartesian meters in the same world convention you expect (typically ENU).
+#   - /imu_gps covariance must be realistic or yaw will jump/oscillate.
+#   - sensor_timeout=0.1 is aggressive; if GPS or heading drops below 10 Hz you may see timeouts.
+#
+
 
 
 
 ekf_filter_node_map:
   ros__parameters:
-    use_sim_time: true
+
+
+    use_sim_time: false
+
+     # Global EKF can run slower than local EKF
     frequency: 30.0
+
+    # Max time to wait for sensor updates before considering them stale
     sensor_timeout: 0.1
+
+    # Constrain to planar motion
     two_d_mode: true
+
     transform_time_offset: 0.0
     transform_timeout: 0.2
+
+    # Helpful while tuning
     print_diagnostics: true
     debug: false
 
-   
+    # With world_frame=map and odom_frame=odom, the EKF publishes TF: map -> odom
     odom_frame: odom
     base_link_frame: base_link
     world_frame: map
@@ -20,7 +56,16 @@ ekf_filter_node_map:
     publish_tf:     true
     publish_odometry_frame: true
 
+
+
+    # ------------------------------------------------------------------------
+    # Input 0: Local odometry source (typically the LOCAL EKF output)
+    # ------------------------------------------------------------------------
+    # Expected to be smooth and continuous, used for velocities and yaw rate.
     odom0: /odometry/local1
+
+    # Fuse vx, vy, and vyaw from local odom.
+    # This gives the global EKF good short-term dynamics even when GPS updates are sparse/noisy.
     odom0_config: [
       false, false, false,    # X, Y, Z positions
       false, false, false,    #  roll, pitch, yaw orientations
@@ -32,7 +77,14 @@ ekf_filter_node_map:
     odom0_differential: false
     odom0_relative: false
 
+    # ------------------------------------------------------------------------
+    # Input 1: GPS position in local Cartesian (x,y)
+    # ------------------------------------------------------------------------
+
     odom1: /odometry/gps1
+
+
+    # Fuse x and y only (global correction against drift).
     odom1_config: [true,  true,  false,    # x y z (pose)
                    false, false, false,    # roll pitch yaw (pose)
                    false, false, false,    # vx vy vz (twist)
@@ -43,8 +95,13 @@ ekf_filter_node_map:
     odom1_relative: false
 
 
-        # IMU input for orientation
+    # ------------------------------------------------------------------------
+    # Input 2: GPS heading as an IMU orientation (yaw only)
+    # ------------------------------------------------------------------------
+    
     imu1: /imu_gps
+
+    # Fuse yaw orientation only.
     imu1_config: [
       false, false, false,    # X, Y, Z positions
       false, false, true,     #  roll, pitch, yaw orientations

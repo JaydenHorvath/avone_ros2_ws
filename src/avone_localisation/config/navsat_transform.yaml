@@ -1,18 +1,63 @@
+# navsat_transform.config (robot_localization navsat_transform_node)
+# -------------------------------------------------------------------------------
+# This config drives `navsat_transform_node`, which converts GNSS latitude/longitude (NavSatFix) into a local
+# Cartesian odometry message (typically in an odom/map frame) that robot_localization can fuse.
+#
+# What navsat_transform_node does (high level):
+#   - Takes in:
+#       * GPS fix (/gps/fix by default, or remapped)
+#       * IMU orientation (or an odometry yaw) to know which way "forward" is
+#       * A filtered odometry source (from an EKF) to provide an origin/frame context
+#   - Produces:
+#       * /odometry/gps (local x,y,z in meters)
+#       * optionally /gps/filtered (if publish_filtered_gps=true)
+#
+# Design intent for AV.ONE:
+#   - Run at 30 Hz for responsive updates.
+#   - Use publish_filtered_gps to output a smoothed NavSatFix for logging/visualisation if needed.
+#   - Keep broadcast_utm_transform disabled if you are managing your own frames (common in a dual-EKF setup).
+#
+# Common gotchas:
+#   - `delay: 3.0` means the node will "look back" 3 seconds to align GPS with IMU/odom.
+#     This can help if GPS arrives late, but it will add lag. If your pipeline is low-latency, reduce it.
+#   - magnetic_declination_radians and yaw_offset matter a lot if you are using magnetometer-based yaw.
+#   - use_odometry_yaw=false means yaw is expected from IMU input to navsat_transform_node, not from odom.
+#   - wait_for_datum=false means it will establish its own datum automatically (often fine for testing).
+#
+
+
+
 navsat_transform_node:
   ros__parameters:
-
+    # Processing frequency (Hz)
     frequency: 30.0
 
+    # Time alignment delay (seconds). Useful if GPS timestamps lag behind IMU/odom.
     delay: 3.0
 
+    # If your heading source is magnetic (compass), set local declination here (radians).
+    # For non-magnetic heading sources (dual GNSS heading, fused yaw, etc.), keep at 0.
     magnetic_declination_radians: 0.0
+
+    # Constant yaw correction (radians) applied to IMU yaw before use.
     yaw_offset: 0.0
 
+    # If true, altitude is forced to 0. If false, altitude passes through.
+    # For 2D driving, you often still keep this false and rely on two_d_mode in EKF.
     zero_altitude: false
 
+    # UTM TF publishing:
+    # If true, publishes transforms involving UTM frames. Often disabled in custom TF setups.
     broadcast_utm_transform: false
     broadcast_utm_transform_as_parent_frame: false
+
+    # Publish a filtered NavSatFix output derived from the fused state.
     publish_filtered_gps: true
 
-    use_odometry_yaw: false        # IMPORTANT
-    wait_for_datum: false          # okay for now
+    # If true, navsat_transform_node will take yaw from the input odometry instead of the IMU.
+    # IMPORTANT: you have this false, so ensure an IMU orientation source is correctly remapped in launch.
+    use_odometry_yaw: false
+
+    # If true, waits for a manual datum to be set (service call) before outputting.
+    # False means it will use the first good data to establish datum.
+    wait_for_datum: false
