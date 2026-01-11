@@ -303,6 +303,7 @@ local_costmap:
 
         pointcloud:
           topic: /quanergy/points                   # Input PointCloud2 topic, NEED TO CHANGE FOR SIM 
+          # topic: /lidar/points                      # SIM LIDAR
           data_type: PointCloud2                    # Data type of observation source
           marking: true                             # Mark obstacles from this source
           clearing: true                            # Clear obstacles using this source
@@ -357,7 +358,8 @@ global_costmap:
         raytrace_max_range: 50.0
         observation_sources: pointcloud
         pointcloud:
-          topic: /quanergy/points            # PointCloud2 used to populate global obstacles NEED TO CHANGE FOR SIM 
+          topic: /quanergy/points                   # Input PointCloud2 topic, NEED TO CHANGE FOR SIM 
+          # topic: /lidar/points                      # SIM LIDAR
           data_type: PointCloud2
           marking: true
           clearing: true

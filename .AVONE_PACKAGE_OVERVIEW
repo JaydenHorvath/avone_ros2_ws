@@ -1,0 +1,527 @@
+=====================
+AVONE PACKAGE OVERVIEW
+=====================
+
+Package:
+  avone
+
+Purpose:
+  - Main AV.ONE robot package
+  - Holds the robot description (URDF/Xacro), Gazebo worlds and models, RViz configs, and core launch files
+  - Provides simulation bringup and basic robot sanity tests
+  - Contains core C++ nodes for vehicle hardware integration (CAN and system hardware)
+
+Where it lives:
+  ~/ros2_ws/src/avone
+
+
+Directory Breakdown:
+
+• config/
+  - Controller config and RViz config
+
+  Files:
+    ackermann_drive_controller.yaml
+      - ros2_control controller config for Ackermann steering and joint_state_broadcaster
+
+    view_avone.rviz
+      - RViz view preset for AV.ONE (TF, RobotModel, fixed frame, etc.)
+
+
+• description/
+  - Robot model definition built from modular Xacro files
+  - This is the single source of truth for the TF tree, link geometry, and ros2_control setup
+
+  Key files:
+    robot.urdf.xacro
+      - Top-level robot entry point (xacro processed into robot_description)
+
+    robot_core.xacro
+      - Main links and joints definition, includes chassis and core frames
+
+    inertial_macros.xacro
+      - Helper macros for inertia and mass definitions
+
+    sensors.xacro
+      - Sensor frames and mounts
+
+    camera.xacro
+      - Camera frame definition
+
+    rgbdcamera.xacro
+      - RGBD camera frame definition (D435 style)
+
+    lidar.xacro
+      - LiDAR frame definition
+
+    ros2_control.xacro
+      - GazeboSimSystem ros2_control config for simulation
+
+    ros2_control_hardware.xacro
+      - Real hardware ros2_control config (CAN based), used on the physical car
+
+  assets/
+    - Meshes and visuals for the robot (STL/DAE/etc.)
+
+
+• launch/
+  - All ROS 2 launch entry points for sim, bringup, and subsystem testing
+
+  Key launch files (from your tree and the code you sent):
+
+    avone_sim.launch.py
+      - Full simulation bringup
+      - Gazebo world + spawn robot + ros2_control + bridges + EKF/navsat + teleop + optional RViz
+
+      Command:
+        ros2 launch avone avone_sim.launch.py
+
+    avone_test_sim.launch.py
+      - Minimal "spawn test" in an empty world
+      - Gazebo + spawn + robot_state_publisher only
+
+      Command:
+        ros2 launch avone avone_test_sim.launch.py
+
+    avone_rsp.launch.py
+      - Desktop URDF and TF sanity test
+      - robot_state_publisher + joint_state_publisher_gui + RViz config
+
+      Command:
+        ros2 launch avone avone_rsp.launch.py use_sim_time:=false
+
+    avone_nuc_boot.launch.py
+      - NUC boot bringup style launch
+      - Starts CAN DBC bridge, LED matrix state display, heartbeat, and timeout monitoring
+
+      Command:
+        ros2 launch avone avone_nuc_boot.launch.py
+
+    avone_control_bringup.launch.py
+      - Control stack bringup (controller_manager and controllers)
+      - Used when driving simulated or real hardware (depends on your setup)
+
+      Command:
+        ros2 launch avone avone_control_bringup.launch.py
+
+    avone_nav2_bringup.launch.py
+      - Nav2 bringup for autonomy navigation
+
+      Command:
+        ros2 launch avone avone_nav2_bringup.launch.py
+
+    avone_localisation_bringup.launch.py
+      - Localisation bringup wrapper (EKF, navsat_transform, TF helpers)
+
+      Command:
+        ros2 launch avone avone_localisation_bringup.launch.py
+
+    avone_gps_bringup.launch.py
+      - GPS driver and related transforms (depending on your setup)
+
+      Command:
+        ros2 launch avone avone_gps_bringup.launch.py
+
+    avone_imu_bringup.launch.py
+      - IMU bringup and transforms
+
+      Command:
+        ros2 launch avone avone_imu_bringup.launch.py
+
+    avone_lidar_bringup.launch.py
+      - LiDAR bringup and transforms
+
+      Command:
+        ros2 launch avone avone_lidar_bringup.launch.py
+
+    teleop_joy.launch.py
+      - Joystick teleop pipeline (joy + teleop_twist_joy + filters)
+
+      Command:
+        ros2 launch avone teleop_joy.launch.py
+
+
+• worlds/
+  - Simulation worlds and Gazebo models
+
+
+• src/
+  - C++ nodes for vehicle integration and hardware interfaces
+
+  Files:
+    avone_can_interface.cpp
+      - CAN interface layer (SocketCAN style)
+      - Typically used to send and receive vehicle messages
+
+    avone_system_hardware.cpp
+      - ros2_control hardware interface for the real vehicle
+      - Bridges controller outputs to CAN commands and reads back feedback (steering, wheel speeds, etc.)
+
+
+========================
+AVONE_CAN PACKAGE OVERVIEW
+========================
+
+Package:
+  avone_can
+
+Purpose:
+  - CAN to ROS 2 interface tools for AV.ONE
+  - DBC based CAN decode into ROS topics, plus simple simulated signal publishers
+
+
+Files:
+
+• can_2_ros.py
+  - DBC CAN -> ROS 2 bridge
+  - Reads CAN frames from SocketCAN (eg can0)
+  - Decodes using a DBC (cantools)
+  - Publishes one ROS topic per decoded signal
+
+  Commands:
+
+    CAN interface up (example 250k):
+      sudo ip link set can0 down
+      sudo ip link set can0 type can bitrate 250000
+      sudo ip link set can0 up
+
+    Run node (example):
+      ros2 run avone_can can_2_ros \
+        --ros-args \
+        -p can_interface:=can0 \
+        -p dbc_file:=/home/avone/NUTEAMSGIT/NUCAN/DBC\ Files/AV1.dbc
+
+
+• sim_wheel_vel.py
+  - Simulated wheel speed publisher
+  - Used when testing without real CAN feedback
+
+  Command:
+    ros2 run avone_can sim_wheel_vel
+
+
+• sim_steer_ang.py
+  - Simulated steering angle publisher
+  - Used when testing without real CAN feedback
+
+  Command:
+    ros2 run avone_can sim_steer_ang
+
+
+=========================
+AVONE_DASH PACKAGE OVERVIEW
+=========================
+
+Package:
+  avone_dash
+
+Purpose:
+  - Lightweight dashboard UI for AV.ONE
+  - Displays key ROS 2 topics, especially those derived from CAN (state, faults, sensors, heartbeats)
+  - Used on the NUC or laptop for quick visibility during testing and scrutineering style checks
+
+
+Files:
+
+• dashboard.py
+  - Main dashboard application
+  - Subscribes to selected ROS 2 topics and renders a live UI view
+
+  Command:
+    ros2 run avone_dash dashboard
+
+===============================
+AVONE_LOCALISATION PACKAGE OVERVIEW
+===============================
+
+Package:
+  avone_localisation
+
+Purpose:
+  - Localisation stack for AV.ONE (state estimation and frame alignment)
+  - Runs robot_localization EKF pipelines (local odom filter, optional global/map aligned filter)
+  - Supports GPS fusion via navsat_transform_node when GPS is available
+  - Includes small helper nodes for IMU and GPS topic/frame plumbing (so Nav2 + control get stable /odom and /map inputs)
+  - Provides a single-EKF option (avone_ekf) for simpler bringup and testing
+
+Files:
+
+
+• fix_to_odom.py
+  - Converts a GPS Fix style input into an Odometry output
+  - Useful for debugging and for providing odom-like streams into localisation pipelines
+
+  Command:
+    ros2 run avone_localisation fix_to_odom
+
+• heading_to_imu.py
+  - Converts a heading source into an IMU compatible message (yaw/orientation)
+  - Used when heading comes from a non-IMU topic (eg dual GPS heading, computed yaw)
+
+  Command:
+    ros2 run avone_localisation heading_to_imu
+
+• imu_start.py
+  - Startup helper for IMU bringup and clean initialisation behaviour
+  - Used to ensure a consistent startup state before EKF/navsat start consuming data
+
+  Command:
+    ros2 run avone_localisation imu_start
+
+
+Config 
+
+• avone_ekf.yaml
+  - Single EKF configuration for simpler testing and bringup
+  - Defines fusion inputs, frames, covariances, and output topics
+
+• local_ekf.yaml
+  - Local odometry EKF config (odom frame)
+  - Typically fuses wheel odom + IMU for smooth short term motion
+
+• global_ekf.yaml
+  - Global/map EKF config (map frame)
+  - Typically fuses local odom + GPS (via navsat_transform) for drift bounded global pose
+
+• navsat_transform.yaml
+  - navsat_transform_node config
+  - Converts GPS Fix + IMU + filtered odom into a fused GPS odometry stream for the global EKF
+
+
+Launch 
+
+• avone_ekf.launch.py
+  - Launches the single EKF pipeline using avone_ekf.yaml
+  - Intended for simpler testing before moving to a dual-EKF (local + global) setup
+
+  Command:
+    ros2 launch avone_localisation avone_ekf.launch.py
+
+• local_ekf.launch.py
+  - Launches the local EKF pipeline
+
+  Command:
+    ros2 launch avone_localisation local_ekf.launch.py
+
+• global_ekf.launch.py
+  - Launches the global EKF pipeline (map aligned)
+
+  Command:
+    ros2 launch avone_localisation global_ekf.launch.py
+
+• navsat_transform.launch.py
+  - Launches navsat_transform_node for GPS fusion
+
+  Command:
+    ros2 launch avone_localisation navsat_transform.launch.py
+
+
+============================
+AVONE_MAPPING PACKAGE OVERVIEW
+============================
+
+Package:
+  avone_mapping
+
+Purpose:
+  - Mapping and track understanding tools for AV.ONE
+  - Processes perception outputs into usable track features (cones, boundaries, centreline)
+  - Provides clustering and planning helpers used for cone based navigation
+  - Includes LiDAR preprocessing utilities for cleaner cone extraction
+
+Files:
+
+• coloured_cone_clustering.py
+  - Groups cone detections into stable cone objects,
+  - Reduces noise by merging nearby detections and maintaining consistent IDs/positions over time
+  - Outputs clustered cone positions for planning and visualisation
+
+  Command:
+    ros2 run avone_mapping coloured_cone_clustering
+
+• delaunay_planner.py
+  - Builds a centreline/drive path from left and right cone boundaries using Delaunay triangulation
+  - Produces a smoothed midline or waypoint set suitable for a downstream controller / Nav2 style follower
+  - Useful for skidpad and trackdrive style cone courses where boundaries are defined by coloured cones
+
+  Command:
+    ros2 run avone_mapping delaunay_planner
+
+• lidar_groundremoval.py
+  - LiDAR preprocessing node that removes ground points to isolate obstacles/cones
+  - Improves downstream clustering reliability by reducing flat ground returns and noise
+  - Typically runs before cone clustering if you are extracting cones directly from point clouds
+
+  Command:
+    ros2 run avone_mapping lidar_groundremoval
+
+=========================
+AVONE_NAV PACKAGE OVERVIEW
+=========================
+
+Package:
+  avone_nav
+
+Purpose:
+  - Main Nav2 bringup package for AV.ONE
+  - Owns the Nav2 configuration, behaviour tree selection, and launch entrypoint
+  - Adds AV.ONE specific glue nodes around Nav2 for track testing workflows:
+    - CAN based goal start and cancel control
+    - LiDAR collision detection that can trigger a CAN safety message when an object is detected ahead
+
+
+Files:
+
+
+• nav2_cancel.py
+  - AV.ONE Nav2 goal control helper
+  - Allows starting and cancelling Nav2 goals from CANBUS derived commands
+  - Used to integrate external safety/state systems (RES, AMI, Teensy, etc.) with Nav2 action control
+
+  Command:
+    ros2 run avone_nav nav2_cancel
+
+• collision_detection.py
+  - Simple LiDAR based collision detection
+  - Monitors points/obstacles in front of the vehicle and triggers a CAN message if an object is detected
+  - Intended as a conservative safety layer during testing (independent of planner behaviour)
+
+  Command:
+    ros2 run avone_nav collision_detection
+
+
+Behaviour Trees (behaviour_trees/)
+
+• avone_bt.xml
+  - AV.ONE custom Nav2 behaviour tree
+  - Defines the navigation flow, replanning, and recovery logic used for AV.ONE testing
+
+• navigate_through_poses_w_replanning_and_recovery.xml
+  - Standard Nav2 behaviour tree 
+  - Used for multi waypoint style navigation workflows
+
+
+Config 
+
+• nav2_config.yaml
+  - Nav2 parameters for AV.ONE
+  - Includes controller, planner, costmaps, lifecycle manager, and behaviour tree configuration
+
+
+Launch 
+• nav2.launch.py
+  - Main launch file for AV.ONE Nav2 bringup
+  - Starts Nav2 using avone_nav/config/nav2_config.yaml and selects the desired behaviour tree
+
+  Command:
+    ros2 launch avone_nav nav2.launch.py
+
+
+===========================
+AVONE_UTILS PACKAGE OVERVIEW
+===========================
+
+Package:
+  avone_utils
+
+Purpose:
+  - Misc utility nodes used across the AV.ONE stack
+  - Small safety and glue layers that sit between major subsystems
+  - Includes:
+    - cmd_vel filtering between Nav2 and the Ackermann controller
+    - drive state LED output to the ESP32 matrix
+    - ROS command heartbeat outputs for LVD safety monitoring
+    - simple watchdog style timeout handling for sensors/inputs
+
+
+Files:
+
+• cmd_vel_filter.py
+  - Safety and sanity layer between Nav2 cmd_vel and the Ackermann steering controller input
+  - Holds or suppresses steering commands until a valid forward linear velocity is present
+  - Prevents "steer while stationary" behaviour and reduces unwanted wheel scrubbing or oscillation
+
+  Command:
+    ros2 run avone_utils cmd_vel_filter
+
+• drive_state_led.py
+  - Publishes the current drive/state indicator to the ESP32 LED matrix
+  - Used to show the vehicle state as a colour or pattern for quick visibility during testing/scrutineering
+
+  Command:
+    ros2 run avone_utils drive_state_led
+
+• ros_cmd_heartbeat.py
+  - Sends ROS derived safety heartbeats intended for the LVD
+  - Used as a "system alive / autonomy alive" style signal alongside other safety layers
+
+  Command:
+    ros2 run avone_utils ros_cmd_heartbeat
+
+• sensor_timeout.py
+  - Simple watchdog that monitors critical topics for dropouts or stale data
+  - Can raise a fault, publish a status, or trigger a safety output when inputs stop updating
+
+  Command:
+    ros2 run avone_utils sensor_timeout
+
+
+==========================
+AVONE_YOLO PACKAGE OVERVIEW
+==========================
+
+Package:
+  avone_yolo
+
+Purpose:
+  - Cone detection package for AV.ONE using a YOLO model
+  - Provides multiple node variants from minimal inference to full visual + marker outputs
+  - Used for camera based cone detection and (in dev) rough position estimation for mapping/visualisation
+
+
+
+Weights:
+
+• best.pt
+  - Trained YOLO weights file used for cone detection inference
+
+
+Files:
+
+
+• yolo_base.py
+  - Bare bones YOLO inference node
+  - Minimal detection pipeline intended as a known-good baseline
+
+  Command:
+    ros2 run avone_yolo yolo_base
+
+• yolo_node.py
+  - More developed YOLO node for normal use
+  - Publishes detections with correctly coloured bounding boxes for cone classes
+  - Intended as the standard "daily driver" camera detection node
+
+  Command:
+    ros2 run avone_yolo yolo_node
+
+• yolo_dev.py
+  - Development and test program for cone detection
+  - Includes position estimation (rough range/bearing or 3D estimate depending on input) and RViz markers
+  - Used to validate model performance, tuning, and downstream interfaces
+
+  Command:
+    ros2 run avone_yolo yolo_dev
+
+• image_publisher.py
+  - Utility publisher for feeding images into the YOLO pipeline from a source (file/stream depending on implementation)
+  - Used for testing without a live camera
+
+  Command:
+    ros2 run avone_yolo image_publisher
+
+• video_publisher.py
+  - Utility publisher for feeding video frames into the YOLO pipeline
+  - Used for offline testing and recorded run playback
+
+  Command:
+    ros2 run avone_yolo video_publisher

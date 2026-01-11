@@ -13,10 +13,10 @@
   <!-- Control interface -->
 
   <!-- FOR SIMULATION -->
-  <xacro:include filename="ros2_control.xacro"/>
+  <!-- <xacro:include filename="ros2_control.xacro"/> -->
 
   <!-- FOR REAL HARDWARE -->
-  <!-- <xacro:include filename="ros2_control_hardware.xacro"/> -->
+  <xacro:include filename="ros2_control_hardware.xacro"/>
 
 
 

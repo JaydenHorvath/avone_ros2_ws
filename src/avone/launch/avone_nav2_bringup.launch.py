@@ -28,7 +28,7 @@ def generate_launch_description():
             # Nav2 CAN message start/cancel
             Node(
                 package="avone_nav",
-                executable="nav2_cancel.py",
+                executable="nav2_cancel",
                 name="nav2_cancel",
                 output="screen",
             ),

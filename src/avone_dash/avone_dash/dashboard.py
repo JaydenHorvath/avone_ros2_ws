@@ -30,13 +30,17 @@
 #   - Many subscriptions are created (one per signal). On slower machines this may be heavy.
 
 
+#!/usr/bin/env python3
 import sys
 import os
 import threading
 import collections
+from functools import partial
+
 import cantools
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
 
 # ROS2 message types
 from std_msgs.msg import (
@@ -74,12 +78,8 @@ import pyqtgraph as pg
 
 
 # =====================================================
-# Manual classification map (tabs)
+# MANUAL CLASSIFICATION MAP
 # =====================================================
-# Tab classification is based on *message name* keyword matching.
-# If a message name contains one of the keywords, it is placed into that tab.
-# Messages that match nothing end up in "Misc".
-
 CLASS_MAP = {
     "Drive": ["THROTTLE", "BRK", "RPM", "GEAR", "ROS", "CMD"],
     "Faults": ["FAULT", "ERROR", "TIMEOUT", "ERR"],
@@ -88,26 +88,16 @@ CLASS_MAP = {
     "System": ["HEARTBEAT", "MODE", "ARMED", "STATE", "HEARTBEAT", "HB"],
     "SLAB": ["MSGID", "DCDC", "CHARGER"],
 }
-# Any message not matching a keyword above goes into “Misc”
+# Any message not matching a keyword above goes into "Misc"
 
 
 # ---------- Thread-safe signal bridge ----------
 class SignalBridge(QObject):
     update_signal = pyqtSignal(str, object, dict)
 
-    #     Qt signal carrier to move data from ROS thread → GUI thread safely.
-
-    # Why this exists:
-    #   - ROS callbacks are executed on the ROS thread.
-    #   - Qt widgets must only be updated from the main GUI thread.
-    #   - pyqtSignal queues the update into the GUI event loop.
-
 
 # ---------- ROS2 Node ----------
 class AVONEDashboard(Node):
-
-    # ROS 2 node that subscribes to all DBC-derived signal topics and pushes updates to the GUI via SignalBridge.
-
     def __init__(self, bridge, dbc_path):
         super().__init__("avone_dashboard")
         self.bridge = bridge
@@ -122,8 +112,25 @@ class AVONEDashboard(Node):
         self.signal_values = {}
         self.callback_count = {}
 
+        # Keep subscriptions alive and avoid duplicates
+        self._subs = []
+        self._subscribed = set()  # (topic, full_type_string)
+
+        # QoS tuned for bag playback / best effort publishers
+        self._qos = QoSProfile(
+            depth=10,
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            durability=QoSDurabilityPolicy.VOLATILE,
+        )
+
         self._parse_dbc()
-        self._create_subscriptions()
+
+        # Initial attempt
+        self._rescan_and_subscribe()
+
+        # Keep checking for topics that appear later (eg when ros2 bag play starts)
+        self.create_timer(1.0, self._rescan_and_subscribe)
+
         self.create_timer(5.0, self._report_stats)
 
     def _parse_dbc(self):
@@ -139,20 +146,24 @@ class AVONEDashboard(Node):
                     "value": None,
                 }
 
-    def _create_subscriptions(self):
+    def _resolve_msg_class(self, full_type: str):
+        full_type_map = {
+            "std_msgs/msg/Bool": Bool,
+            "std_msgs/msg/Int8": Int8,
+            "std_msgs/msg/UInt8": UInt8,
+            "std_msgs/msg/Int16": Int16,
+            "std_msgs/msg/UInt16": UInt16,
+            "std_msgs/msg/Int32": Int32,
+            "std_msgs/msg/UInt32": UInt32,
+            "std_msgs/msg/Float32": Float32,
+            "std_msgs/msg/Float64": Float64,
+        }
+        if full_type in full_type_map:
+            return full_type_map[full_type]
 
-        # #
-        # Creates one subscription per DBC signal.
-
-        # Topic convention (must match your CAN→ROS bridge):
-        #   /av1/<message_name_lower>/<signal_name_lower>
-
-        # Message type selection:
-        #   - We inspect the existing ROS graph at startup (get_topic_names_and_types()).
-        #   - If the topic exists, we pick its exact std_msgs type to avoid type mismatches.
-        #   - If the topic is not present at startup, we fall back to Float32 (may not match later).
-
-        type_map = {
+        # Fallback
+        base = full_type.split("/")[-1].lower()
+        base_type_map = {
             "bool": Bool,
             "int8": Int8,
             "uint8": UInt8,
@@ -163,26 +174,45 @@ class AVONEDashboard(Node):
             "float32": Float32,
             "float64": Float64,
         }
+        return base_type_map.get(base, Float32)
+
+    def _topic_for_signal(self, info: dict) -> str:
+        msg, sig = info["message"], info["name"]
+        return f"/av1/{msg.lower()}/{sig.lower()}"
+
+    def _rescan_and_subscribe(self):
         topics = dict(self.get_topic_names_and_types())
 
         for key, info in self.signal_values.items():
-            msg, sig = info["message"], info["name"]
-            topic = f"/av1/{msg.lower()}/{sig.lower()}"
-            self.callback_count[key] = 0
+            topic = self._topic_for_signal(info)
+            self.callback_count.setdefault(key, 0)
 
-            msg_type = Float32  # default
-            if topic in topics:
-                full = topics[topic][0]
-                base = full.split("/")[-1].lower()
-                msg_type = type_map.get(base, Float32)
+            if topic not in topics:
+                continue
 
-            try:
-                self.create_subscription(
-                    msg_type, topic, lambda m, k=key: self._callback(m, k), 10
+            type_list = topics[topic]
+            if len(type_list) > 1:
+                self.get_logger().warning(
+                    f"Topic has multiple types: {topic} -> {type_list}"
                 )
-                self.get_logger().info(f"Subscribed: {topic} ({msg_type.__name__})")
-            except Exception as e:
-                self.get_logger().warn(f"Failed {topic}: {e}")
+
+            for full_type in type_list:
+                sub_key = (topic, full_type)
+                if sub_key in self._subscribed:
+                    continue
+
+                msg_cls = self._resolve_msg_class(full_type)
+                try:
+                    sub = self.create_subscription(
+                        msg_cls, topic, partial(self._callback, key=key), self._qos
+                    )
+                    self._subs.append(sub)
+                    self._subscribed.add(sub_key)
+                    self.get_logger().info(f"Subscribed: {topic} ({full_type})")
+                except Exception as e:
+                    self.get_logger().warning(
+                        f"Failed subscribe {topic} ({full_type}): {e}"
+                    )
 
     def _callback(self, msg, key):
         if key not in self.signal_values:
@@ -200,11 +230,6 @@ class AVONEDashboard(Node):
 
 # ---------- GUI ----------
 class DashboardGUI(QMainWindow):
-
-    #     Tabbed dashboard GUI:
-    #   - Each tab contains groups (QGroupBox) per CAN message.
-    #   - Each row is a DBC signal: name | (bar) | value | unit | (plot).
-
     def __init__(self, enable_plots=True):
         super().__init__()
         self.setWindowTitle("AV.ONE Dashboard (Tabbed)")
@@ -250,18 +275,11 @@ class DashboardGUI(QMainWindow):
 
     # ---------- UI Build ----------
     def build_ui(self, signal_values):
-
-        # Builds the full UI once at startup using the DBC signal catalog.
-
-        # Layout logic:
-        #   1) Classify signals into tabs based on message name keywords (CLASS_MAP).
-        #   2) Within each tab, group rows by message name (QGroupBox per message).
-        #   3) Within each message group, render each signal as a row.
-
+        # Classify messages
         classified = {k: [] for k in CLASS_MAP.keys()}
         classified["Misc"] = []
 
-        for key, info in signal_values.items():
+        for _, info in signal_values.items():
             msg = info["message"]
             found = False
             for class_name, keywords in CLASS_MAP.items():
@@ -344,15 +362,6 @@ class DashboardGUI(QMainWindow):
 
     # ---------- Signal Update ----------
     def _update_signal(self, key, val, info):
-
-        # Slot called on the GUI thread when a ROS signal update arrives.
-
-        # Handles:
-        #   - Enum decoding (choices dict) when present
-        #   - Numeric formatting for floats
-        #   - Progress bar update where applicable
-        #   - Buffering samples for plotting
-
         if key not in self.signal_widgets:
             return
         w = self.signal_widgets[key]
@@ -362,7 +371,10 @@ class DashboardGUI(QMainWindow):
 
         choices = w["choices"]
         if choices:
-            lbl.setText(str(choices.get(int(val), int(val))))
+            try:
+                lbl.setText(str(choices.get(int(val), int(val))))
+            except Exception:
+                lbl.setText(str(val))
         else:
             lbl.setText(f"{val:.2f}" if isinstance(val, float) else str(val))
 

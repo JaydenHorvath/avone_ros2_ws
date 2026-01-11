@@ -1,0 +1,71 @@
+=====================
+USEFUL AV.ONE COMMANDS
+=====================
+
+CAN SETUP
+  - Bring up physical SocketCAN interface (can0)
+  - Create a virtual CAN interface for testing (vcan0)
+
+  CAN0 (physical bus, 250k):
+    sudo ip link set can0 down
+    sudo ip link set can0 type can bitrate 250000
+    sudo ip link set can0 up
+
+  VCAN0 (virtual bus):
+    sudo modprobe vcan
+    sudo ip link add dev vcan0 type vcan
+    sudo ip link set up vcan0
+
+
+GPS
+  - NMEA serial driver for GPS over USB serial
+
+  Command:
+    ros2 run nmea_navsat_driver nmea_serial_driver \
+      --ros-args \
+      -p port:=/dev/ttyUSB1 \
+      -p baud:=115200 \
+      -p frame_id:=base_link
+
+
+LIDAR
+  - Launch Quanergy client and publish a static TF for the sensor frame
+
+  Quanergy driver:
+    ros2 launch quanergy_client_ros client.launch.py host:=192.168.1.57
+
+  Static TF (laser_frame -> quanergy):
+    ros2 run tf2_ros static_transform_publisher \
+      0 0 0 0 0 0 laser_frame quanergy
+
+
+STATIC TF
+  - Map to Odom (useful when you want a fixed frame without full localisation)
+
+  Command:
+    ros2 run tf2_ros static_transform_publisher \
+      0 0 0 0 0 0 map odom
+
+
+INTEL REALSENSE D435
+  - Single D435 launch (RGB + Depth + Pointcloud + aligned depth)
+
+  Command:
+    ros2 launch realsense2_camera rs_launch.py \
+      enable_color:=true \
+      enable_depth:=true \
+      rgb_camera.profile:=1920x1080x30 \
+      depth_module.profile:=1920x1080x30 \
+      pointcloud.enable:=true \
+      align_depth.enable:=true
+
+
+KEYBOARD TELEOP
+  - Send Twist commands to the Ackermann controller reference topic
+
+  Command:
+    ros2 run teleop_twist_keyboard teleop_twist_keyboard \
+      --ros-args \
+      --remap cmd_vel:=/ackermann_steering_controller/reference \
+      -p repeat_rate:=10.0 \
+      -p stamped:=true
