@@ -57,18 +57,22 @@ Recommended ROS installs:
 
 ---
 
+Note: 
+- For Gazebo simulation to work, the path's to AV.ONE's meshes must be    hard coded to meshes path. This can be changed in avone/description/robot_core.xacro
+
+- Similar with CAN Programs utilising the AV1.dbc, this dbc path should be changed to your local NUCAN git repository
+
+
+
 ## Build
 
 ```bash
-# create workspace
-mkdir -p ~/avone_ws/src
-cd ~/avone_ws/src
 
 # clone this repo into src
-git clone <YOUR_REPO_SSH_OR_HTTPS_URL> avone
+git clone <YOUR_REPO_SSH_OR_HTTPS_URL>
 
 # install dependencies (run from workspace root)
-cd ~/avone_ws
+cd ~/avone_ros2_ws
 rosdep update
 rosdep install --from-paths src --ignore-src -r -y
 
@@ -77,3 +81,6 @@ colcon build --symlink-install
 
 # source
 source install/setup.bash
+
+
+

@@ -82,3 +82,5 @@ Commands:
   # Source workspace overlay (if it exists)
   source ~/ros2_ws/install/setup.bash
 
+  #If error is found trying to run programs, use a 
+  #LLM (chatgpt), they know all 
